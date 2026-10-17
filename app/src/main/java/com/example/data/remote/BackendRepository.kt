@@ -158,9 +158,12 @@ class BackendRepository(
         val cleanPhone = phoneNumber.trim()
         val expectedOtp = pendingOtps[cleanPhone]
 
-        // Allow configured OTP or test master code '12345'
-        if (expectedOtp != null && expectedOtp != otpCode && otpCode != "12345") {
-            return@withContext Result.Error("کد تایید وارد شده اشتباه است.")
+        if (expectedOtp == null || expectedOtp != otpCode) {
+            return@withContext Result.Error("کد تایید وارد شده نامعتبر است یا منقضی شده است.")
+        }
+
+        if (!supabaseClient.isConfigured) {
+            return@withContext Result.Error("اتصال به سرور Supabase تنظیم نشده است. ورود مسابقه‌ای نیازمند سرور آنلاین است.")
         }
 
         val existingUser = userDao.getCurrentUser()
