@@ -35,27 +35,8 @@ class SupabaseApiClient(
     val isConfigured: Boolean
         get() = prefs.supabaseUrl.isNotBlank() && prefs.supabaseAnonKey.isNotBlank()
 
-    /**
-     * Call Supabase stored procedure: rpc_register_or_login
-     */
-    suspend fun registerOrLogin(
-        firstName: String,
-        lastName: String,
-        phoneNumber: String
-    ): Result<JSONObject> = withContext(Dispatchers.IO) {
-        if (!isConfigured) {
-            return@withContext Result.Error("تنظیمات اتصال به Supabase ست نشده است.")
-        }
-
-        val url = "${prefs.supabaseUrl.trimEnd('/')}/rest/v1/rpc/rpc_register_or_login"
-        val payload = JSONObject().apply {
-            put("p_first_name", firstName)
-            put("p_last_name", lastName)
-            put("p_phone", phoneNumber)
-        }
-
-        executePostRpc(url, payload)
-    }
+    // Supabase Auth handles user registration and login securely via Auth API (signInWithOtp / verifyOtp)
+    // No insecure custom rpc_register_or_login is used.
 
     /**
      * Call Supabase stored procedure: rpc_award_ad_point

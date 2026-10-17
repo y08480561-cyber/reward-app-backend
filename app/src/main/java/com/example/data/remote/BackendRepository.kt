@@ -72,62 +72,36 @@ class BackendRepository(
             return@withContext Result.Error("شماره موبایل وارد شده باید ۱۱ رقمی و با 09 شروع شود.")
         }
 
-        // If Supabase is configured, register or login remotely
-        if (supabaseClient.isConfigured) {
-            when (val remoteResult = supabaseClient.registerOrLogin(firstName, lastName, cleanPhone)) {
-                is Result.Success -> {
-                    val userJson = remoteResult.data.optJSONObject("user")
-                    if (userJson != null) {
-                        val remoteUser = User(
-                            id = userJson.optString("id"),
-                            firstName = userJson.optString("first_name", firstName),
-                            lastName = userJson.optString("last_name", lastName),
-                            phoneNumber = userJson.optString("phone_number", cleanPhone),
-                            totalScore = userJson.optInt("total_score", 0),
-                            token = "TOKEN_" + System.currentTimeMillis()
-                        )
-                        userDao.saveUser(
-                            UserEntity(
-                                id = remoteUser.id,
-                                firstName = remoteUser.firstName,
-                                lastName = remoteUser.lastName,
-                                phoneNumber = remoteUser.phoneNumber,
-                                totalScore = remoteUser.totalScore,
-                                token = remoteUser.token,
-                                registeredAt = remoteUser.registeredAt
-                            )
-                        )
-                        prefs.saveUserSession(remoteUser.id, remoteUser.firstName, remoteUser.lastName, remoteUser.phoneNumber, remoteUser.token, remoteUser.totalScore)
-                        ensureActiveCycle(remoteUser.id)
-                        return@withContext Result.Success(remoteUser)
-                    }
-                }
-                is Result.Error -> {
-                    // Log error and proceed to local fallback
-                    android.util.Log.w("BackendRepository", "Supabase register error: ${remoteResult.message}")
-                }
-            }
+        if (!supabaseClient.isConfigured) {
+            return@withContext Result.Error("تنظیمات اتصال به سرور Supabase تنظیم نشده است. ورود مسابقه‌ای نیازمند اتصال فعال به سرور ابری است.")
         }
 
-        // Local Fallback
         val existingUser = userDao.getCurrentUser()
-        val userId = if (existingUser != null && existingUser.phoneNumber == cleanPhone) {
-            existingUser.id
-        } else {
-            "USR_" + UUID.randomUUID().toString().take(8).uppercase()
+        if (existingUser != null && existingUser.phoneNumber == cleanPhone) {
+            ensureActiveCycle(existingUser.id)
+            val domainUser = User(
+                id = existingUser.id,
+                firstName = existingUser.firstName,
+                lastName = existingUser.lastName,
+                phoneNumber = existingUser.phoneNumber,
+                totalScore = existingUser.totalScore,
+                token = existingUser.token,
+                registeredAt = existingUser.registeredAt
+            )
+            return@withContext Result.Success(domainUser)
         }
 
+        val userId = "USR_" + UUID.randomUUID().toString().take(8).uppercase()
         val token = "SEC_TOKEN_" + sha256("$userId:$cleanPhone:${System.currentTimeMillis()}")
-        val totalScore = existingUser?.totalScore ?: prefs.totalScore
 
         val user = User(
             id = userId,
             firstName = firstName.trim(),
             lastName = lastName.trim(),
             phoneNumber = cleanPhone,
-            totalScore = totalScore,
+            totalScore = 0,
             token = token,
-            registeredAt = existingUser?.registeredAt ?: System.currentTimeMillis()
+            registeredAt = System.currentTimeMillis()
         )
 
         userDao.saveUser(
