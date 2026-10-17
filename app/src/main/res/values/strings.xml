@@ -1,0 +1,51 @@
+<resources>
+    <string name="app_name">رقابت و جایزه</string>
+    <string name="app_full_title">رقابت کن، جایزه ببر</string>
+    <string name="slogan">مشاهده تبلیغات جایزه‌دار، کسب امتیاز و برنده شدن جوایز بزرگ</string>
+    
+    <!-- Navigation -->
+    <string name="nav_home">خانه</string>
+    <string name="nav_squares">۵۰ مربع</string>
+    <string name="nav_leaderboard">رتبه‌بندی</string>
+    <string name="nav_prizes">جوایز</string>
+    <string name="nav_profile">پروفایل</string>
+    <string name="nav_admin">پنل مدیریت</string>
+
+    <!-- Auth -->
+    <string name="register_title">ثبت‌نام و شروع رقابت</string>
+    <string name="login_title">ورود به حساب کاربری</string>
+    <string name="first_name">نام</string>
+    <string name="last_name">نام خانوادگی</string>
+    <string name="phone_number">شماره تلفن همراه</string>
+    <string name="phone_hint">مثال: 09123456789</string>
+    <string name="otp_code">کد تایید پیامکی</string>
+    <string name="otp_hint">کد ۵ رقمی</string>
+    <string name="send_otp">ارسال کد تایید</string>
+    <string name="verify_and_continue">تایید و ادامه</string>
+    <string name="resend_otp">ارسال مجدد کد</string>
+    <string name="logout">خروج از حساب</string>
+    <string name="logout_confirm">آیا مطمئن هستید که می‌خواهید از حساب کاربری خارج شوید؟</string>
+
+    <!-- Errors and Validations -->
+    <string name="err_empty_name">لطفاً نام خود را وارد کنید.</string>
+    <string name="err_empty_family">لطفاً نام خانوادگی خود را وارد کنید.</string>
+    <string name="err_invalid_phone">شماره تلفن وارد شده معتبر نیست (باید ۱۱ رقم با 09 باشد).</string>
+    <string name="err_invalid_otp">کد تایید وارد شده نامعتبر است.</string>
+    <string name="err_network">خطا در برقراری ارتباط با سرور. لطفاً اینترنت خود را بررسی کنید.</string>
+    <string name="err_ad_failed">بارگذاری تبلیغ با خطا مواجه شد. لطفاً دوباره تلاش کنید.</string>
+    <string name="err_ad_cancelled">تبلیغ تا انتها مشاهده نشد. امتیازی ثبت نگردید.</string>
+    <string name="err_duplicate_square">شما قبلاً در این دوره امتیاز این مربع را دریافت کرده‌اید.</string>
+    <string name="err_cycle_reset">دوره ۲۴ ساعته بازنشانی شد. اطلاعات به‌روزرسانی شد.</string>
+
+    <!-- Squares & Ads -->
+    <string name="squares_title">مربع‌های امتیاز روزانه</string>
+    <string name="square_status_ready">آماده مشاهده تبلیغ</string>
+    <string name="square_status_loading">در حال بارگذاری…</string>
+    <string name="square_status_playing">در حال پخش تبلیغ…</string>
+    <string name="square_status_completed">تکمیل شده (۱ امتیاز)</string>
+    <string name="square_status_failed">ناموفق (تلاش مجدد)</string>
+    <string name="reward_awarded">۱ امتیاز با موفقیت ثبت شد!</string>
+    <string name="all_squares_completed">تبریک! تمام ۵۰ مربع این دوره تکمیل شد.</string>
+    <string name="cycle_countdown_prefix">زمان تا باز شدن مجدد مربع‌ها:</string>
+    <string name="daily_limit_info">حداکثر ۵۰ امتیاز در هر دوره ۲۴ ساعته</string>
+</resources>

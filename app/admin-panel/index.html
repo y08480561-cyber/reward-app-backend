@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>پنل مدیریت مسابقه و جوایز | ۵۰ مربع</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Supabase JS Client CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Vazirmatn Persian Font CDN -->
+    <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
+    <style>
+        body { font-family: 'Vazirmatn', sans-serif; }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen">
+
+    <!-- Login Modal / Screen -->
+    <div id="loginSection" class="min-h-screen flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-8 max-w-md w-full shadow-2xl">
+            <div class="text-center mb-6">
+                <div class="w-16 h-16 bg-amber-500 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg">
+                    <svg class="w-8 h-8 text-slate-950" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                </div>
+                <h1 class="text-2xl font-bold text-white">ورود به پنل مدیریت</h1>
+                <p class="text-sm text-slate-400 mt-1">اتصال مستقیم و امن به Supabase</p>
+            </div>
+
+            <form id="connectForm" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">آدرس پروژه Supabase (Project URL)</label>
+                    <input type="text" id="supabaseUrlInput" placeholder="https://xyz.supabase.co" required
+                        class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-amber-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">کلید عمومی یا کلید مدیر (Anon Key / Service Key)</label>
+                    <input type="password" id="supabaseKeyInput" placeholder="eyJhbGciOi..." required
+                        class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-amber-500">
+                </div>
+                <button type="submit"
+                    class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-3 rounded-xl transition duration-200 shadow-md">
+                    اتصال و ورود به داشبورد
+                </button>
+            </form>
+            <div id="loginError" class="hidden mt-4 p-3 bg-rose-950/50 border border-rose-800 rounded-xl text-rose-300 text-xs text-center"></div>
+        </div>
+    </div>
+
+    <!-- Main Dashboard Section -->
+    <div id="dashboardSection" class="hidden min-h-screen flex flex-col">
+        <!-- Top Navbar -->
+        <header class="bg-slate-800/80 backdrop-blur border-b border-slate-700 sticky top-0 z-40 px-6 py-4">
+            <div class="max-w-7xl mx-auto flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center shadow">
+                        <span class="text-slate-950 font-black text-lg">۵۰</span>
+                    </div>
+                    <div>
+                        <h2 class="font-bold text-white text-lg">پنل مدیریت مسابقه و جوایز</h2>
+                        <span class="text-xs text-emerald-400 flex items-center gap-1">● اتصال آنلاین به سرور Supabase</span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button id="refreshBtn" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-xl text-xs font-bold text-slate-200 transition">
+                        به‌روزرسانی اطلاعات
+                    </button>
+                    <button id="logoutBtn" class="bg-rose-900/50 hover:bg-rose-900 border border-rose-700 px-3 py-2 rounded-xl text-xs font-bold text-rose-200 transition">
+                        خروج
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content Container -->
+        <main class="max-w-7xl mx-auto p-6 flex-1 w-full space-y-6">
+
+            <!-- KPI Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="bg-slate-800 border border-slate-700 p-5 rounded-2xl shadow-sm">
+                    <p class="text-xs text-slate-400">تعداد کل کاربران ثبت‌نامی</p>
+                    <h3 id="statTotalUsers" class="text-3xl font-black text-white mt-1">۰</h3>
+                </div>
+                <div class="bg-slate-800 border border-slate-700 p-5 rounded-2xl shadow-sm">
+                    <p class="text-xs text-slate-400">مجموع امتیازهای اعطا شده</p>
+                    <h3 id="statTotalScore" class="text-3xl font-black text-amber-400 mt-1">۰</h3>
+                </div>
+                <div class="bg-slate-800 border border-slate-700 p-5 rounded-2xl shadow-sm">
+                    <p class="text-xs text-slate-400">تبلیغات مشاهده‌شده امروز</p>
+                    <h3 id="statTodayAds" class="text-3xl font-black text-emerald-400 mt-1">۰</h3>
+                </div>
+                <div class="bg-slate-800 border border-slate-700 p-5 rounded-2xl shadow-sm">
+                    <p class="text-xs text-slate-400">مسابقات فعال</p>
+                    <h3 id="statActiveCompetitions" class="text-3xl font-black text-sky-400 mt-1">۱</h3>
+                </div>
+            </div>
+
+            <!-- Tabs Navigation -->
+            <div class="flex border-b border-slate-700 gap-4 text-sm font-bold">
+                <button id="tabUsersBtn" class="pb-3 border-b-2 border-amber-500 text-amber-400">کاربران و امتیازها</button>
+                <button id="tabLogsBtn" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">گزارش‌های امنیتی و ضد تقلب</button>
+                <button id="tabPrizesBtn" class="pb-3 border-b-2 border-transparent text-slate-400 hover:text-white">جوایز و برندگان</button>
+            </div>
+
+            <!-- Tab 1: Users Table -->
+            <div id="tabUsersContent" class="space-y-4">
+                <div class="flex flex-col md:flex-row gap-3 justify-between items-center">
+                    <input type="text" id="userSearchInput" placeholder="جستجو بر اساس نام یا شماره همراه..."
+                        class="w-full md:w-80 px-4 py-2 rounded-xl bg-slate-800 border border-slate-700 text-sm text-white focus:outline-none focus:border-amber-500">
+                    <span id="userCountBadge" class="text-xs bg-slate-800 border border-slate-700 px-3 py-1.5 rounded-lg text-slate-300"></span>
+                </div>
+
+                <div class="bg-slate-800 border border-slate-700 rounded-2xl overflow-hidden shadow-sm">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-right text-sm">
+                            <thead class="bg-slate-900/60 text-slate-400 text-xs font-semibold">
+                                <tr>
+                                    <th class="p-3.5">شناسه</th>
+                                    <th class="p-3.5">نام و نام خانوادگی</th>
+                                    <th class="p-3.5">شماره تماس</th>
+                                    <th class="p-3.5">امتیاز</th>
+                                    <th class="p-3.5">وضعیت</th>
+                                    <th class="p-3.5">تاریخ ثبت‌نام</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersTableBody" class="divide-y divide-slate-700">
+                                <tr><td colspan="6" class="p-6 text-center text-slate-500">در حال بارگذاری اطلاعات کاربران...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 2: Security Logs -->
+            <div id="tabLogsContent" class="hidden space-y-4">
+                <div class="bg-slate-800 border border-slate-700 rounded-2xl overflow-hidden shadow-sm">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-right text-sm">
+                            <thead class="bg-slate-900/60 text-slate-400 text-xs font-semibold">
+                                <tr>
+                                    <th class="p-3.5">زمان</th>
+                                    <th class="p-3.5">شناسه کاربر</th>
+                                    <th class="p-3.5">مربع</th>
+                                    <th class="p-3.5">امتیاز</th>
+                                    <th class="p-3.5">توکن اعتبارسنجی (Nonce)</th>
+                                    <th class="p-3.5">وضعیت</th>
+                                </tr>
+                            </thead>
+                            <tbody id="logsTableBody" class="divide-y divide-slate-700">
+                                <tr><td colspan="6" class="p-6 text-center text-slate-500">در حال دریافت لاگ‌های امنیتی...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 3: Prizes & Winners -->
+            <div id="tabPrizesContent" class="hidden space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="prizesListContainer">
+                    <!-- Dynamic prizes card -->
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        let supabaseClient = null;
+
+        // Initialize from localStorage if saved
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedUrl = localStorage.getItem('supabase_url');
+            const savedKey = localStorage.getItem('supabase_key');
+            if (savedUrl && savedKey) {
+                document.getElementById('supabaseUrlInput').value = savedUrl;
+                document.getElementById('supabaseKeyInput').value = savedKey;
+                connectToSupabase(savedUrl, savedKey);
+            }
+        });
+
+        document.getElementById('connectForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const url = document.getElementById('supabaseUrlInput').value.trim();
+            const key = document.getElementById('supabaseKeyInput').value.trim();
+            connectToSupabase(url, key);
+        });
+
+        async function connectToSupabase(url, key) {
+            const errDiv = document.getElementById('loginError');
+            errDiv.classList.add('hidden');
+            try {
+                supabaseClient = supabase.createClient(url, key);
+                // Test connection
+                const { data, error } = await supabaseClient.from('users').select('id').limit(1);
+                if (error) throw error;
+
+                localStorage.setItem('supabase_url', url);
+                localStorage.setItem('supabase_key', key);
+
+                document.getElementById('loginSection').classList.add('hidden');
+                document.getElementById('dashboardSection').classList.remove('hidden');
+
+                loadDashboard();
+            } catch (err) {
+                errDiv.textContent = 'خطا در برقراری ارتباط با Supabase: ' + (err.message || err);
+                errDiv.classList.remove('hidden');
+            }
+        }
+
+        async function loadDashboard() {
+            if (!supabaseClient) return;
+
+            // Load Stats
+            try {
+                const { data: statsData, error: statsErr } = await supabaseClient.rpc('rpc_get_admin_dashboard_stats');
+                if (!statsErr && statsData) {
+                    document.getElementById('statTotalUsers').textContent = Number(statsData.total_users || 0).toLocaleString('fa-IR');
+                    document.getElementById('statTotalScore').textContent = Number(statsData.total_score || 0).toLocaleString('fa-IR');
+                    document.getElementById('statTodayAds').textContent = Number(statsData.today_ads_viewed || 0).toLocaleString('fa-IR');
+                    document.getElementById('statActiveCompetitions').textContent = Number(statsData.active_competitions || 1).toLocaleString('fa-IR');
+                }
+            } catch (e) {
+                console.error("Stats error", e);
+            }
+
+            loadUsers();
+            loadLogs();
+            loadPrizes();
+        }
+
+        async function loadUsers(filterText = '') {
+            const tbody = document.getElementById('usersTableBody');
+            let query = supabaseClient.from('users').select('*').order('total_score', { ascending: false });
+
+            if (filterText) {
+                query = query.or(`first_name.ilike.%${filterText}%,last_name.ilike.%${filterText}%,phone_number.ilike.%${filterText}%`);
+            }
+
+            const { data: users, error } = await query;
+            if (error) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-rose-400">خطا: ${error.message}</td></tr>`;
+                return;
+            }
+
+            document.getElementById('userCountBadge').textContent = `${(users?.length || 0).toLocaleString('fa-IR')} کاربر`;
+
+            if (!users || users.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-500">هیچ کاربری یافت نشد.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = users.map(u => `
+                <tr class="hover:bg-slate-700/30 transition">
+                    <td class="p-3.5 font-mono text-xs text-amber-400">${u.id}</td>
+                    <td class="p-3.5 font-bold text-white">${u.first_name} ${u.last_name}</td>
+                    <td class="p-3.5 font-mono text-slate-300">${u.phone_number}</td>
+                    <td class="p-3.5 font-bold text-amber-400">${Number(u.total_score).toLocaleString('fa-IR')}</td>
+                    <td class="p-3.5"><span class="px-2 py-0.5 rounded text-xs ${u.status === 'active' ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-rose-950 text-rose-400'}">${u.status === 'active' ? 'فعال' : u.status}</span></td>
+                    <td class="p-3.5 text-xs text-slate-400">${new Date(u.created_at).toLocaleDateString('fa-IR')}</td>
+                </tr>
+            `).join('');
+        }
+
+        async function loadLogs() {
+            const tbody = document.getElementById('logsTableBody');
+            const { data: logs, error } = await supabaseClient
+                .from('score_transactions')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(50);
+
+            if (error || !logs || logs.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-500">تراکنشی یافت نشد.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = logs.map(l => `
+                <tr class="hover:bg-slate-700/30 transition font-mono text-xs">
+                    <td class="p-3.5 text-slate-400">${new Date(l.created_at).toLocaleTimeString('fa-IR')}</td>
+                    <td class="p-3.5 text-amber-400">${l.user_id}</td>
+                    <td class="p-3.5 text-slate-300 font-sans font-bold">مربع ${l.square_number || '-'}</td>
+                    <td class="p-3.5 font-bold text-emerald-400">+${l.points}</td>
+                    <td class="p-3.5 text-slate-400 truncate max-w-xs" title="${l.nonce}">${l.nonce}</td>
+                    <td class="p-3.5 text-emerald-400 font-sans font-semibold">${l.status}</td>
+                </tr>
+            `).join('');
+        }
+
+        async function loadPrizes() {
+            const container = document.getElementById('prizesListContainer');
+            const { data: prizes, error } = await supabaseClient.from('prizes').select('*');
+            if (error || !prizes) {
+                container.innerHTML = `<div class="p-4 text-slate-500">جایزه‌ای یافت نشد.</div>`;
+                return;
+            }
+
+            container.innerHTML = prizes.map(p => `
+                <div class="bg-slate-800 border border-slate-700 p-5 rounded-2xl flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs bg-amber-500/20 text-amber-400 border border-amber-500/40 px-2.5 py-1 rounded-lg font-bold">${p.rank_required}</span>
+                            <span class="text-xs text-emerald-400 font-bold">${p.value_text}</span>
+                        </div>
+                        <h4 class="font-bold text-white text-base">${p.title}</h4>
+                        <p class="text-xs text-slate-400 mt-2 leading-relaxed">${p.description || ''}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Tabs switcher
+        document.getElementById('tabUsersBtn').addEventListener('click', () => switchTab('users'));
+        document.getElementById('tabLogsBtn').addEventListener('click', () => switchTab('logs'));
+        document.getElementById('tabPrizesBtn').addEventListener('click', () => switchTab('prizes'));
+
+        function switchTab(tab) {
+            const tabs = ['users', 'logs', 'prizes'];
+            tabs.forEach(t => {
+                const btn = document.getElementById(`tab${t.charAt(0).toUpperCase() + t.slice(1)}Btn`);
+                const content = document.getElementById(`tab${t.charAt(0).toUpperCase() + t.slice(1)}Content`);
+                if (t === tab) {
+                    btn.className = 'pb-3 border-b-2 border-amber-500 text-amber-400';
+                    content.classList.remove('hidden');
+                } else {
+                    btn.className = 'pb-3 border-b-2 border-transparent text-slate-400 hover:text-white';
+                    content.classList.add('hidden');
+                }
+            });
+        }
+
+        document.getElementById('userSearchInput').addEventListener('input', (e) => {
+            loadUsers(e.target.value.trim());
+        });
+
+        document.getElementById('refreshBtn').addEventListener('click', loadDashboard);
+
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            localStorage.removeItem('supabase_url');
+            localStorage.removeItem('supabase_key');
+            location.reload();
+        });
+    </script>
+</body>
+</html>

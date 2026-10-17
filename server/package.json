@@ -1,0 +1,14 @@
+{
+  "name": "reqabat-jayezah-backend",
+  "version": "1.0.0",
+  "description": "Real backend server and admin dashboard for 'رقابت کن، جایزه ببر' with Tapsell rewarded ad validation and 24h cycles",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "better-sqlite3": "^9.4.3"
+  }
+}

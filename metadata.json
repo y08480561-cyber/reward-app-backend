@@ -1,0 +1,6 @@
+{
+  "name": "رقابت کن، جایزه ببر",
+  "description": "اپلیکیشن حرفه‌ای مسابقه، تماشای تبلیغات جایزه‌دار تپسل، کسب امتیاز روزانه و برنده شدن جوایز نقدی و ارزشمند با چرخه ۲۴ ساعته",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
