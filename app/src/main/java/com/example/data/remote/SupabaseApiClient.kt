@@ -62,7 +62,6 @@ class SupabaseApiClient(
      * Validates Nonce (replay attack prevention) and 1 point/square/day limit in DB transaction.
      */
     suspend fun awardAdPoint(
-        userId: String,
         squareNumber: Int,
         nonce: String
     ): Result<JSONObject> = withContext(Dispatchers.IO) {
@@ -72,7 +71,6 @@ class SupabaseApiClient(
 
         val url = "${prefs.supabaseUrl.trimEnd('/')}/rest/v1/rpc/rpc_award_ad_point"
         val payload = JSONObject().apply {
-            put("p_user_id", userId)
             put("p_square_number", squareNumber)
             put("p_nonce", nonce)
         }
@@ -119,10 +117,11 @@ class SupabaseApiClient(
 
     private fun executePostRpc(url: String, payload: JSONObject): Result<JSONObject> {
         return try {
+            val authHeader = if (prefs.authToken.startsWith("ey")) "Bearer ${prefs.authToken}" else "Bearer ${prefs.supabaseAnonKey}"
             val request = Request.Builder()
                 .url(url)
                 .header("apikey", prefs.supabaseAnonKey)
-                .header("Authorization", "Bearer ${prefs.supabaseAnonKey}")
+                .header("Authorization", authHeader)
                 .header("Content-Type", "application/json")
                 .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE))
                 .build()

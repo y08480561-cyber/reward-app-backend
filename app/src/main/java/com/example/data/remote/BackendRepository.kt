@@ -308,7 +308,7 @@ class BackendRepository(
 
         // If Supabase is configured, call atomic stored procedure on server
         if (supabaseClient.isConfigured) {
-            when (val remoteResult = supabaseClient.awardAdPoint(userId, squareNumber, rewardNonce)) {
+            when (val remoteResult = supabaseClient.awardAdPoint(squareNumber, rewardNonce)) {
                 is Result.Success -> {
                     val newScore = remoteResult.data.optInt("new_total_score", prefs.totalScore + 1)
                     val now = System.currentTimeMillis()

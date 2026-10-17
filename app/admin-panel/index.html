@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>پنل مدیریت مسابقه و جوایز | ۵۰ مربع</title>
+    <title>پنل مدیریت امن مسابقه و جوایز | ۵۰ مربع</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Supabase JS Client CDN -->
@@ -16,34 +16,44 @@
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen">
 
-    <!-- Login Modal / Screen -->
+    <!-- Secure Admin Login Screen -->
     <div id="loginSection" class="min-h-screen flex items-center justify-center p-4">
         <div class="bg-slate-800 border border-slate-700 rounded-2xl p-8 max-w-md w-full shadow-2xl">
             <div class="text-center mb-6">
                 <div class="w-16 h-16 bg-amber-500 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg">
                     <svg class="w-8 h-8 text-slate-950" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                 </div>
-                <h1 class="text-2xl font-bold text-white">ورود به پنل مدیریت</h1>
-                <p class="text-sm text-slate-400 mt-1">اتصال مستقیم و امن به Supabase</p>
+                <h1 class="text-2xl font-bold text-white">ورود مدیر سیستم</h1>
+                <p class="text-sm text-slate-400 mt-1">احراز هویت امن با Supabase Auth</p>
             </div>
 
-            <form id="connectForm" class="space-y-4">
+            <form id="adminLoginForm" class="space-y-3.5">
                 <div>
                     <label class="block text-xs font-semibold text-slate-300 mb-1">آدرس پروژه Supabase (Project URL)</label>
-                    <input type="text" id="supabaseUrlInput" placeholder="https://xyz.supabase.co" required
-                        class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-amber-500">
+                    <input type="url" id="supabaseUrlInput" placeholder="https://xyz.supabase.co" required
+                        class="w-full px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-amber-500">
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-slate-300 mb-1">کلید عمومی یا کلید مدیر (Anon Key / Service Key)</label>
-                    <input type="password" id="supabaseKeyInput" placeholder="eyJhbGciOi..." required
-                        class="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-amber-500">
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">کلید عمومی Anon Key</label>
+                    <input type="password" id="supabaseAnonKeyInput" placeholder="eyJhbGciOi..." required
+                        class="w-full px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-amber-500">
                 </div>
-                <button type="submit"
-                    class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-3 rounded-xl transition duration-200 shadow-md">
-                    اتصال و ورود به داشبورد
+                <div class="border-t border-slate-700 my-2 pt-2">
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">ایمیل مدیر (Admin Email)</label>
+                    <input type="email" id="adminEmailInput" placeholder="admin@example.com" required
+                        class="w-full px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-amber-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">کلمه عبور مدیر</label>
+                    <input type="password" id="adminPasswordInput" placeholder="••••••••" required
+                        class="w-full px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-amber-500">
+                </div>
+                <button type="submit" id="loginSubmitBtn"
+                    class="w-full mt-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2.5 rounded-xl transition duration-200 shadow-md">
+                    ورود ایمن به پنل مدیریت
                 </button>
             </form>
-            <div id="loginError" class="hidden mt-4 p-3 bg-rose-950/50 border border-rose-800 rounded-xl text-rose-300 text-xs text-center"></div>
+            <div id="loginError" class="hidden mt-4 p-3 bg-rose-950/70 border border-rose-800 rounded-xl text-rose-300 text-xs text-center leading-relaxed"></div>
         </div>
     </div>
 
@@ -57,16 +67,16 @@
                         <span class="text-slate-950 font-black text-lg">۵۰</span>
                     </div>
                     <div>
-                        <h2 class="font-bold text-white text-lg">پنل مدیریت مسابقه و جوایز</h2>
-                        <span class="text-xs text-emerald-400 flex items-center gap-1">● اتصال آنلاین به سرور Supabase</span>
+                        <h2 class="font-bold text-white text-lg">پنل مدیریت امن مسابقه</h2>
+                        <span id="adminEmailBadge" class="text-xs text-emerald-400 flex items-center gap-1">● احراز هویت شده</span>
                     </div>
                 </div>
                 <div class="flex items-center gap-3">
                     <button id="refreshBtn" class="bg-slate-700 hover:bg-slate-600 px-3 py-2 rounded-xl text-xs font-bold text-slate-200 transition">
-                        به‌روزرسانی اطلاعات
+                        به‌روزرسانی
                     </button>
                     <button id="logoutBtn" class="bg-rose-900/50 hover:bg-rose-900 border border-rose-700 px-3 py-2 rounded-xl text-xs font-bold text-rose-200 transition">
-                        خروج
+                        خروج از حساب
                     </button>
                 </div>
             </div>
@@ -117,7 +127,7 @@
                                 <tr>
                                     <th class="p-3.5">شناسه</th>
                                     <th class="p-3.5">نام و نام خانوادگی</th>
-                                    <th class="p-3.5">شماره تماس</th>
+                                    <th class="p-3.5">شماره تماس (فقط مدیر)</th>
                                     <th class="p-3.5">امتیاز</th>
                                     <th class="p-3.5">وضعیت</th>
                                     <th class="p-3.5">تاریخ ثبت‌نام</th>
@@ -167,50 +177,58 @@
     <script>
         let supabaseClient = null;
 
-        // Initialize from localStorage if saved
-        document.addEventListener('DOMContentLoaded', () => {
-            const savedUrl = localStorage.getItem('supabase_url');
-            const savedKey = localStorage.getItem('supabase_key');
-            if (savedUrl && savedKey) {
-                document.getElementById('supabaseUrlInput').value = savedUrl;
-                document.getElementById('supabaseKeyInput').value = savedKey;
-                connectToSupabase(savedUrl, savedKey);
-            }
-        });
-
-        document.getElementById('connectForm').addEventListener('submit', (e) => {
+        document.getElementById('adminLoginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
-            const url = document.getElementById('supabaseUrlInput').value.trim();
-            const key = document.getElementById('supabaseKeyInput').value.trim();
-            connectToSupabase(url, key);
-        });
-
-        async function connectToSupabase(url, key) {
+            const btn = document.getElementById('loginSubmitBtn');
             const errDiv = document.getElementById('loginError');
             errDiv.classList.add('hidden');
+            btn.disabled = true;
+            btn.textContent = 'در حال اعتبارسنجی...';
+
+            const url = document.getElementById('supabaseUrlInput').value.trim();
+            const anonKey = document.getElementById('supabaseAnonKeyInput').value.trim();
+            const email = document.getElementById('adminEmailInput').value.trim();
+            const password = document.getElementById('adminPasswordInput').value;
+
             try {
-                supabaseClient = supabase.createClient(url, key);
-                // Test connection
-                const { data, error } = await supabaseClient.from('users').select('id').limit(1);
-                if (error) throw error;
+                supabaseClient = supabase.createClient(url, anonKey);
 
-                localStorage.setItem('supabase_url', url);
-                localStorage.setItem('supabase_key', key);
+                // ۱. احراز هویت رسمی Supabase Auth
+                const { data: authData, error: authError } = await supabaseClient.auth.signInWithPassword({
+                    email: email,
+                    password: password
+                });
 
+                if (authError) {
+                    throw new Error('ایمیل یا کلمه عبور مدیر اشتباه است: ' + authError.message);
+                }
+
+                // ۲. بررسی سطح دسترسی در سرور (RLS و تابع is_admin)
+                const { data: isAdmin, error: roleError } = await supabaseClient.rpc('is_admin');
+                if (roleError || !isAdmin) {
+                    await supabaseClient.auth.signOut();
+                    throw new Error('دسترسی غیرمجاز: حساب کاربری شما در لیست مدیران سیستم (admin_users) ثبت نشده است.');
+                }
+
+                // ورود موفق
+                document.getElementById('adminEmailBadge').textContent = 'مدیر: ' + email;
                 document.getElementById('loginSection').classList.add('hidden');
                 document.getElementById('dashboardSection').classList.remove('hidden');
 
                 loadDashboard();
             } catch (err) {
-                errDiv.textContent = 'خطا در برقراری ارتباط با Supabase: ' + (err.message || err);
+                errDiv.textContent = err.message || 'خطا در برقراری ارتباط امن.';
                 errDiv.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'ورود ایمن به پنل مدیریت';
             }
-        }
+        });
 
         async function loadDashboard() {
             if (!supabaseClient) return;
 
-            // Load Stats
+            // دریافت آمار از طریق متد امن ویژه مدیران
             try {
                 const { data: statsData, error: statsErr } = await supabaseClient.rpc('rpc_get_admin_dashboard_stats');
                 if (!statsErr && statsData) {
@@ -238,20 +256,20 @@
 
             const { data: users, error } = await query;
             if (error) {
-                tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-rose-400">خطا: ${error.message}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-rose-400">خطای دسترسی: ${error.message}</td></tr>`;
                 return;
             }
 
             document.getElementById('userCountBadge').textContent = `${(users?.length || 0).toLocaleString('fa-IR')} کاربر`;
 
             if (!users || users.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-500">هیچ کاربری یافت نشد.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" class="p-6 text-center text-slate-500">هیچ کاربری ثبت نشده است.</td></tr>`;
                 return;
             }
 
             tbody.innerHTML = users.map(u => `
                 <tr class="hover:bg-slate-700/30 transition">
-                    <td class="p-3.5 font-mono text-xs text-amber-400">${u.id}</td>
+                    <td class="p-3.5 font-mono text-xs text-amber-400">${u.id.substring(0, 8)}...</td>
                     <td class="p-3.5 font-bold text-white">${u.first_name} ${u.last_name}</td>
                     <td class="p-3.5 font-mono text-slate-300">${u.phone_number}</td>
                     <td class="p-3.5 font-bold text-amber-400">${Number(u.total_score).toLocaleString('fa-IR')}</td>
@@ -277,7 +295,7 @@
             tbody.innerHTML = logs.map(l => `
                 <tr class="hover:bg-slate-700/30 transition font-mono text-xs">
                     <td class="p-3.5 text-slate-400">${new Date(l.created_at).toLocaleTimeString('fa-IR')}</td>
-                    <td class="p-3.5 text-amber-400">${l.user_id}</td>
+                    <td class="p-3.5 text-amber-400">${l.user_id.substring(0, 8)}...</td>
                     <td class="p-3.5 text-slate-300 font-sans font-bold">مربع ${l.square_number || '-'}</td>
                     <td class="p-3.5 font-bold text-emerald-400">+${l.points}</td>
                     <td class="p-3.5 text-slate-400 truncate max-w-xs" title="${l.nonce}">${l.nonce}</td>
@@ -334,9 +352,10 @@
 
         document.getElementById('refreshBtn').addEventListener('click', loadDashboard);
 
-        document.getElementById('logoutBtn').addEventListener('click', () => {
-            localStorage.removeItem('supabase_url');
-            localStorage.removeItem('supabase_key');
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            if (supabaseClient) {
+                await supabaseClient.auth.signOut();
+            }
             location.reload();
         });
     </script>

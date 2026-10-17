@@ -1,66 +1,32 @@
 # مستندات فنی و راهنمای APIهای بک‌اند (Supabase PostgreSQL)
-## برنامه رقابت و دریافت جایزه (۵۰ مربع)
+## برنامه رقابت و دریافت جایزه (۵۰ مربع) - نسخه امن
 
 ---
 
 ### ۱. معماری و امنیت (Zero Trust Architecture)
-تمامی اعتبارسنجی‌ها و ثبت امتیازها درون توابع **PostgreSQL Stored Procedures (SECURITY DEFINER)** انجام می‌شود:
-1. **جلوگیری از تغییر مستقیم امتیاز**: کلاینت به جدول `users` دسترسی `UPDATE` مستقیم ندارد. افزایش امتیاز صرفاً از طریق تابع اتمیک `rpc_award_ad_point` ممکن است.
-2. **جلوگیری از تقلب و Replay Attack**: هر تبلیغ تماشاشده یک توکن رمزنگاری‌شده منحصر‌به‌فرد (`nonce`) دارد که در جدول `score_transactions` ثبت می‌شود. ارسال مجدد یک توکن با خطای یکتایی مواجه شده و رد می‌شود.
-3. **محدودیت چرخه ۲۴ ساعته**: هر مربع در هر روز تقویمی فقط ۱ بار می‌تواند امتیاز دریافت کند (ثبت در `user_daily_squares`).
-4. **حفظ حریم خصوصی**: در پاسخ‌های عمومی (مانند لیدربورد)، نام خانوادگی ماسک شده (`سهراب ک***`) و شماره تلفن‌ها هرگز به عموم ارسال نمی‌شوند.
+تمامی اعتبارسنجی‌ها، ثبت امتیازها و بررسی دسترسی‌ها درون توابع و سیاست‌های امنیتی **PostgreSQL RLS & SECURITY DEFINER** انجام می‌شود:
+1. **جلوگیری از تغییر یا جعل مستقیم امتیاز**: کلاینت به جدول `users` و `score_transactions` دسترسی مستقیم `UPDATE` یا `INSERT` ندارد.
+2. **احراز هویت اجباری**: در تابع `rpc_award_ad_point`، شناسه کاربر دیگر از پارامتر کلاینت دریافت نمی‌شود، بلکه مستقیماً از توکن معتبر `auth.uid()` استخراج می‌گردد. بنابراین هیچ کاربری نمی‌تواند برای شناسه دیگری امتیاز ثبت کند.
+3. **جلوگیری از Replay Attack با Nonce یکتا**: هر تبلیغ تماشاشده یک توکن رمزنگاری‌شده منحصر‌به‌فرد (`nonce`) دارد که در جدول `score_transactions` با قید `UNIQUE` ثبت می‌شود.
+4. **محدودیت چرخه ۲۴ ساعته**: هر مربع در هر روز تقویمی فقط ۱ بار می‌تواند امتیاز دریافت کند (ثبت با قید یکتایی در `user_daily_squares`).
+5. **محدودیت نرخ درخواست (Rate Limiting)**: حداقل ۱۰ ثانیه فاصله زمانی بین ثبت دو امتیاز متوالی در سرور الزامی است تا از ارسال درخواست‌های رباتیک و پشت‌سرهم جلوگیری شود.
+6. **حفظ کامل حریم خصوصی (RLS)**: جدول `users` روی دسترسی مستقیم کاربران ناشناس و سایر کاربران بسته است. هر کاربر تنها رکورد خود را می‌تواند بخواند (`auth.uid() = id`). در جدول رتبه‌بندی عمومی (`rpc_get_leaderboard`)، نام خانوادگی ماسک شده و شماره تلفن‌ها اصلاً واکشی نمی‌شوند.
+7. **پنل مدیریت مجهز به احراز هویت واقعی**: ورود به پنل مدیریت نیازمند اعتبارسنجی ایمیل و رمز عبور از طریق `Supabase Auth` بوده و تابع `is_admin()` احراز هویت در جدول `admin_users` را بررسی می‌کند.
 
 ---
 
 ### ۲. مستندات Endpointهای RPC
 
-#### ۲.۱. ثبت‌نام یا ورود کاربر (`rpc_register_or_login`)
+#### ۲.۱. اعطای امتیاز مشاهده تبلیغ (`rpc_award_ad_point`)
 - **مسیر (POST):**
-  `https://<YOUR_PROJECT_ID>.supabase.co/rest/v1/rpc/rpc_register_or_login`
+  `https://<YOUR_PROJECT_ID>.supabase.co/rest/v1/rpc/rpc_award_ad_point`
 - **هدرها:**
   - `apikey`: `<SUPABASE_ANON_KEY>`
-  - `Authorization`: `Bearer <SUPABASE_ANON_KEY>`
+  - `Authorization`: `Bearer <USER_AUTH_TOKEN>` (توکن JWT کاربر احراز هویت شده)
   - `Content-Type`: `application/json`
 - **بدنه درخواست (JSON):**
   ```json
   {
-    "p_first_name": "مهدی",
-    "p_last_name": "محمدی",
-    "p_phone": "09121234567"
-  }
-  ```
-- **پاسخ موفق (HTTP 200):**
-  ```json
-  {
-    "success": true,
-    "user": {
-      "id": "USR_8F2A10CB",
-      "first_name": "مهدی",
-      "last_name": "محمدی",
-      "phone_number": "09121234567",
-      "total_score": 0,
-      "status": "active",
-      "created_at": "2026-10-17T04:40:00Z"
-    }
-  }
-  ```
-- **پاسخ خطا:**
-  ```json
-  {
-    "success": false,
-    "message": "شماره موبایل نامعتبر است. باید ۱۱ رقمی و با 09 شروع شود."
-  }
-  ```
-
----
-
-#### ۲.۲. اعطای امتیاز مشاهده تبلیغ (`rpc_award_ad_point`)
-- **مسیر (POST):**
-  `https://<YOUR_PROJECT_ID>.supabase.co/rest/v1/rpc/rpc_award_ad_point`
-- **بدنه درخواست (JSON):**
-  ```json
-  {
-    "p_user_id": "USR_8F2A10CB",
     "p_square_number": 12,
     "p_nonce": "TAPSELL_VERIFIED_98F0123ABDE"
   }
@@ -71,22 +37,32 @@
     "success": true,
     "new_total_score": 1,
     "square_number": 12,
-    "message": "امتیاز با موفقیت در سرور ثبت شد."
+    "message": "۱ امتیاز مسابقه با موفقیت ثبت شد."
   }
   ```
 - **پاسخ در صورت تقلب یا ارسال تکراری:**
   ```json
   {
     "success": false,
-    "message": "این درخواست قبلاً ثبت شده است (تکراری)."
+    "message": "این درخواست قبلاً ثبت شده است (توکن تکراری)."
+  }
+  ```
+- **پاسخ در صورت فاصله زمانی غیرمجاز (اسپم):**
+  ```json
+  {
+    "success": false,
+    "message": "فاصله زمانی بین تماشای تبلیغات رعایت نشده است. لطفاً کمی صبر کنید."
   }
   ```
 
 ---
 
-#### ۲.۳. دریافت آمار داشبورد پنل مدیریت (`rpc_get_admin_dashboard_stats`)
+#### ۲.۲. دریافت آمار داشبورد پنل مدیریت (`rpc_get_admin_dashboard_stats`)
 - **مسیر (POST):**
   `https://<YOUR_PROJECT_ID>.supabase.co/rest/v1/rpc/rpc_get_admin_dashboard_stats`
+- **هدرها:**
+  - `apikey`: `<SUPABASE_ANON_KEY>`
+  - `Authorization`: `Bearer <ADMIN_AUTH_TOKEN>` (فقط با توکن مدیر مجاز)
 - **پاسخ موفق (HTTP 200):**
   ```json
   {
@@ -96,12 +72,19 @@
     "active_competitions": 1
   }
   ```
+- **پاسخ در صورت عدم دسترسی ادمین:**
+  ```
+  HTTP 403 Forbidden - دسترسی غیرمجاز: این متد فقط برای مدیران سیستم قابل فراخوانی است.
+  ```
 
 ---
 
-#### ۲.۴. دریافت لیدربورد عمومی (`rpc_get_leaderboard`)
+#### ۲.۳. دریافت لیدربورد عمومی (`rpc_get_leaderboard`)
 - **مسیر (POST):**
   `https://<YOUR_PROJECT_ID>.supabase.co/rest/v1/rpc/rpc_get_leaderboard`
+- **هدرها:**
+  - `apikey`: `<SUPABASE_ANON_KEY>`
+  - `Authorization`: `Bearer <SUPABASE_ANON_KEY>`
 - **بدنه درخواست (JSON):**
   ```json
   {
@@ -113,7 +96,6 @@
   [
     {
       "rank": 1,
-      "user_id": "USR_8F2A10CB",
       "display_name": "مهدی م***",
       "total_score": 45
     }
