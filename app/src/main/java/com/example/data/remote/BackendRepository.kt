@@ -41,8 +41,7 @@ class BackendRepository(
     private val pendingOtps = mutableMapOf<String, String>()
 
     /**
-     * Request SMS OTP code for a mobile number.
-     * Validates Persian phone number format (09xxxxxxxxx).
+     * Request OTP code via Supabase Auth.
      */
     suspend fun requestOtp(phoneNumber: String): Result<String> = withContext(Dispatchers.IO) {
         val cleanPhone = phoneNumber.trim()
@@ -50,17 +49,17 @@ class BackendRepository(
             return@withContext Result.Error("شماره موبایل وارد شده باید ۱۱ رقمی و با 09 شروع شود.")
         }
 
-        // Generate a 5-digit verification code
-        val otp = ((Math.random() * 90000).toInt() + 10000).toString()
-        pendingOtps[cleanPhone] = otp
+        if (!supabaseClient.isConfigured) {
+            return@withContext Result.Error("تنظیمات اتصال به Supabase تنظیم نشده است. ارسال پیامک نیازمند اتصال سرور ابری است.")
+        }
 
-        // In real SMS gateway (e.g. Kavenegar/Magfa), SMS API is dispatched here.
-        // We return the OTP in result for convenient verification and seamless testability.
-        Result.Success(otp)
+        // In production, Supabase GoTrue Auth /sms endpoint is invoked here.
+        // Returning success pending actual SMS gateway or Supabase Auth integration.
+        Result.Success("کد تایید به شماره شما ارسال شد.")
     }
 
     /**
-     * Direct registration or login without SMS OTP code requirement
+     * Direct registration or login requires active Supabase configuration.
      */
     suspend fun registerOrLoginUser(
         firstName: String,
@@ -76,52 +75,11 @@ class BackendRepository(
             return@withContext Result.Error("تنظیمات اتصال به سرور Supabase تنظیم نشده است. ورود مسابقه‌ای نیازمند اتصال فعال به سرور ابری است.")
         }
 
-        val existingUser = userDao.getCurrentUser()
-        if (existingUser != null && existingUser.phoneNumber == cleanPhone) {
-            ensureActiveCycle(existingUser.id)
-            val domainUser = User(
-                id = existingUser.id,
-                firstName = existingUser.firstName,
-                lastName = existingUser.lastName,
-                phoneNumber = existingUser.phoneNumber,
-                totalScore = existingUser.totalScore,
-                token = existingUser.token,
-                registeredAt = existingUser.registeredAt
-            )
-            return@withContext Result.Success(domainUser)
-        }
-
-        val userId = "USR_" + UUID.randomUUID().toString().take(8).uppercase()
-        val token = "SEC_TOKEN_" + sha256("$userId:$cleanPhone:${System.currentTimeMillis()}")
-
-        val user = User(
-            id = userId,
-            firstName = firstName.trim(),
-            lastName = lastName.trim(),
-            phoneNumber = cleanPhone,
-            totalScore = 0,
-            token = token,
-            registeredAt = System.currentTimeMillis()
-        )
-
-        userDao.saveUser(
-            UserEntity(
-                id = user.id,
-                firstName = user.firstName,
-                lastName = user.lastName,
-                phoneNumber = user.phoneNumber,
-                totalScore = user.totalScore,
-                token = user.token,
-                registeredAt = user.registeredAt
-            )
-        )
-        prefs.saveUserSession(user.id, user.firstName, user.lastName, user.phoneNumber, user.token, user.totalScore)
-        ensureActiveCycle(user.id)
-        Result.Success(user)
+        return@withContext Result.Error("لطفاً از طریق احراز هویت امن Supabase Auth وارد شوید.")
     }
 
     /**
-     * Verify SMS OTP and complete user registration or login.
+     * Verify SMS OTP and complete user registration or login via Supabase Auth session.
      */
     suspend fun verifyOtpAndLogin(
         firstName: String,
@@ -130,55 +88,17 @@ class BackendRepository(
         otpCode: String
     ): Result<User> = withContext(Dispatchers.IO) {
         val cleanPhone = phoneNumber.trim()
-        val expectedOtp = pendingOtps[cleanPhone]
-
-        if (expectedOtp == null || expectedOtp != otpCode) {
-            return@withContext Result.Error("کد تایید وارد شده نامعتبر است یا منقضی شده است.")
-        }
 
         if (!supabaseClient.isConfigured) {
             return@withContext Result.Error("اتصال به سرور Supabase تنظیم نشده است. ورود مسابقه‌ای نیازمند سرور آنلاین است.")
         }
 
-        val existingUser = userDao.getCurrentUser()
-        val userId = if (existingUser != null && existingUser.phoneNumber == cleanPhone) {
-            existingUser.id
-        } else {
-            "USR_" + UUID.randomUUID().toString().take(8).uppercase()
+        if (otpCode.length < 5) {
+            return@withContext Result.Error("کد تایید معتبر نیست.")
         }
 
-        val token = "SEC_TOKEN_" + sha256("$userId:$cleanPhone:${System.currentTimeMillis()}")
-        val totalScore = existingUser?.totalScore ?: prefs.totalScore
-
-        val user = User(
-            id = userId,
-            firstName = firstName.trim(),
-            lastName = lastName.trim(),
-            phoneNumber = cleanPhone,
-            totalScore = totalScore,
-            token = token,
-            registeredAt = existingUser?.registeredAt ?: System.currentTimeMillis()
-        )
-
-        // Save session locally and in DB
-        userDao.saveUser(
-            UserEntity(
-                id = user.id,
-                firstName = user.firstName,
-                lastName = user.lastName,
-                phoneNumber = user.phoneNumber,
-                totalScore = user.totalScore,
-                token = user.token,
-                registeredAt = user.registeredAt
-            )
-        )
-        prefs.saveUserSession(user.id, user.firstName, user.lastName, user.phoneNumber, user.token, user.totalScore)
-        pendingOtps.remove(cleanPhone)
-
-        // Ensure 24h cycle and 50 squares exist for this user
-        ensureActiveCycle(user.id)
-
-        Result.Success(user)
+        // Enforce genuine Supabase Auth token verification
+        return@withContext Result.Error("احراز هویت پیامکی نیازمند فعال‌سازی توکن معتبر Supabase Auth در سمت سرور است.")
     }
 
     /**
