@@ -41,7 +41,7 @@ class BackendRepository(
     private val pendingOtps = mutableMapOf<String, String>()
 
     /**
-     * Request OTP code via Supabase Auth.
+     * Request OTP code via Supabase GoTrue Auth API.
      */
     suspend fun requestOtp(phoneNumber: String): Result<String> = withContext(Dispatchers.IO) {
         val cleanPhone = phoneNumber.trim()
@@ -53,33 +53,25 @@ class BackendRepository(
             return@withContext Result.Error("تنظیمات اتصال به Supabase تنظیم نشده است. ارسال پیامک نیازمند اتصال سرور ابری است.")
         }
 
-        // In production, Supabase GoTrue Auth /sms endpoint is invoked here.
-        // Returning success pending actual SMS gateway or Supabase Auth integration.
-        Result.Success("کد تایید به شماره شما ارسال شد.")
+        when (val result = supabaseClient.requestAuthOtp(cleanPhone)) {
+            is Result.Success -> Result.Success(result.data)
+            is Result.Error -> Result.Error(result.message)
+        }
     }
 
     /**
-     * Direct registration or login requires active Supabase configuration.
+     * Direct registration or login not supported without OTP verification.
      */
     suspend fun registerOrLoginUser(
         firstName: String,
         lastName: String,
         phoneNumber: String
     ): Result<User> = withContext(Dispatchers.IO) {
-        val cleanPhone = phoneNumber.trim()
-        if (!cleanPhone.matches(Regex("^09[0-9]{9}\$"))) {
-            return@withContext Result.Error("شماره موبایل وارد شده باید ۱۱ رقمی و با 09 شروع شود.")
-        }
-
-        if (!supabaseClient.isConfigured) {
-            return@withContext Result.Error("تنظیمات اتصال به سرور Supabase تنظیم نشده است. ورود مسابقه‌ای نیازمند اتصال فعال به سرور ابری است.")
-        }
-
-        return@withContext Result.Error("لطفاً از طریق احراز هویت امن Supabase Auth وارد شوید.")
+        Result.Error("لطفاً از طریق ارسال کد تایید (OTP) وارد شوید.")
     }
 
     /**
-     * Verify SMS OTP and complete user registration or login via Supabase Auth session.
+     * Verify SMS OTP and complete user registration or login via Supabase Auth session token.
      */
     suspend fun verifyOtpAndLogin(
         firstName: String,
@@ -94,11 +86,46 @@ class BackendRepository(
         }
 
         if (otpCode.length < 5) {
-            return@withContext Result.Error("کد تایید معتبر نیست.")
+            return@withContext Result.Error("کد تایید وارد شده نامعتبر است.")
         }
 
-        // Enforce genuine Supabase Auth token verification
-        return@withContext Result.Error("احراز هویت پیامکی نیازمند فعال‌سازی توکن معتبر Supabase Auth در سمت سرور است.")
+        when (val verifyResult = supabaseClient.verifyAuthOtp(cleanPhone, otpCode)) {
+            is Result.Success -> {
+                val json = verifyResult.data
+                val accessToken = json.optString("access_token")
+                val userObj = json.optJSONObject("user")
+                val userId = userObj?.optString("id") ?: ("USR_" + UUID.randomUUID().toString().take(8).uppercase())
+
+                val user = User(
+                    id = userId,
+                    firstName = firstName.trim(),
+                    lastName = lastName.trim(),
+                    phoneNumber = cleanPhone,
+                    totalScore = 0,
+                    token = accessToken,
+                    registeredAt = System.currentTimeMillis()
+                )
+
+                userDao.saveUser(
+                    UserEntity(
+                        id = user.id,
+                        firstName = user.firstName,
+                        lastName = user.lastName,
+                        phoneNumber = user.phoneNumber,
+                        totalScore = user.totalScore,
+                        token = user.token,
+                        registeredAt = user.registeredAt
+                    )
+                )
+                prefs.saveUserSession(user.id, user.firstName, user.lastName, user.phoneNumber, user.token, user.totalScore)
+                ensureActiveCycle(user.id)
+
+                Result.Success(user)
+            }
+            is Result.Error -> {
+                Result.Error(verifyResult.message)
+            }
+        }
     }
 
     /**

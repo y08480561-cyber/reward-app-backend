@@ -35,8 +35,83 @@ class SupabaseApiClient(
     val isConfigured: Boolean
         get() = prefs.supabaseUrl.isNotBlank() && prefs.supabaseAnonKey.isNotBlank()
 
-    // Supabase Auth handles user registration and login securely via Auth API (signInWithOtp / verifyOtp)
-    // No insecure custom rpc_register_or_login is used.
+    /**
+     * Request OTP code via Supabase GoTrue Auth API (/auth/v1/otp).
+     */
+    suspend fun requestAuthOtp(phoneNumber: String): Result<String> = withContext(Dispatchers.IO) {
+        if (!isConfigured) {
+            return@withContext Result.Error("تنظیمات اتصال به Supabase ست نشده است.")
+        }
+
+        val url = "${prefs.supabaseUrl.trimEnd('/')}/auth/v1/otp"
+        val payload = JSONObject().apply {
+            put("phone", phoneNumber)
+        }
+
+        try {
+            val request = Request.Builder()
+                .url(url)
+                .header("apikey", prefs.supabaseAnonKey)
+                .header("Content-Type", "application/json")
+                .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE))
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (response.isSuccessful) {
+                    Result.Success("کد تایید با موفقیت از طریق Supabase Auth به شماره شما ارسال شد.")
+                } else {
+                    Log.e(TAG, "requestAuthOtp error HTTP ${response.code}: $body")
+                    val errJson = try { JSONObject(body) } catch(e: Exception) { null }
+                    val msg = errJson?.optString("error_description") ?: errJson?.optString("msg") ?: "خطا در ارسال کد تایید از طریق سرور"
+                    Result.Error(msg)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Network exception in requestAuthOtp", e)
+            Result.Error("خطای شبکه در ارتباط با سرور: ${e.localizedMessage}")
+        }
+    }
+
+    /**
+     * Verify OTP code via Supabase GoTrue Auth API (/auth/v1/verify) and return JWT access token.
+     */
+    suspend fun verifyAuthOtp(phoneNumber: String, token: String): Result<JSONObject> = withContext(Dispatchers.IO) {
+        if (!isConfigured) {
+            return@withContext Result.Error("تنظیمات اتصال به Supabase ست نشده است.")
+        }
+
+        val url = "${prefs.supabaseUrl.trimEnd('/')}/auth/v1/verify"
+        val payload = JSONObject().apply {
+            put("type", "sms")
+            put("phone", phoneNumber)
+            put("token", token)
+        }
+
+        try {
+            val request = Request.Builder()
+                .url(url)
+                .header("apikey", prefs.supabaseAnonKey)
+                .header("Content-Type", "application/json")
+                .post(payload.toString().toRequestBody(JSON_MEDIA_TYPE))
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (response.isSuccessful) {
+                    Result.Success(JSONObject(body))
+                } else {
+                    Log.e(TAG, "verifyAuthOtp error HTTP ${response.code}: $body")
+                    val errJson = try { JSONObject(body) } catch(e: Exception) { null }
+                    val msg = errJson?.optString("error_description") ?: errJson?.optString("msg") ?: "کد تایید نامعتبر یا منقضی شده است."
+                    Result.Error(msg)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Network exception in verifyAuthOtp", e)
+            Result.Error("خطای شبکه در تایید کد: ${e.localizedMessage}")
+        }
+    }
 
     /**
      * Call Supabase stored procedure: rpc_award_ad_point
