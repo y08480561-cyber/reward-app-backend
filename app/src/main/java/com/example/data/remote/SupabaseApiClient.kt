@@ -35,6 +35,17 @@ class SupabaseApiClient(
     val isConfigured: Boolean
         get() = prefs.supabaseUrl.isNotBlank() && prefs.supabaseAnonKey.isNotBlank()
 
+    private fun formatPhone(phone: String): String {
+        val clean = phone.trim()
+        return if (clean.startsWith("09")) {
+            "+98${clean.substring(1)}"
+        } else if (clean.startsWith("9")) {
+            "+98$clean"
+        } else {
+            clean
+        }
+    }
+
     /**
      * Request OTP code via Supabase GoTrue Auth API (/auth/v1/otp).
      */
@@ -43,9 +54,10 @@ class SupabaseApiClient(
             return@withContext Result.Error("تنظیمات اتصال به Supabase ست نشده است.")
         }
 
+        val formattedPhone = formatPhone(phoneNumber)
         val url = "${prefs.supabaseUrl.trimEnd('/')}/auth/v1/otp"
         val payload = JSONObject().apply {
-            put("phone", phoneNumber)
+            put("phone", formattedPhone)
         }
 
         try {
@@ -81,10 +93,11 @@ class SupabaseApiClient(
             return@withContext Result.Error("تنظیمات اتصال به Supabase ست نشده است.")
         }
 
+        val formattedPhone = formatPhone(phoneNumber)
         val url = "${prefs.supabaseUrl.trimEnd('/')}/auth/v1/verify"
         val payload = JSONObject().apply {
             put("type", "sms")
-            put("phone", phoneNumber)
+            put("phone", formattedPhone)
             put("token", token)
         }
 
@@ -99,7 +112,16 @@ class SupabaseApiClient(
             client.newCall(request).execute().use { response ->
                 val body = response.body?.string().orEmpty()
                 if (response.isSuccessful) {
-                    Result.Success(JSONObject(body))
+                    val json = JSONObject(body)
+                    val accessToken = json.optString("access_token")
+                    val userObj = json.optJSONObject("user")
+                    val userId = userObj?.optString("id")
+
+                    if (accessToken.isBlank() || userId.isNullOrBlank()) {
+                        Result.Error("پاسخ نامعتبر از سرور احراز هویت: توکن یا شناسه کاربر یافت نشد.")
+                    } else {
+                        Result.Success(json)
+                    }
                 } else {
                     Log.e(TAG, "verifyAuthOtp error HTTP ${response.code}: $body")
                     val errJson = try { JSONObject(body) } catch(e: Exception) { null }
