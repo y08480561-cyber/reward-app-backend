@@ -314,40 +314,79 @@ class BackendRepository(
             return@withContext Result.Error("تبلیغ به طور کامل مشاهده نشد.")
         }
 
-        // Check if nonce was already used to prevent replay attacks
-        val existingWithNonce = adLogDao.countCompletedForSquareInCycle(squareNumber, activeCycle.cycleId)
-        if (existingWithNonce > 0) {
-            return@withContext Result.Error("درخواست تکراری تشخیص داده شد.")
+        // If Supabase is configured, call atomic stored procedure on server
+        if (supabaseClient.isConfigured) {
+            when (val remoteResult = supabaseClient.awardAdPoint(squareNumber, rewardNonce)) {
+                is Result.Success -> {
+                    val newScore = remoteResult.data.optInt("new_total_score", prefs.totalScore + 1)
+                    val now = System.currentTimeMillis()
+                    squareDao.setSquareStatus(squareNumber, SquareStatus.COMPLETED.name, now)
+                    userDao.updateScore(userId, newScore)
+                    prefs.totalScore = newScore
+                    return@withContext Result.Success(newScore)
+                }
+                is Result.Error -> {
+                    return@withContext Result.Error(remoteResult.message)
+                }
+            }
         }
 
-        // Atomically award 1 point
-        val now = System.currentTimeMillis()
-        val sessionId = "ADS_" + UUID.randomUUID().toString().take(12)
+        // Send point registration to Render Backend API
+        val url = "${prefs.serverUrl.trimEnd('/')}/api/ads/complete"
+        val payload = JSONObject().apply {
+            put("userId", userId)
+            put("squareNumber", squareNumber)
+            put("rewardNonce", rewardNonce)
+            put("adDurationSeconds", adDurationSeconds)
+        }
 
-        // 1. Mark square as completed and lock it
-        squareDao.setSquareStatus(squareNumber, SquareStatus.COMPLETED.name, now)
+        try {
+            val request = Request.Builder()
+                .url(url)
+                .header("x-user-id", userId)
+                .header("Content-Type", "application/json")
+                .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+                .build()
 
-        // 2. Increment score
-        val currentUser = userDao.getCurrentUser()
-        val updatedScore = (currentUser?.totalScore ?: prefs.totalScore) + 1
-        userDao.updateScore(userId, updatedScore)
-        prefs.totalScore = updatedScore
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (response.isSuccessful) {
+                    val json = JSONObject(body)
+                    val newScore = json.optInt("newTotalScore", prefs.totalScore + 1)
+                    val now = System.currentTimeMillis()
+                    val sessionId = "ADS_" + UUID.randomUUID().toString().take(12)
 
-        // 3. Log audit ad session
-        adLogDao.insertLog(
-            AdLogEntity(
-                sessionId = sessionId,
-                userId = userId,
-                squareNumber = squareNumber,
-                cycleId = activeCycle.cycleId,
-                timestamp = now,
-                durationSeconds = adDurationSeconds,
-                status = "COMPLETED",
-                token = rewardNonce
-            )
-        )
+                    // 1. Mark square as completed and lock it
+                    squareDao.setSquareStatus(squareNumber, SquareStatus.COMPLETED.name, now)
 
-        Result.Success(updatedScore)
+                    // 2. Increment score
+                    userDao.updateScore(userId, newScore)
+                    prefs.totalScore = newScore
+
+                    // 3. Log audit ad session locally
+                    adLogDao.insertLog(
+                        AdLogEntity(
+                            sessionId = sessionId,
+                            userId = userId,
+                            squareNumber = squareNumber,
+                            cycleId = activeCycle.cycleId,
+                            timestamp = now,
+                            durationSeconds = adDurationSeconds,
+                            status = "COMPLETED",
+                            token = rewardNonce
+                        )
+                    )
+
+                    Result.Success(newScore)
+                } else {
+                    val errJson = try { JSONObject(body) } catch (e: Exception) { null }
+                    val msg = errJson?.optString("error") ?: "خطا در تایید تبلیغ توسط سرور"
+                    Result.Error(msg)
+                }
+            }
+        } catch (e: Exception) {
+            Result.Error("خطای شبکه در ارتباط با سرور: ${e.localizedMessage}")
+        }
     }
 
     /**
@@ -358,36 +397,60 @@ class BackendRepository(
     }
 
     /**
-     * Get real-time Leaderboard
+     * Get real-time Leaderboard from server without fake seed data
      */
     suspend fun getLeaderboard(currentUserId: String): List<LeaderboardEntry> = withContext(Dispatchers.IO) {
         val currentUser = userDao.getCurrentUser()
         val currentScore = currentUser?.totalScore ?: prefs.totalScore
 
-        // Top competing Iranian players list
-        val baseCompetitors = listOf(
-            LeaderboardEntry(1, "USR_7821", "سهراب ک****", (currentScore + 42).coerceAtLeast(184), adsCompletedToday = 48),
-            LeaderboardEntry(2, "USR_3310", "مریم ر****", (currentScore + 27).coerceAtLeast(159), adsCompletedToday = 45),
-            LeaderboardEntry(3, "USR_9942", "امیرحسین ف****", (currentScore + 18).coerceAtLeast(138), adsCompletedToday = 41),
-            LeaderboardEntry(4, "USR_5128", "نگار ط****", (currentScore + 9).coerceAtLeast(112), adsCompletedToday = 36),
-            LeaderboardEntry(5, "USR_1044", "محمدصادق ع****", (currentScore + 4).coerceAtLeast(95), adsCompletedToday = 30),
-            LeaderboardEntry(6, "USR_8820", "پریسا ن****", (currentScore + 2).coerceAtLeast(78), adsCompletedToday = 26),
-            LeaderboardEntry(7, "USR_6419", "احسان ج****", (currentScore.coerceAtLeast(50)), adsCompletedToday = 20)
-        )
+        val url = "${prefs.serverUrl.trimEnd('/')}/api/leaderboard"
+        try {
+            val request = Request.Builder()
+                .url(url)
+                .header("x-user-id", currentUserId)
+                .get()
+                .build()
 
-        // Insert or rank current user
-        val allEntries = (baseCompetitors + LeaderboardEntry(
-            rank = 0,
-            userId = currentUserId,
-            displayName = if (currentUser != null) currentUser.firstName + " " + currentUser.lastName else "شما",
-            totalScore = currentScore,
-            isCurrentUser = true,
-            adsCompletedToday = squareDao.getAllSquares().count { it.status == SquareStatus.COMPLETED.name }
-        )).sortedByDescending { it.totalScore }
-
-        allEntries.mapIndexed { index, entry ->
-            entry.copy(rank = index + 1)
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (response.isSuccessful) {
+                    val json = JSONObject(body)
+                    val array = json.optJSONArray("leaderboard")
+                    if (array != null) {
+                        val list = mutableListOf<LeaderboardEntry>()
+                        for (i in 0 until array.length()) {
+                            val item = array.getJSONObject(i)
+                            list.add(
+                                LeaderboardEntry(
+                                    rank = item.optInt("rank", i + 1),
+                                    userId = item.optString("userId"),
+                                    displayName = item.optString("displayName", "کاربر مسابقه"),
+                                    totalScore = item.optInt("totalScore", 0),
+                                    isCurrentUser = item.optBoolean("isCurrentUser", item.optString("userId") == currentUserId),
+                                    adsCompletedToday = 0
+                                )
+                            )
+                        }
+                        if (list.isNotEmpty()) {
+                            return@withContext list
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            // Fall through to real current user record only
         }
+
+        listOf(
+            LeaderboardEntry(
+                rank = 1,
+                userId = currentUserId,
+                displayName = if (currentUser != null) "${currentUser.firstName} ${currentUser.lastName}" else "شما",
+                totalScore = currentScore,
+                isCurrentUser = true,
+                adsCompletedToday = squareDao.getAllSquares().count { it.status == SquareStatus.COMPLETED.name }
+            )
+        )
     }
 
     /**

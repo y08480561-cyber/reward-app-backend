@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const crypto = require('crypto');
+const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -16,7 +17,9 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', uptime: process.uptime(), timestamp: Date.now() });
 });
 
-// In-Memory Persistent Store (with SQLite Schema structure)
+// JSON File Persistent Storage
+const DB_FILE = path.join(__dirname, 'database.json');
+
 const db = {
   users: new Map(),
   userScores: new Map(),
@@ -31,17 +34,63 @@ const db = {
   }
 };
 
-// Seed sample leaderboard competitors
-const seedUsers = [
-  { id: "USR_SEED_1", firstName: "سهراب", lastName: "کریمی", phone: "09121112233", score: 184 },
-  { id: "USR_SEED_2", firstName: "مریم", lastName: "رضایی", phone: "09352223344", score: 159 },
-  { id: "USR_SEED_3", firstName: "امیرحسین", lastName: "فراهانی", phone: "09193334455", score: 138 }
-];
+function loadDatabase() {
+  try {
+    if (fs.existsSync(DB_FILE)) {
+      const raw = fs.readFileSync(DB_FILE, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed.users)) {
+        parsed.users.forEach(u => db.users.set(u.id, u));
+      }
+      if (Array.isArray(parsed.userScores)) {
+        parsed.userScores.forEach(s => db.userScores.set(s.userId, s));
+      }
+      if (Array.isArray(parsed.dailyCycles)) {
+        parsed.dailyCycles.forEach(c => db.dailyCycles.set(c.cycleId, c));
+      }
+      if (Array.isArray(parsed.adSessions)) {
+        parsed.adSessions.forEach(a => db.adSessions.set(a.sessionId, a));
+      }
+      if (Array.isArray(parsed.squareStates)) {
+        parsed.squareStates.forEach(sq => db.squareStates.set(sq.key, sq.value));
+      }
+      console.log(`[Database] Loaded ${db.users.size} users, ${db.adSessions.size} sessions from ${DB_FILE}`);
+    }
+  } catch (err) {
+    console.error('[Database] Error reading database file:', err.message);
+  }
+}
 
-seedUsers.forEach(u => {
-  db.users.set(u.id, { id: u.id, firstName: u.firstName, lastName: u.lastName, phoneNumber: u.phone, registeredAt: Date.now() });
-  db.userScores.set(u.id, { userId: u.id, totalScore: u.score, updatedAt: Date.now() });
-});
+function saveDatabase() {
+  try {
+    const data = {
+      users: Array.from(db.users.values()),
+      userScores: Array.from(db.userScores.values()),
+      dailyCycles: Array.from(db.dailyCycles.values()),
+      adSessions: Array.from(db.adSessions.values()),
+      squareStates: Array.from(db.squareStates.entries()).map(([key, value]) => ({ key, value }))
+    };
+    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8');
+  } catch (err) {
+    console.error('[Database] Error saving database file:', err.message);
+  }
+}
+
+// Initial load
+loadDatabase();
+
+// Admin Authentication Middleware
+function requireAdminAuth(req, res, next) {
+  const provided = req.headers['x-admin-key'] ||
+                   req.query.adminKey ||
+                   req.query.key ||
+                   (req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/i, '').trim() : '');
+
+  if (!provided || provided !== ADMIN_API_KEY) {
+    return res.status(401).json({ error: "دسترسی غیرمجاز. کلید امنیتی مدیریت نامعتبر است." });
+  }
+  next();
+}
 
 // Helper: Ensure 24-hour cycle
 function getOrCreateActiveCycle(userId) {
@@ -68,15 +117,80 @@ function getOrCreateActiveCycle(userId) {
   return activeCycle;
 }
 
-// 1. Auth: Request OTP
-app.post('/api/auth/otp/request', (req, res) => {
-  const { phoneNumber } = req.body;
-  if (!phoneNumber || !/^09\d{9}$/.test(phoneNumber)) {
-    return res.status(400).json({ error: "شماره موبایل وارد شده باید ۱۱ رقمی و با 09 شروع شود." });
+// In-memory OTP storage with rate limiting and expiration
+const otpStore = new Map(); // key: phoneNumber -> { otp, expiresAt, requestsCount, lastRequestedAt }
+
+async function sendSmsViaKavenegar(phoneNumber, otp) {
+  const apiKey = process.env.KAVENEGAR_API_KEY || process.env.SMS_API_KEY;
+  if (!apiKey) {
+    throw new Error("سرویس پیامکی روی سرور تنظیم نشده است. لطفاً متغیر محیطی SMS_API_KEY یا KAVENEGAR_API_KEY را در تنظیمات Render وارد کنید.");
   }
-  const otp = Math.floor(10000 + Math.random() * 90000).toString();
-  console.log(`[SMS-GATEWAY] Verification OTP for ${phoneNumber} is: ${otp}`);
-  return res.json({ success: true, message: "کد تایید ارسال گردید.", debugOtp: otp });
+
+  const receptor = phoneNumber.trim();
+  const message = `کد تایید مسابقه رقابت و جایزه: ${otp}\nاعتبار ۲ دقیقه`;
+
+  const url = `https://api.kavenegar.com/v1/${apiKey}/sms/send.json`;
+  const params = new URLSearchParams();
+  params.append('receptor', receptor);
+  params.append('message', message);
+  if (process.env.SMS_SENDER) {
+    params.append('sender', process.env.SMS_SENDER);
+  }
+
+  const response = await fetch(url, {
+    method: 'POST',
+    body: params,
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    }
+  });
+
+  const data = await response.json();
+  if (data && data.return && data.return.status === 200) {
+    return true;
+  } else {
+    const errMsg = data?.return?.message || 'خطا در ارسال پیامک از طریق درگاه کاوه‌نگار';
+    throw new Error(errMsg);
+  }
+}
+
+// 1. Auth: Request OTP
+app.post('/api/auth/otp/request', async (req, res) => {
+  try {
+    const { phoneNumber } = req.body;
+    if (!phoneNumber || !/^09\d{9}$/.test(phoneNumber)) {
+      return res.status(400).json({ error: "شماره موبایل وارد شده باید ۱۱ رقمی و با 09 شروع شود." });
+    }
+
+    // Rate limiting check: max 3 requests per 5 minutes
+    const now = Date.now();
+    const existing = otpStore.get(phoneNumber);
+    if (existing && (now - existing.lastRequestedAt < 5 * 60 * 1000)) {
+      if (existing.requestsCount >= 3) {
+        return res.status(429).json({ error: "تعداد درخواست‌های کد تایید بیش از حد مجاز است. لطفاً ۵ دقیقه دیگر تلاش کنید." });
+      }
+    }
+
+    const otp = crypto.randomInt(10000, 100000).toString();
+    const expiresAt = now + 2 * 60 * 1000; // 2 minutes expiry
+
+    // Send via real SMS gateway
+    await sendSmsViaKavenegar(phoneNumber, otp);
+
+    const requestsCount = (existing && (now - existing.lastRequestedAt < 5 * 60 * 1000)) ? existing.requestsCount + 1 : 1;
+    otpStore.set(phoneNumber, {
+      otp,
+      expiresAt,
+      requestsCount,
+      lastRequestedAt: now
+    });
+
+    console.log(`[SMS-GATEWAY] OTP successfully dispatched via Kavenegar to ${phoneNumber.substring(0, 4)}***`);
+    return res.json({ success: true, message: "کد تایید با موفقیت به شماره همراه شما ارسال شد." });
+  } catch (err) {
+    console.error('[SMS Error]', err.message);
+    return res.status(500).json({ error: err.message || "خطا در ارسال پیامک. لطفاً تنظیمات سرویس پیامکی را در سرور بررسی کنید." });
+  }
 });
 
 // 2. Auth: Verify OTP & Login
@@ -85,6 +199,24 @@ app.post('/api/auth/otp/verify', (req, res) => {
   if (!phoneNumber || !otpCode) {
     return res.status(400).json({ error: "اطلاعات ورودی ناقص است." });
   }
+
+  const record = otpStore.get(phoneNumber);
+  if (!record) {
+    return res.status(400).json({ error: "کد تاییدی برای این شماره درخواست نشده یا منقضی شده است." });
+  }
+
+  if (Date.now() > record.expiresAt) {
+    otpStore.delete(phoneNumber);
+    return res.status(400).json({ error: "کد تایید منقضی شده است. لطفاً مجدداً درخواست کد کنید." });
+  }
+
+  if (record.otp !== otpCode.trim()) {
+    return res.status(400).json({ error: "کد تایید وارد شده اشتباه است." });
+  }
+
+  // OTP verified successfully -> clear record
+  otpStore.delete(phoneNumber);
+
   let user = null;
   for (const u of db.users.values()) {
     if (u.phoneNumber === phoneNumber) {
@@ -103,7 +235,9 @@ app.post('/api/auth/otp/verify', (req, res) => {
     };
     db.users.set(userId, user);
     db.userScores.set(userId, { userId, totalScore: 0, updatedAt: Date.now() });
+    saveDatabase();
   }
+
   const token = "SEC_JWT_" + crypto.createHash('sha256').update(`${user.id}:${phoneNumber}:${Date.now()}`).digest('hex');
   const score = db.userScores.get(user.id)?.totalScore || 0;
   const cycle = getOrCreateActiveCycle(user.id);
@@ -170,6 +304,8 @@ app.post('/api/ads/complete', (req, res) => {
     status: "COMPLETED",
     token: rewardNonce
   });
+  saveDatabase();
+
   return res.json({
     success: true,
     squareNumber,
@@ -198,24 +334,28 @@ app.get('/api/leaderboard', (req, res) => {
   return res.json({ leaderboard: ranked });
 });
 
-// 6. Admin Overview API
-app.get('/api/admin/overview', (req, res) => {
-  const sessions = Array.from(db.adSessions.values()).reverse().slice(0, 50);
+// 6. Admin Overview API (Protected)
+app.get('/api/admin/overview', requireAdminAuth, (req, res) => {
+  const sessions = Array.from(db.adSessions.values()).reverse().slice(0, 100);
   const users = Array.from(db.users.values()).map(u => ({
     ...u,
     score: db.userScores.get(u.id)?.totalScore || 0
-  }));
+  })).sort((a, b) => b.score - a.score);
+
+  const totalScoresSum = users.reduce((sum, u) => sum + (u.score || 0), 0);
+
   return res.json({
-    totalUsers: db.users.size,
+    totalUsers: users.length,
     totalAdSessions: db.adSessions.size,
+    totalScoresSum,
     settings: db.settings,
     recentSessions: sessions,
     users
   });
 });
 
-// 7. Admin Force Reset Cycle
-app.post('/api/admin/cycle/reset', (req, res) => {
+// 7. Admin Force Reset Cycle (Protected)
+app.post('/api/admin/cycle/reset', requireAdminAuth, (req, res) => {
   try {
     const { userId } = req.body;
     if (!userId) return res.status(400).json({ error: "شناسه کاربر الزامی است." });
@@ -229,6 +369,7 @@ app.post('/api/admin/cycle/reset', (req, res) => {
       status: "ACTIVE"
     };
     db.dailyCycles.set(newCycleId, cycle);
+    saveDatabase();
     return res.json({ success: true, newCycle: cycle });
   } catch (err) {
     console.error("Error in cycle reset:", err);
