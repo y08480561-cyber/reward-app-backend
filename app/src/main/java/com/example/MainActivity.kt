@@ -47,6 +47,9 @@ class MainActivity : ComponentActivity() {
                                     onFirstNameChange = { viewModel.onFirstNameChange(it) },
                                     onLastNameChange = { viewModel.onLastNameChange(it) },
                                     onPhoneChange = { viewModel.onPhoneNumberChange(it) },
+                                    onPasswordChange = { viewModel.onPasswordChange(it) },
+                                    onAuthModeChange = { viewModel.onAuthModeChange(it) },
+                                    onDirectLogin = { viewModel.loginOrRegister() },
                                     onOtpChange = { viewModel.onOtpCodeChange(it) },
                                     onRequestOtp = { viewModel.requestOtp() },
                                     onVerifyOtp = { viewModel.verifyOtpAndSubmit() }

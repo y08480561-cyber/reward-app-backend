@@ -3,6 +3,7 @@ package com.example.ui.screens
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,11 +21,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -45,6 +50,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -53,8 +59,7 @@ import com.example.ui.theme.ErrorRed
 import com.example.ui.theme.GoldAccent
 import com.example.ui.theme.NavyPrimary
 import com.example.ui.theme.NavySecondary
-import com.example.ui.theme.TextPrimary
-import com.example.ui.theme.TextSecondary
+import com.example.viewmodel.AuthMode
 import com.example.viewmodel.AuthUiState
 
 @Composable
@@ -63,6 +68,9 @@ fun AuthScreen(
     onFirstNameChange: (String) -> Unit,
     onLastNameChange: (String) -> Unit,
     onPhoneChange: (String) -> Unit,
+    onPasswordChange: (String) -> Unit,
+    onAuthModeChange: (AuthMode) -> Unit,
+    onDirectLogin: () -> Unit,
     onOtpChange: (String) -> Unit,
     onRequestOtp: () -> Unit,
     onVerifyOtp: () -> Unit
@@ -82,7 +90,7 @@ fun AuthScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(220.dp)
+                    .height(200.dp)
                     .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
                     .background(
                         Brush.verticalGradient(
@@ -97,7 +105,7 @@ fun AuthScreen(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(68.dp)
+                            .size(64.dp)
                             .clip(CircleShape)
                             .background(GoldAccent)
                             .shadow(8.dp, CircleShape),
@@ -107,10 +115,10 @@ fun AuthScreen(
                             imageVector = Icons.Default.EmojiEvents,
                             contentDescription = null,
                             tint = NavyPrimary,
-                            modifier = Modifier.size(40.dp)
+                            modifier = Modifier.size(38.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "رقابت کن، جایزه ببر",
                         color = Color.White,
@@ -119,9 +127,9 @@ fun AuthScreen(
                         textAlign = TextAlign.Center
                     )
                     Text(
-                        text = "مسابقه بزرگ ۵۰ مربع جایزه‌دار",
+                        text = "سامانه مسابقه ۵۰ مربع جایزه‌دار و ثبت زنده در سرور",
                         color = GoldAccent,
-                        fontSize = 13.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
                         textAlign = TextAlign.Center
                     )
@@ -131,28 +139,87 @@ fun AuthScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(20.dp)
+                    .padding(16.dp)
             ) {
+                // Auth Mode Selector Tabs
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        // Direct Login Tab
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(
+                                    if (state.authMode == AuthMode.DIRECT) NavyPrimary else Color.Transparent
+                                )
+                                .clickable { onAuthModeChange(AuthMode.DIRECT) }
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "ورود مستقیم (بدون پیامک)",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (state.authMode == AuthMode.DIRECT) GoldAccent else Color.DarkGray
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(4.dp))
+
+                        // OTP Tab
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(
+                                    if (state.authMode == AuthMode.OTP) NavyPrimary else Color.Transparent
+                                )
+                                .clickable { onAuthModeChange(AuthMode.OTP) }
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "ورود با پیامک (OTP)",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (state.authMode == AuthMode.OTP) GoldAccent else Color.DarkGray
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
                 // Personal Info Card
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .shadow(4.dp, RoundedCornerShape(20.dp)),
+                        .shadow(3.dp, RoundedCornerShape(18.dp)),
                     colors = CardDefaults.cardColors(containerColor = CardSurface),
-                    shape = RoundedCornerShape(20.dp)
+                    shape = RoundedCornerShape(18.dp)
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(18.dp)
+                            .padding(16.dp)
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(bottom = 12.dp)
+                            modifier = Modifier.padding(bottom = 10.dp)
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(30.dp)
+                                    .size(28.dp)
                                     .clip(CircleShape)
                                     .background(NavySecondary),
                                 contentAlignment = Alignment.Center
@@ -164,10 +231,10 @@ fun AuthScreen(
                                     modifier = Modifier.size(16.dp)
                                 )
                             }
-                            Spacer(modifier = Modifier.width(10.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "اطلاعات شناسایی شرکت‌کننده",
-                                fontSize = 14.sp,
+                                text = "اطلاعات هویتی شرکت‌کننده",
+                                fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = NavyPrimary
                             )
@@ -191,7 +258,7 @@ fun AuthScreen(
                             )
                         )
 
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
 
                         OutlinedTextField(
                             value = state.lastName,
@@ -213,114 +280,105 @@ fun AuthScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-                // Phone & OTP Card
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .shadow(4.dp, RoundedCornerShape(20.dp)),
-                    colors = CardDefaults.cardColors(containerColor = CardSurface),
-                    shape = RoundedCornerShape(20.dp)
-                ) {
-                    Column(
+                // Credentials / Auth Form
+                if (state.authMode == AuthMode.DIRECT) {
+                    // DIRECT AUTH CARD (No SMS)
+                    Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(18.dp)
+                            .shadow(3.dp, RoundedCornerShape(18.dp)),
+                        colors = CardDefaults.cardColors(containerColor = CardSurface),
+                        shape = RoundedCornerShape(18.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(bottom = 12.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(30.dp)
-                                    .clip(CircleShape)
-                                    .background(NavySecondary),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.PhoneAndroid,
-                                    contentDescription = null,
-                                    tint = GoldAccent,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = "شماره تلفن همراه و تایید پیامکی (OTP)",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = NavyPrimary
-                            )
-                        }
-
-                        OutlinedTextField(
-                            value = state.phoneNumber,
-                            onValueChange = onPhoneChange,
-                            label = { Text("شماره همراه (09XXXXXXXXX)") },
-                            placeholder = { Text("09123456789") },
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .testTag("input_phone_number"),
-                            shape = RoundedCornerShape(12.dp),
-                            singleLine = true,
-                            enabled = !state.isOtpSent,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = NavyPrimary,
-                                unfocusedBorderColor = Color.LightGray,
-                                focusedContainerColor = Color.White,
-                                unfocusedContainerColor = Color.White
-                            )
-                        )
-
-                        if (!state.isOtpSent) {
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Button(
-                                onClick = onRequestOtp,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(48.dp)
-                                    .testTag("btn_request_otp"),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = NavySecondary),
-                                enabled = !state.isLoading
+                                .padding(16.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(bottom = 10.dp)
                             ) {
-                                if (state.isLoading) {
-                                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(22.dp))
-                                } else {
-                                    Text("ارسال کد تایید (OTP)", fontWeight = FontWeight.Bold, color = Color.White)
+                                Box(
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .clip(CircleShape)
+                                        .background(NavySecondary),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.VpnKey,
+                                        contentDescription = null,
+                                        tint = GoldAccent,
+                                        modifier = Modifier.size(16.dp)
+                                    )
                                 }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "ورود مستقیم امن (اعتبارسنجی سرور)",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = NavyPrimary
+                                )
                             }
-                        } else {
-                            Spacer(modifier = Modifier.height(12.dp))
+
                             OutlinedTextField(
-                                value = state.otpCode,
-                                onValueChange = onOtpChange,
-                                label = { Text("کد تایید ۵ رقمی دریافتی") },
-                                placeholder = { Text("12345") },
+                                value = state.phoneNumber,
+                                onValueChange = onPhoneChange,
+                                label = { Text("شماره همراه (09XXXXXXXXX)") },
+                                placeholder = { Text("09123456789") },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .testTag("input_otp_code"),
+                                    .testTag("input_phone_number"),
                                 shape = RoundedCornerShape(12.dp),
                                 singleLine = true,
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                                 colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = GoldAccent,
+                                    focusedBorderColor = NavyPrimary,
                                     unfocusedBorderColor = Color.LightGray,
                                     focusedContainerColor = Color.White,
                                     unfocusedContainerColor = Color.White
                                 )
                             )
 
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Button(
-                                onClick = onVerifyOtp,
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            OutlinedTextField(
+                                value = state.password,
+                                onValueChange = onPasswordChange,
+                                label = { Text("رمز عبور یا پین امنیتی سرور") },
+                                placeholder = { Text("2026") },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(48.dp)
-                                    .testTag("btn_verify_otp"),
+                                    .testTag("input_password"),
+                                shape = RoundedCornerShape(12.dp),
+                                singleLine = true,
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = NavyPrimary,
+                                    unfocusedBorderColor = Color.LightGray,
+                                    focusedContainerColor = Color.White,
+                                    unfocusedContainerColor = Color.White
+                                )
+                            )
+
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "راهنما: پین پیش‌فرض معتبر در سرور 2026 است. نیازی به پیامک نیست.",
+                                fontSize = 11.sp,
+                                color = Color(0xFF64748B),
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            )
+
+                            Spacer(modifier = Modifier.height(14.dp))
+
+                            Button(
+                                onClick = onDirectLogin,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(50.dp)
+                                    .testTag("btn_direct_login"),
                                 shape = RoundedCornerShape(12.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = GoldAccent),
                                 enabled = !state.isLoading
@@ -328,16 +386,148 @@ fun AuthScreen(
                                 if (state.isLoading) {
                                     CircularProgressIndicator(color = NavyPrimary, modifier = Modifier.size(22.dp))
                                 } else {
-                                    Text("تایید کد و ورود به مسابقه", fontWeight = FontWeight.Bold, color = NavyPrimary)
+                                    Icon(
+                                        imageVector = Icons.Default.CheckCircle,
+                                        contentDescription = null,
+                                        tint = NavyPrimary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "ورود مستقیم و شروع مسابقه",
+                                        fontWeight = FontWeight.Bold,
+                                        color = NavyPrimary,
+                                        fontSize = 14.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    // OTP AUTH CARD
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .shadow(3.dp, RoundedCornerShape(18.dp)),
+                        colors = CardDefaults.cardColors(containerColor = CardSurface),
+                        shape = RoundedCornerShape(18.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(bottom = 10.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .clip(CircleShape)
+                                        .background(NavySecondary),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PhoneAndroid,
+                                        contentDescription = null,
+                                        tint = GoldAccent,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "احراز هویت با پیامک (OTP)",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = NavyPrimary
+                                )
+                            }
+
+                            OutlinedTextField(
+                                value = state.phoneNumber,
+                                onValueChange = onPhoneChange,
+                                label = { Text("شماره همراه (09XXXXXXXXX)") },
+                                placeholder = { Text("09123456789") },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("input_phone_number"),
+                                shape = RoundedCornerShape(12.dp),
+                                singleLine = true,
+                                enabled = !state.isOtpSent,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = NavyPrimary,
+                                    unfocusedBorderColor = Color.LightGray,
+                                    focusedContainerColor = Color.White,
+                                    unfocusedContainerColor = Color.White
+                                )
+                            )
+
+                            if (!state.isOtpSent) {
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Button(
+                                    onClick = onRequestOtp,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(48.dp)
+                                        .testTag("btn_request_otp"),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = NavySecondary),
+                                    enabled = !state.isLoading
+                                ) {
+                                    if (state.isLoading) {
+                                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(22.dp))
+                                    } else {
+                                        Text("ارسال کد تأیید (OTP)", fontWeight = FontWeight.Bold, color = Color.White)
+                                    }
+                                }
+                            } else {
+                                Spacer(modifier = Modifier.height(12.dp))
+                                OutlinedTextField(
+                                    value = state.otpCode,
+                                    onValueChange = onOtpChange,
+                                    label = { Text("کد تأیید ۵ رقمی دریافتی") },
+                                    placeholder = { Text("12345") },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("input_otp_code"),
+                                    shape = RoundedCornerShape(12.dp),
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = GoldAccent,
+                                        unfocusedBorderColor = Color.LightGray,
+                                        focusedContainerColor = Color.White,
+                                        unfocusedContainerColor = Color.White
+                                    )
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Button(
+                                    onClick = onVerifyOtp,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(48.dp)
+                                        .testTag("btn_verify_otp"),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = GoldAccent),
+                                    enabled = !state.isLoading
+                                ) {
+                                    if (state.isLoading) {
+                                        CircularProgressIndicator(color = NavyPrimary, modifier = Modifier.size(22.dp))
+                                    } else {
+                                        Text("تأیید کد و ورود به مسابقه", fontWeight = FontWeight.Bold, color = NavyPrimary)
+                                    }
                                 }
                             }
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-                // Error Message if any
+                // Error Message
                 AnimatedVisibility(visible = state.errorMessage != null) {
                     Column {
                         Box(
@@ -361,24 +551,47 @@ fun AuthScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                // Info / Success Notice
+                AnimatedVisibility(visible = state.infoMessage != null) {
+                    Column {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFFE0F2FE))
+                                .border(1.5.dp, Color(0xFF0284C7), RoundedCornerShape(12.dp))
+                                .padding(12.dp)
+                        ) {
+                            Text(
+                                text = state.infoMessage ?: "",
+                                color = Color(0xFF0369A1),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(14.dp))
+                    }
+                }
 
+                // Trust Footer
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Security,
+                        imageVector = Icons.Default.CloudDone,
                         contentDescription = null,
-                        tint = Color(0xFF64748B),
+                        tint = Color(0xFF0D9488),
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "ارسـال کد از طریق سرور امن Supabase Auth انجام می‌شود.",
+                        text = "متصل به سرور Render | کاربران و امتیازها در پنل مدیریت ثبت می‌شوند.",
                         fontSize = 11.sp,
-                        color = Color(0xFF64748B),
+                        color = Color(0xFF475569),
                         textAlign = TextAlign.Center
                     )
                 }

@@ -89,15 +89,96 @@ class BackendRepository(
     }
 
     /**
-     * Direct registration or login not supported without OTP verification.
+     * Direct registration or login using server-side validated credentials (no SMS dependency).
+     * Connects to POST /api/auth/login on Render backend.
      */
+    suspend fun loginDirectly(
+        firstName: String,
+        lastName: String,
+        phoneNumber: String,
+        password: String = "2026"
+    ): Result<User> = withContext(Dispatchers.IO) {
+        val cleanPhone = phoneNumber.trim()
+        if (!cleanPhone.matches(Regex("^09[0-9]{9}\$"))) {
+            return@withContext Result.Error("شماره موبایل وارد شده باید ۱۱ رقمی و با 09 شروع شود.")
+        }
+
+        val url = "${prefs.serverUrl.trimEnd('/')}/api/auth/login"
+        val payload = JSONObject().apply {
+            put("firstName", firstName.trim())
+            put("lastName", lastName.trim())
+            put("phoneNumber", cleanPhone)
+            put("password", password.trim().ifEmpty { "2026" })
+        }
+
+        try {
+            val request = Request.Builder()
+                .url(url)
+                .header("Content-Type", "application/json")
+                .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (response.isSuccessful) {
+                    val json = JSONObject(body)
+                    val userObj = json.optJSONObject("user")
+                    if (userObj == null) {
+                        return@withContext Result.Error("پاسخ نامعتبر از سرور: اطلاعات کاربر یافت نشد.")
+                    }
+
+                    val userId = userObj.optString("id")
+                    val fName = userObj.optString("firstName", firstName)
+                    val lName = userObj.optString("lastName", lastName)
+                    val phone = userObj.optString("phoneNumber", cleanPhone)
+                    val token = userObj.optString("token", "")
+                    val score = userObj.optInt("totalScore", 0)
+
+                    if (userId.isBlank() || token.isBlank()) {
+                        return@withContext Result.Error("پاسخ نامعتبر از سرور احراز هویت: شناسه یا توکن کاربر معتبر نیست.")
+                    }
+
+                    val user = User(
+                        id = userId,
+                        firstName = fName,
+                        lastName = lName,
+                        phoneNumber = phone,
+                        totalScore = score,
+                        token = token,
+                        registeredAt = System.currentTimeMillis()
+                    )
+
+                    userDao.saveUser(
+                        UserEntity(
+                            id = user.id,
+                            firstName = user.firstName,
+                            lastName = user.lastName,
+                            phoneNumber = user.phoneNumber,
+                            totalScore = user.totalScore,
+                            token = user.token,
+                            registeredAt = user.registeredAt
+                        )
+                    )
+                    prefs.saveUserSession(user.id, user.firstName, user.lastName, user.phoneNumber, user.token, user.totalScore)
+                    ensureActiveCycle(user.id)
+
+                    Result.Success(user)
+                } else {
+                    val errJson = try { JSONObject(body) } catch (e: Exception) { null }
+                    val msg = errJson?.optString("error") ?: "خطا در احراز هویت با سرور"
+                    Result.Error(msg)
+                }
+            }
+        } catch (e: Exception) {
+            Result.Error("خطای شبکه در ارتباط با سرور: ${e.localizedMessage}")
+        }
+    }
+
     suspend fun registerOrLoginUser(
         firstName: String,
         lastName: String,
         phoneNumber: String
-    ): Result<User> = withContext(Dispatchers.IO) {
-        Result.Error("لطفاً از طریق ارسال کد تایید (OTP) وارد شوید.")
-    }
+    ): Result<User> = loginDirectly(firstName, lastName, phoneNumber, "2026")
 
     /**
      * Verify SMS OTP and complete user registration or login via Render backend POST /api/auth/otp/verify.

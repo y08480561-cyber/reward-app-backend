@@ -320,6 +320,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun onFirstNameChange(value: String) = _authUiState.update { it.copy(firstName = value, errorMessage = null) }
     fun onLastNameChange(value: String) = _authUiState.update { it.copy(lastName = value, errorMessage = null) }
     fun onPhoneNumberChange(value: String) = _authUiState.update { it.copy(phoneNumber = value, errorMessage = null) }
+    fun onPasswordChange(value: String) = _authUiState.update { it.copy(password = value, errorMessage = null) }
+    fun onAuthModeChange(mode: AuthMode) = _authUiState.update { it.copy(authMode = mode, errorMessage = null, infoMessage = null) }
     fun onOtpCodeChange(value: String) = _authUiState.update { it.copy(otpCode = value, errorMessage = null) }
 
     fun loginOrRegister() {
@@ -336,13 +338,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _authUiState.update { it.copy(errorMessage = "شماره موبایل وارد شده باید ۱۱ رقم و با 09 آغاز شود.") }
             return
         }
+        val pin = state.password.trim().ifEmpty { "2026" }
 
         viewModelScope.launch {
             _authUiState.update { it.copy(isLoading = true, errorMessage = null) }
-            when (val result = backendRepository.registerOrLoginUser(
+            when (val result = backendRepository.loginDirectly(
                 firstName = state.firstName,
                 lastName = state.lastName,
-                phoneNumber = state.phoneNumber
+                phoneNumber = state.phoneNumber,
+                password = pin
             )) {
                 is Result.Success -> {
                     val user = result.data
@@ -350,7 +354,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _uiState.update {
                         it.copy(
                             currentUser = user,
-                            currentScreen = AppScreen.PROFILE,
+                            currentScreen = AppScreen.SQUARES,
                             infoMessage = "خوش آمدید، ${user.firstName} عزیز!"
                         )
                     }

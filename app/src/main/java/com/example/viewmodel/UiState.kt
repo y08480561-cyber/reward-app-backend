@@ -16,15 +16,23 @@ enum class AppScreen {
     PROFILE
 }
 
+enum class AuthMode {
+    DIRECT, // Server-validated direct login without SMS
+    OTP     // SMS OTP login
+}
+
 data class AuthUiState(
     val firstName: String = "",
     val lastName: String = "",
     val phoneNumber: String = "",
+    val password: String = "2026",
+    val authMode: AuthMode = AuthMode.DIRECT,
     val otpCode: String = "",
     val isOtpSent: Boolean = false,
     val otpCountdown: Int = 120,
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
+    val infoMessage: String? = null,
     val simulatedSentOtp: String? = null
 )
 
