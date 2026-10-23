@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -21,9 +20,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.EmojiEvents
-import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Security
@@ -53,7 +51,6 @@ import androidx.compose.ui.unit.sp
 import com.example.ui.theme.CardSurface
 import com.example.ui.theme.ErrorRed
 import com.example.ui.theme.GoldAccent
-import com.example.ui.theme.GoldLight
 import com.example.ui.theme.NavyPrimary
 import com.example.ui.theme.NavySecondary
 import com.example.ui.theme.TextPrimary
@@ -66,7 +63,9 @@ fun AuthScreen(
     onFirstNameChange: (String) -> Unit,
     onLastNameChange: (String) -> Unit,
     onPhoneChange: (String) -> Unit,
-    onSubmit: () -> Unit
+    onOtpChange: (String) -> Unit,
+    onRequestOtp: () -> Unit,
+    onVerifyOtp: () -> Unit
 ) {
     val scrollState = rememberScrollState()
 
@@ -83,7 +82,7 @@ fun AuthScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(230.dp)
+                    .height(220.dp)
                     .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
                     .background(
                         Brush.verticalGradient(
@@ -98,7 +97,7 @@ fun AuthScreen(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(72.dp)
+                            .size(68.dp)
                             .clip(CircleShape)
                             .background(GoldAccent)
                             .shadow(8.dp, CircleShape),
@@ -108,22 +107,22 @@ fun AuthScreen(
                             imageVector = Icons.Default.EmojiEvents,
                             contentDescription = null,
                             tint = NavyPrimary,
-                            modifier = Modifier.size(44.dp)
+                            modifier = Modifier.size(40.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
                     Text(
                         text = "رقابت کن، جایزه ببر",
                         color = Color.White,
-                        fontSize = 22.sp,
+                        fontSize = 20.sp,
                         fontWeight = FontWeight.ExtraBold,
                         textAlign = TextAlign.Center
                     )
-                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "ورود مستقیم به ۵۰ مربع مسابقه",
-                        color = GoldLight,
+                        text = "مسابقه بزرگ ۵۰ مربع جایزه‌دار",
+                        color = GoldAccent,
                         fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
                         textAlign = TextAlign.Center
                     )
                 }
@@ -132,23 +131,20 @@ fun AuthScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .offset(y = (-20).dp)
-                    .padding(horizontal = 20.dp)
-                    .padding(bottom = 24.dp)
+                    .padding(20.dp)
             ) {
-                // SECTION 1: مشخصات فردی (نام و نام خانوادگی) with prominent bold border
+                // Personal Info Card
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .shadow(4.dp, RoundedCornerShape(20.dp))
-                        .border(2.5.dp, NavyPrimary, RoundedCornerShape(20.dp)),
+                        .shadow(4.dp, RoundedCornerShape(20.dp)),
                     colors = CardDefaults.cardColors(containerColor = CardSurface),
                     shape = RoundedCornerShape(20.dp)
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(20.dp)
+                            .padding(18.dp)
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -156,91 +152,62 @@ fun AuthScreen(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(32.dp)
+                                    .size(30.dp)
                                     .clip(CircleShape)
-                                    .background(NavyPrimary),
+                                    .background(NavySecondary),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Person,
                                     contentDescription = null,
                                     tint = GoldAccent,
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
                             }
                             Spacer(modifier = Modifier.width(10.dp))
-                            Column {
-                                Text(
-                                    text = "بخش اول: مشخصات فردی",
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = NavyPrimary
-                                )
-                                Text(
-                                    text = "نام و نام خانوادگی خود را وارد کنید",
-                                    fontSize = 11.sp,
-                                    color = TextSecondary
-                                )
-                            }
+                            Text(
+                                text = "اطلاعات شناسایی شرکت‌کننده",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NavyPrimary
+                            )
                         }
 
-                        // First Name Input with Bold Border
                         OutlinedTextField(
                             value = state.firstName,
                             onValueChange = onFirstNameChange,
-                            label = { Text("نام", fontWeight = FontWeight.Bold) },
-                            placeholder = { Text("مثال: مهدی") },
-                            leadingIcon = {
-                                Icon(Icons.Default.Person, contentDescription = null, tint = NavyPrimary)
-                            },
+                            label = { Text("نام کوچک") },
+                            placeholder = { Text("مثلاً علی") },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .border(2.dp, NavySecondary, RoundedCornerShape(14.dp))
                                 .testTag("input_first_name"),
-                            shape = RoundedCornerShape(14.dp),
+                            shape = RoundedCornerShape(12.dp),
                             singleLine = true,
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = NavyPrimary,
-                                unfocusedBorderColor = Color.Transparent,
+                                unfocusedBorderColor = Color.LightGray,
                                 focusedContainerColor = Color.White,
-                                unfocusedContainerColor = Color.White,
-                                focusedLabelColor = NavyPrimary,
-                                unfocusedLabelColor = NavyPrimary,
-                                focusedLeadingIconColor = NavyPrimary,
-                                unfocusedLeadingIconColor = NavySecondary,
-                                focusedTextColor = TextPrimary,
-                                unfocusedTextColor = TextPrimary
+                                unfocusedContainerColor = Color.White
                             )
                         )
 
-                        Spacer(modifier = Modifier.height(14.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
 
-                        // Last Name Input with Bold Border
                         OutlinedTextField(
                             value = state.lastName,
                             onValueChange = onLastNameChange,
-                            label = { Text("نام خانوادگی", fontWeight = FontWeight.Bold) },
-                            placeholder = { Text("مثال: محمدی") },
-                            leadingIcon = {
-                                Icon(Icons.Default.Badge, contentDescription = null, tint = NavyPrimary)
-                            },
+                            label = { Text("نام خانوادگی") },
+                            placeholder = { Text("مثلاً رضایی") },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .border(2.dp, NavySecondary, RoundedCornerShape(14.dp))
                                 .testTag("input_last_name"),
-                            shape = RoundedCornerShape(14.dp),
+                            shape = RoundedCornerShape(12.dp),
                             singleLine = true,
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = NavyPrimary,
-                                unfocusedBorderColor = Color.Transparent,
+                                unfocusedBorderColor = Color.LightGray,
                                 focusedContainerColor = Color.White,
-                                unfocusedContainerColor = Color.White,
-                                focusedLabelColor = NavyPrimary,
-                                unfocusedLabelColor = NavyPrimary,
-                                focusedLeadingIconColor = NavyPrimary,
-                                unfocusedLeadingIconColor = NavySecondary,
-                                focusedTextColor = TextPrimary,
-                                unfocusedTextColor = TextPrimary
+                                unfocusedContainerColor = Color.White
                             )
                         )
                     }
@@ -248,19 +215,18 @@ fun AuthScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // SECTION 2: شماره تلفن همراه (کاملاً تفکیک‌شده و مجزا با کادر پررنگ)
+                // Phone & OTP Card
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .shadow(4.dp, RoundedCornerShape(20.dp))
-                        .border(2.5.dp, NavySecondary, RoundedCornerShape(20.dp)),
+                        .shadow(4.dp, RoundedCornerShape(20.dp)),
                     colors = CardDefaults.cardColors(containerColor = CardSurface),
                     shape = RoundedCornerShape(20.dp)
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(20.dp)
+                            .padding(18.dp)
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -268,7 +234,7 @@ fun AuthScreen(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(32.dp)
+                                    .size(30.dp)
                                     .clip(CircleShape)
                                     .background(NavySecondary),
                                 contentAlignment = Alignment.Center
@@ -277,58 +243,99 @@ fun AuthScreen(
                                     imageVector = Icons.Default.PhoneAndroid,
                                     contentDescription = null,
                                     tint = GoldAccent,
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
                             }
                             Spacer(modifier = Modifier.width(10.dp))
-                            Column {
-                                Text(
-                                    text = "بخش دوم: شماره تماس همراه",
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = NavyPrimary
-                                )
-                                Text(
-                                    text = "بدون نیاز به کد پیامکی، ورود مستقیم انجام می‌شود",
-                                    fontSize = 11.sp,
-                                    color = TextSecondary
-                                )
-                            }
+                            Text(
+                                text = "شماره تلفن همراه و تایید پیامکی (OTP)",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NavyPrimary
+                            )
                         }
 
-                        // Phone Number Input with Bold Border
                         OutlinedTextField(
                             value = state.phoneNumber,
                             onValueChange = onPhoneChange,
-                            label = { Text("شماره تلفن همراه", fontWeight = FontWeight.Bold) },
+                            label = { Text("شماره همراه (09XXXXXXXXX)") },
                             placeholder = { Text("09123456789") },
-                            leadingIcon = {
-                                Icon(Icons.Default.PhoneAndroid, contentDescription = null, tint = NavyPrimary)
-                            },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .border(2.dp, NavySecondary, RoundedCornerShape(14.dp))
                                 .testTag("input_phone_number"),
-                            shape = RoundedCornerShape(14.dp),
+                            shape = RoundedCornerShape(12.dp),
                             singleLine = true,
+                            enabled = !state.isOtpSent,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = NavyPrimary,
-                                unfocusedBorderColor = Color.Transparent,
+                                unfocusedBorderColor = Color.LightGray,
                                 focusedContainerColor = Color.White,
-                                unfocusedContainerColor = Color.White,
-                                focusedLabelColor = NavyPrimary,
-                                unfocusedLabelColor = NavyPrimary,
-                                focusedLeadingIconColor = NavyPrimary,
-                                unfocusedLeadingIconColor = NavySecondary,
-                                focusedTextColor = TextPrimary,
-                                unfocusedTextColor = TextPrimary
+                                unfocusedContainerColor = Color.White
                             )
                         )
+
+                        if (!state.isOtpSent) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(
+                                onClick = onRequestOtp,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp)
+                                    .testTag("btn_request_otp"),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = NavySecondary),
+                                enabled = !state.isLoading
+                            ) {
+                                if (state.isLoading) {
+                                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(22.dp))
+                                } else {
+                                    Text("ارسال کد تایید (OTP)", fontWeight = FontWeight.Bold, color = Color.White)
+                                }
+                            }
+                        } else {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            OutlinedTextField(
+                                value = state.otpCode,
+                                onValueChange = onOtpChange,
+                                label = { Text("کد تایید ۵ رقمی دریافتی") },
+                                placeholder = { Text("12345") },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("input_otp_code"),
+                                shape = RoundedCornerShape(12.dp),
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = GoldAccent,
+                                    unfocusedBorderColor = Color.LightGray,
+                                    focusedContainerColor = Color.White,
+                                    unfocusedContainerColor = Color.White
+                                )
+                            )
+
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(
+                                onClick = onVerifyOtp,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp)
+                                    .testTag("btn_verify_otp"),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = GoldAccent),
+                                enabled = !state.isLoading
+                            ) {
+                                if (state.isLoading) {
+                                    CircularProgressIndicator(color = NavyPrimary, modifier = Modifier.size(22.dp))
+                                } else {
+                                    Text("تایید کد و ورود به مسابقه", fontWeight = FontWeight.Bold, color = NavyPrimary)
+                                }
+                            }
+                        }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 // Error Message if any
                 AnimatedVisibility(visible = state.errorMessage != null) {
@@ -354,50 +361,10 @@ fun AuthScreen(
                     }
                 }
 
-                // Direct Submit Button
-                Button(
-                    onClick = onSubmit,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(54.dp)
-                        .shadow(6.dp, RoundedCornerShape(16.dp))
-                        .testTag("btn_submit_auth"),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = NavyPrimary),
-                    enabled = !state.isLoading
-                ) {
-                    if (state.isLoading) {
-                        CircularProgressIndicator(
-                            color = Color.White,
-                            modifier = Modifier.size(24.dp),
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Person,
-                                contentDescription = null,
-                                tint = GoldAccent,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "تایید و ورود به برنامه",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = Color.White
-                            )
-                        }
-                    }
-                }
-
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Security & Privacy Notice
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -409,7 +376,7 @@ fun AuthScreen(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "اطلاعات شما با امنیت کامل و بدون نیاز به ارسال پیامک ذخیره می‌شود.",
+                        text = "ارسـال کد از طریق سرور امن Supabase Auth انجام می‌شود.",
                         fontSize = 11.sp,
                         color = Color(0xFF64748B),
                         textAlign = TextAlign.Center

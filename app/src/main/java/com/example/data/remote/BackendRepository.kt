@@ -18,6 +18,13 @@ import kotlinx.coroutines.withContext
 import java.security.MessageDigest
 import java.util.UUID
 
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
+import java.util.concurrent.TimeUnit
+
 sealed class Result<out T> {
     data class Success<out T>(val data: T) : Result<T>()
     data class Error(val message: String, val code: Int = -1) : Result<Nothing>()
@@ -34,14 +41,16 @@ class BackendRepository(
     private val adLogDao = database.adLogDao()
     val supabaseClient = SupabaseApiClient(prefs)
 
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .build()
+
     // 24 hours in milliseconds
     private val CYCLE_DURATION_MS = 24 * 60 * 60 * 1000L
 
-    // In-memory OTP code for SMS verification simulation
-    private val pendingOtps = mutableMapOf<String, String>()
-
     /**
-     * Request OTP code via Supabase GoTrue Auth API.
+     * Request OTP code via Render backend POST /api/auth/otp/request.
      */
     suspend fun requestOtp(phoneNumber: String): Result<String> = withContext(Dispatchers.IO) {
         val cleanPhone = phoneNumber.trim()
@@ -49,13 +58,33 @@ class BackendRepository(
             return@withContext Result.Error("شماره موبایل وارد شده باید ۱۱ رقمی و با 09 شروع شود.")
         }
 
-        if (!supabaseClient.isConfigured) {
-            return@withContext Result.Error("تنظیمات اتصال به Supabase تنظیم نشده است. ارسال پیامک نیازمند اتصال سرور ابری است.")
+        val url = "${prefs.serverUrl.trimEnd('/')}/api/auth/otp/request"
+        val payload = JSONObject().apply {
+            put("phoneNumber", cleanPhone)
         }
 
-        when (val result = supabaseClient.requestAuthOtp(cleanPhone)) {
-            is Result.Success -> Result.Success(result.data)
-            is Result.Error -> Result.Error(result.message)
+        try {
+            val request = Request.Builder()
+                .url(url)
+                .header("Content-Type", "application/json")
+                .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (response.isSuccessful) {
+                    val json = JSONObject(body)
+                    val debugOtp = json.optString("debugOtp", "")
+                    val msg = json.optString("message", "کد تایید ارسال گردید.")
+                    Result.Success(debugOtp.ifBlank { msg })
+                } else {
+                    val errJson = try { JSONObject(body) } catch(e: Exception) { null }
+                    val msg = errJson?.optString("error") ?: "خطا در ارسال کد تایید از سرور"
+                    Result.Error(msg)
+                }
+            }
+        } catch (e: Exception) {
+            Result.Error("خطای شبکه در ارتباط با سرور: ${e.localizedMessage}")
         }
     }
 
@@ -71,7 +100,7 @@ class BackendRepository(
     }
 
     /**
-     * Verify SMS OTP and complete user registration or login via Supabase Auth session token.
+     * Verify SMS OTP and complete user registration or login via Render backend POST /api/auth/otp/verify.
      */
     suspend fun verifyOtpAndLogin(
         firstName: String,
@@ -81,50 +110,78 @@ class BackendRepository(
     ): Result<User> = withContext(Dispatchers.IO) {
         val cleanPhone = phoneNumber.trim()
 
-        if (!supabaseClient.isConfigured) {
-            return@withContext Result.Error("اتصال به سرور Supabase تنظیم نشده است. ورود مسابقه‌ای نیازمند سرور آنلاین است.")
-        }
-
-        if (otpCode.length < 5) {
+        if (otpCode.length < 4) {
             return@withContext Result.Error("کد تایید وارد شده نامعتبر است.")
         }
 
-        when (val verifyResult = supabaseClient.verifyAuthOtp(cleanPhone, otpCode)) {
-            is Result.Success -> {
-                val json = verifyResult.data
-                val accessToken = json.optString("access_token")
-                val userObj = json.optJSONObject("user")
-                val userId = userObj?.optString("id") ?: ("USR_" + UUID.randomUUID().toString().take(8).uppercase())
+        val url = "${prefs.serverUrl.trimEnd('/')}/api/auth/otp/verify"
+        val payload = JSONObject().apply {
+            put("firstName", firstName.trim())
+            put("lastName", lastName.trim())
+            put("phoneNumber", cleanPhone)
+            put("otpCode", otpCode.trim())
+        }
 
-                val user = User(
-                    id = userId,
-                    firstName = firstName.trim(),
-                    lastName = lastName.trim(),
-                    phoneNumber = cleanPhone,
-                    totalScore = 0,
-                    token = accessToken,
-                    registeredAt = System.currentTimeMillis()
-                )
+        try {
+            val request = Request.Builder()
+                .url(url)
+                .header("Content-Type", "application/json")
+                .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+                .build()
 
-                userDao.saveUser(
-                    UserEntity(
-                        id = user.id,
-                        firstName = user.firstName,
-                        lastName = user.lastName,
-                        phoneNumber = user.phoneNumber,
-                        totalScore = user.totalScore,
-                        token = user.token,
-                        registeredAt = user.registeredAt
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (response.isSuccessful) {
+                    val json = JSONObject(body)
+                    val userObj = json.optJSONObject("user")
+                    if (userObj == null) {
+                        return@withContext Result.Error("پاسخ نامعتبر از سرور: اطلاعات کاربر یافت نشد.")
+                    }
+
+                    val userId = userObj.optString("id")
+                    val fName = userObj.optString("firstName", firstName)
+                    val lName = userObj.optString("lastName", lastName)
+                    val phone = userObj.optString("phoneNumber", cleanPhone)
+                    val token = userObj.optString("token", "")
+                    val score = userObj.optInt("totalScore", 0)
+
+                    if (userId.isBlank() || token.isBlank()) {
+                        return@withContext Result.Error("پاسخ نامعتبر از سرور احراز هویت: توکن یا شناسه کاربر معتبر نیست.")
+                    }
+
+                    val user = User(
+                        id = userId,
+                        firstName = fName,
+                        lastName = lName,
+                        phoneNumber = phone,
+                        totalScore = score,
+                        token = token,
+                        registeredAt = System.currentTimeMillis()
                     )
-                )
-                prefs.saveUserSession(user.id, user.firstName, user.lastName, user.phoneNumber, user.token, user.totalScore)
-                ensureActiveCycle(user.id)
 
-                Result.Success(user)
+                    userDao.saveUser(
+                        UserEntity(
+                            id = user.id,
+                            firstName = user.firstName,
+                            lastName = user.lastName,
+                            phoneNumber = user.phoneNumber,
+                            totalScore = user.totalScore,
+                            token = user.token,
+                            registeredAt = user.registeredAt
+                        )
+                    )
+                    prefs.saveUserSession(user.id, user.firstName, user.lastName, user.phoneNumber, user.token, user.totalScore)
+                    ensureActiveCycle(user.id)
+
+                    Result.Success(user)
+                } else {
+                    val errJson = try { JSONObject(body) } catch(e: Exception) { null }
+                    val msg = errJson?.optString("error") ?: "کد تایید نامعتبر یا منقضی شده است."
+                    Result.Error(msg)
+                }
             }
-            is Result.Error -> {
-                Result.Error(verifyResult.message)
-            }
+        } catch (e: Exception) {
+            Result.Error("خطای شبکه در تایید کد: ${e.localizedMessage}")
         }
     }
 

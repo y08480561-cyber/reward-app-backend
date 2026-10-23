@@ -26,7 +26,7 @@ class PreferencesManager(context: Context) {
         // Real Tapsell Plus credentials provided by user
         const val DEFAULT_TAPSELL_KEY = "sgedhqdbofphgpajkrqtahjkedbkokdlqiesotcmfqcklbamjaaiddqsqnihdtmobfidcb"
         const val DEFAULT_REWARDED_ZONE = "6ad231b89140ba2215e772db"
-        const val DEFAULT_SERVER_URL = "https://api.reqabat.app"
+        const val DEFAULT_SERVER_URL = "https://reward-app-backend-a9ze.onrender.com"
         const val DEFAULT_ADMIN_PIN = "1234"
         const val DEFAULT_SUPABASE_URL = ""
         const val DEFAULT_SUPABASE_ANON_KEY = ""
