@@ -12,6 +12,16 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Standalone Admin Users Page (Pure users table)
+app.get(['/admin/users', '/admin/users/'], (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'users.html'));
+});
+
+// Admin Dashboard Alias
+app.get(['/admin', '/admin/dashboard'], (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 // Health check endpoint for Render
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok', uptime: process.uptime(), timestamp: Date.now() });
@@ -424,6 +434,20 @@ app.get('/api/admin/overview', requireAdminAuth, (req, res) => {
     totalScoresSum,
     settings: db.settings,
     recentSessions: sessions,
+    users
+  });
+});
+
+// 6.1 Admin Users List API (Protected - Standalone Users Table)
+app.get('/api/admin/users', requireAdminAuth, (req, res) => {
+  const users = Array.from(db.users.values()).map(u => ({
+    ...u,
+    score: db.userScores.get(u.id)?.totalScore || 0
+  })).sort((a, b) => b.score - a.score);
+
+  return res.json({
+    success: true,
+    totalUsers: users.length,
     users
   });
 });
