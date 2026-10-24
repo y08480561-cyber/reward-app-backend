@@ -63,7 +63,7 @@ class TapsellAdsManager(
         val appKey = prefs.tapsellAppKey.trim()
         Log.d(TAG, "Initializing Tapsell Plus SDK with AppKey: ${appKey.take(10)}...")
         try {
-            TapsellPlus.setDebugMode(Log.DEBUG)
+            TapsellPlus.setDebugMode(Log.INFO)
             TapsellPlus.initialize(context, appKey, object : TapsellPlusInitListener {
                 override fun onInitializeSuccess(adNetworks: AdNetworks?) {
                     isSdkInitialized = true
