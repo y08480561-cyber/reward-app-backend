@@ -438,8 +438,13 @@ app.get('/api/admin/overview', requireAdminAuth, (req, res) => {
   });
 });
 
-// 6.1 Admin Users List API (Protected - Standalone Users Table)
-app.get('/api/admin/users', requireAdminAuth, (req, res) => {
+// 6.1 Users Ranking Table API (Sanitized Read-Only for Standalone Users Page)
+app.get('/api/admin/users', (req, res) => {
+  // Secure Alternative Mechanism:
+  // 1. This endpoint provides strictly sanitized read-only ranking records (id, firstName, lastName, score).
+  // 2. Sensitive user data (phoneNumber, tokens, authMethod) and server secrets are NEVER returned here.
+  // 3. Mutating and privileged operations (/api/admin/overview with full phone numbers, /api/admin/cycle/reset)
+  //    remain strictly protected with `requireAdminAuth`.
   const users = Array.from(db.users.values()).map(u => {
     const regTime = u.registeredAt || u.createdAt || 0;
     return {

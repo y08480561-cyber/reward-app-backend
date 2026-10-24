@@ -51,16 +51,6 @@
     .form-control-dark::placeholder {
       color: #94A3B8;
     }
-    .btn-gold {
-      background: linear-gradient(135deg, #FFB703, #FB8500);
-      color: #0B192C;
-      font-weight: bold;
-      border: none;
-    }
-    .btn-gold:hover {
-      background: linear-gradient(135deg, #FB8500, #FFB703);
-      color: #0B192C;
-    }
     .user-id-badge {
       background-color: #0B192C;
       border: 1px solid #2E5077;
@@ -75,28 +65,13 @@
       font-weight: 700;
       font-size: 0.95rem;
     }
-    /* Auth Modal Overlay */
-    .auth-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(11, 25, 44, 0.88);
-      backdrop-filter: blur(6px);
-      z-index: 9999;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 16px;
-    }
   </style>
 </head>
 <body>
 
-  <!-- Clean Main Page Content -->
+  <!-- Main Direct Users Table View -->
   <main class="container-fluid px-3 px-md-4 max-w-7xl py-4">
-    <!-- Header with Title and Search only -->
+    <!-- Header with Title and Search -->
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
       <h2 class="gold-text mb-0">
         <i class="bi bi-trophy-fill text-warning me-2"></i>فهرست کاربران واقعی
@@ -105,6 +80,9 @@
         <input type="text" id="userSearchInput" class="form-control form-control-dark" style="min-width: 260px;" placeholder="جستجو بر اساس نام یا شناسه..." onkeyup="filterUsers()">
       </div>
     </div>
+
+    <!-- Alert Box (in case of network failure) -->
+    <div id="alertBox" class="alert alert-danger d-none shadow-sm" role="alert"></div>
 
     <!-- Users Table Card -->
     <div class="card p-3 p-md-4">
@@ -131,41 +109,16 @@
     </div>
   </main>
 
-  <!-- Clean Security Dialog (Only shown if key is missing or invalid) -->
-  <div id="authModal" class="auth-overlay d-none">
-    <div class="card p-4" style="max-width: 420px; width: 100%; border-color: #FFB703;">
-      <div class="text-center mb-3">
-        <div class="mb-2">
-          <i class="bi bi-shield-lock-fill text-warning" style="font-size: 2.5rem;"></i>
-        </div>
-        <h5 class="gold-text mb-1">احراز هویت مدیر</h5>
-        <p class="text-secondary small mb-0">برای مشاهده فهرست کاربران و مجموع امتیازها، کلید امنیتی مدیریت را وارد کنید:</p>
-      </div>
-
-      <form onsubmit="event.preventDefault(); submitAuthKey();">
-        <div class="mb-3">
-          <input type="password" id="modalKeyInput" class="form-control form-control-dark py-2 text-center" placeholder="کلید مدیریت (ADMIN_KEY)..." autocomplete="current-password" autofocus>
-          <div id="modalErrorMsg" class="text-danger small mt-2 text-center d-none"></div>
-        </div>
-        <button type="submit" id="modalSubmitBtn" class="btn btn-gold w-100 py-2">
-          <span id="modalSpinner" class="spinner-border spinner-border-sm me-1 d-none" role="status"></span>
-          ورود به فهرست کاربران
-        </button>
-      </form>
-    </div>
-  </div>
-
   <script>
     let cachedUsers = [];
 
-    // Check if key is provided in URL query (?key=... or ?adminKey=...)
+    // Optional query parameter handling (?key=... or ?adminKey=...)
     (function handleUrlKey() {
       try {
         const params = new URLSearchParams(window.location.search);
         const urlKey = params.get('key') || params.get('adminKey');
         if (urlKey && urlKey.trim()) {
           localStorage.setItem('reqabat_admin_key', urlKey.trim());
-          // Remove key from URL for security without reloading
           const cleanUrl = window.location.pathname;
           window.history.replaceState({}, document.title, cleanUrl);
         }
@@ -174,60 +127,21 @@
       }
     })();
 
-    function getAdminKey() {
+    function getSavedKey() {
       return (localStorage.getItem('reqabat_admin_key') || '').trim();
     }
 
-    function showAuthModal(errorText) {
-      const modal = document.getElementById('authModal');
-      const errBox = document.getElementById('modalErrorMsg');
-      modal.classList.remove('d-none');
-      if (errorText) {
-        errBox.innerText = errorText;
-        errBox.classList.remove('d-none');
-      } else {
-        errBox.classList.add('d-none');
+    function showAlert(msg) {
+      const el = document.getElementById('alertBox');
+      if (el) {
+        el.innerText = msg;
+        el.classList.remove('d-none');
       }
-      setTimeout(() => {
-        const inp = document.getElementById('modalKeyInput');
-        if (inp) inp.focus();
-      }, 100);
     }
 
-    function hideAuthModal() {
-      document.getElementById('authModal').classList.add('d-none');
-      document.getElementById('modalErrorMsg').classList.add('d-none');
-    }
-
-    async function submitAuthKey() {
-      const inp = document.getElementById('modalKeyInput');
-      const btn = document.getElementById('modalSubmitBtn');
-      const spinner = document.getElementById('modalSpinner');
-      const key = (inp.value || '').trim();
-
-      if (!key) {
-        const errBox = document.getElementById('modalErrorMsg');
-        errBox.innerText = 'لطفاً کلید مدیریت را وارد کنید.';
-        errBox.classList.remove('d-none');
-        return;
-      }
-
-      btn.disabled = true;
-      spinner.classList.remove('d-none');
-
-      localStorage.setItem('reqabat_admin_key', key);
-      const success = await loadUsers();
-
-      btn.disabled = false;
-      spinner.classList.add('d-none');
-
-      if (success) {
-        hideAuthModal();
-      } else {
-        const errBox = document.getElementById('modalErrorMsg');
-        errBox.innerText = 'کلید مدیریت وارد شده نامعتبر است.';
-        errBox.classList.remove('d-none');
-      }
+    function hideAlert() {
+      const el = document.getElementById('alertBox');
+      if (el) el.classList.add('d-none');
     }
 
     function sortUsersList(list) {
@@ -247,40 +161,28 @@
     }
 
     async function loadUsers() {
-      const key = getAdminKey();
+      hideAlert();
 
-      if (!key) {
-        showAuthModal();
-        return false;
+      const headers = {};
+      const key = getSavedKey();
+      if (key) {
+        headers['x-admin-key'] = key;
       }
 
       try {
-        const res = await fetch('/api/admin/users', {
-          headers: {
-            'x-admin-key': key
-          }
-        });
-
-        if (res.status === 401) {
-          showAuthModal('کلید مدیریت منقضی یا نامعتبر است.');
-          return false;
-        }
+        const res = await fetch('/api/admin/users', { headers });
 
         if (!res.ok) {
-          throw new Error('خطا در ارتباط با سرور (کد ' + res.status + ')');
+          throw new Error('خطا در دریافت اطلاعات از سرور (کد ' + res.status + ')');
         }
 
         const data = await res.json();
-        hideAuthModal();
-
-        // Sort descending by total score
         cachedUsers = sortUsersList(data.users || []);
         renderUsers(cachedUsers);
-        return true;
 
       } catch (err) {
         console.error('Error loading users:', err);
-        return false;
+        showAlert(err.message || 'خطا در ارتباط با سرور.');
       }
     }
 
@@ -328,10 +230,10 @@
       renderUsers(filtered);
     }
 
-    // Initial load
+    // Direct initial load
     loadUsers();
 
-    // Auto-refresh every 12 seconds with real data
+    // Auto-refresh every 12 seconds with live data
     setInterval(loadUsers, 12000);
   </script>
 </body>
