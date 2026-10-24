@@ -12,6 +12,8 @@
       background-color: #0B192C;
       color: #F8FAFC;
       min-height: 100vh;
+      margin: 0;
+      padding: 0;
     }
     .card {
       background-color: #1E3E62;
@@ -22,7 +24,8 @@
     }
     .gold-text {
       color: #FFB703;
-      font-weight: bold;
+      font-weight: 800;
+      letter-spacing: -0.5px;
     }
     .badge-gold {
       background: linear-gradient(135deg, #FFB703, #FB8500);
@@ -45,6 +48,9 @@
       color: #fff;
       box-shadow: 0 0 0 0.25rem rgba(255,183,3,0.25);
     }
+    .form-control-dark::placeholder {
+      color: #94A3B8;
+    }
     .btn-gold {
       background: linear-gradient(135deg, #FFB703, #FB8500);
       color: #0B192C;
@@ -54,10 +60,6 @@
     .btn-gold:hover {
       background: linear-gradient(135deg, #FB8500, #FFB703);
       color: #0B192C;
-    }
-    .auth-bar {
-      background-color: #152A44;
-      border-bottom: 2px solid #2E5077;
     }
     .user-id-badge {
       background-color: #0B192C;
@@ -71,72 +73,47 @@
     .row-index {
       color: #94A3B8;
       font-weight: 700;
+      font-size: 0.95rem;
+    }
+    /* Auth Modal Overlay */
+    .auth-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(11, 25, 44, 0.88);
+      backdrop-filter: blur(6px);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
     }
   </style>
 </head>
 <body>
 
-  <!-- Top Admin Auth Bar -->
-  <header class="auth-bar py-2 px-3 px-md-4 mb-4">
-    <div class="container-fluid d-flex flex-wrap justify-content-between align-items-center gap-3">
-      <div class="d-flex align-items-center gap-2 flex-wrap">
-        <a href="/" class="btn btn-outline-light btn-sm me-2" title="بازگشت به پنل جامع مدیریت">
-          <i class="bi bi-arrow-right"></i> پنل اصلی
-        </a>
-        <i class="bi bi-shield-lock-fill text-warning fs-5"></i>
-        <span class="fw-bold d-none d-sm-inline">احراز هویت مدیر:</span>
-        <span id="authStatusBadge" class="badge bg-secondary">در حال بررسی...</span>
-      </div>
-      <div class="d-flex align-items-center gap-2 flex-grow-1 flex-sm-grow-0 justify-content-end">
-        <input type="password" id="adminKeyInput" class="form-control form-control-sm form-control-dark" style="max-width: 220px;" placeholder="کلید مدیریت (ADMIN_KEY)...">
-        <button class="btn btn-sm btn-gold px-3 text-nowrap" onclick="saveAdminKey()">
-          <i class="bi bi-key-fill"></i> تایید
-        </button>
-      </div>
-    </div>
-  </header>
-
-  <main class="container-fluid px-3 px-md-4 max-w-7xl pb-5">
-    <!-- Standalone Header -->
-    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-3 border-bottom border-secondary gap-3">
-      <div>
-        <h2 class="gold-text mb-1">
-          <i class="bi bi-trophy-fill text-warning me-1"></i> فهرست کاربران واقعی
-        </h2>
-        <small class="text-secondary">مرتب‌شده بر اساس بیشترین امتیاز (از بیشترین به کمترین)</small>
-      </div>
-      <div class="d-flex gap-2 align-items-center flex-wrap">
-        <span class="badge bg-dark border border-secondary text-info px-3 py-2 fs-6">
-          تعداد کاربران: <span id="usersCountBadge" class="text-warning fw-bold">۰</span>
-        </span>
-        <button id="refreshBtn" class="btn btn-warning fw-bold px-3 py-2 text-dark" onclick="loadUsers()">
-          <span id="refreshSpinner" class="spinner-border spinner-border-sm d-none me-1" role="status"></span>
-          <i class="bi bi-arrow-clockwise"></i> به‌روزرسانی
-        </button>
+  <!-- Clean Main Page Content -->
+  <main class="container-fluid px-3 px-md-4 max-w-7xl py-4">
+    <!-- Header with Title and Search only -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+      <h2 class="gold-text mb-0">
+        <i class="bi bi-trophy-fill text-warning me-2"></i>فهرست کاربران واقعی
+      </h2>
+      <div class="d-flex align-items-center gap-2">
+        <input type="text" id="userSearchInput" class="form-control form-control-dark" style="min-width: 260px;" placeholder="جستجو بر اساس نام یا شناسه..." onkeyup="filterUsers()">
       </div>
     </div>
 
-    <!-- Alert Box -->
-    <div id="alertBox" class="alert alert-danger d-none shadow-sm" role="alert"></div>
-
-    <!-- Standalone Users Table Card -->
+    <!-- Users Table Card -->
     <div class="card p-3 p-md-4">
-      <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-3">
-        <div class="d-flex align-items-center gap-2">
-          <span class="badge bg-primary-subtle text-primary border border-primary px-3 py-1">اطلاعات زنده سرور</span>
-          <small class="text-secondary">به‌روزرسانی خودکار هر ۱۲ ثانیه</small>
-        </div>
-        <div class="d-flex align-items-center gap-2">
-          <input type="text" id="userSearchInput" class="form-control form-control-dark" style="min-width: 260px;" placeholder="جستجو بر اساس نام یا شناسه..." onkeyup="filterUsers()">
-        </div>
-      </div>
-
       <div class="table-responsive">
         <table class="table table-dark table-hover table-striped rounded align-middle mb-0">
           <thead>
             <tr class="text-secondary border-secondary">
-              <th scope="col" style="width: 70px;">#</th>
-              <th scope="col" style="min-width: 140px;">شناسه کاربر</th>
+              <th scope="col" style="width: 110px;">شماره ردیف</th>
+              <th scope="col" style="min-width: 150px;">شناسه کاربر</th>
               <th scope="col">نام و نام خانوادگی</th>
               <th scope="col" style="min-width: 150px;">مجموع امتیاز</th>
             </tr>
@@ -154,33 +131,103 @@
     </div>
   </main>
 
+  <!-- Clean Security Dialog (Only shown if key is missing or invalid) -->
+  <div id="authModal" class="auth-overlay d-none">
+    <div class="card p-4" style="max-width: 420px; width: 100%; border-color: #FFB703;">
+      <div class="text-center mb-3">
+        <div class="mb-2">
+          <i class="bi bi-shield-lock-fill text-warning" style="font-size: 2.5rem;"></i>
+        </div>
+        <h5 class="gold-text mb-1">احراز هویت مدیر</h5>
+        <p class="text-secondary small mb-0">برای مشاهده فهرست کاربران و مجموع امتیازها، کلید امنیتی مدیریت را وارد کنید:</p>
+      </div>
+
+      <form onsubmit="event.preventDefault(); submitAuthKey();">
+        <div class="mb-3">
+          <input type="password" id="modalKeyInput" class="form-control form-control-dark py-2 text-center" placeholder="کلید مدیریت (ADMIN_KEY)..." autocomplete="current-password" autofocus>
+          <div id="modalErrorMsg" class="text-danger small mt-2 text-center d-none"></div>
+        </div>
+        <button type="submit" id="modalSubmitBtn" class="btn btn-gold w-100 py-2">
+          <span id="modalSpinner" class="spinner-border spinner-border-sm me-1 d-none" role="status"></span>
+          ورود به فهرست کاربران
+        </button>
+      </form>
+    </div>
+  </div>
+
   <script>
     let cachedUsers = [];
 
-    function getAdminKey() {
-      return localStorage.getItem('reqabat_admin_key') || "ReqabatAdmin2026";
-    }
-
-    function saveAdminKey() {
-      const input = document.getElementById('adminKeyInput').value.trim();
-      if (input) {
-        localStorage.setItem('reqabat_admin_key', input);
-        loadUsers();
+    // Check if key is provided in URL query (?key=... or ?adminKey=...)
+    (function handleUrlKey() {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const urlKey = params.get('key') || params.get('adminKey');
+        if (urlKey && urlKey.trim()) {
+          localStorage.setItem('reqabat_admin_key', urlKey.trim());
+          // Remove key from URL for security without reloading
+          const cleanUrl = window.location.pathname;
+          window.history.replaceState({}, document.title, cleanUrl);
+        }
+      } catch (e) {
+        console.error('URL parse error:', e);
       }
+    })();
+
+    function getAdminKey() {
+      return (localStorage.getItem('reqabat_admin_key') || '').trim();
     }
 
-    // Initialize key field with saved value
-    document.getElementById('adminKeyInput').value = getAdminKey();
-
-    function showAlert(msg) {
-      const el = document.getElementById('alertBox');
-      el.innerText = msg;
-      el.classList.remove('d-none');
+    function showAuthModal(errorText) {
+      const modal = document.getElementById('authModal');
+      const errBox = document.getElementById('modalErrorMsg');
+      modal.classList.remove('d-none');
+      if (errorText) {
+        errBox.innerText = errorText;
+        errBox.classList.remove('d-none');
+      } else {
+        errBox.classList.add('d-none');
+      }
+      setTimeout(() => {
+        const inp = document.getElementById('modalKeyInput');
+        if (inp) inp.focus();
+      }, 100);
     }
 
-    function hideAlert() {
-      const el = document.getElementById('alertBox');
-      el.classList.add('d-none');
+    function hideAuthModal() {
+      document.getElementById('authModal').classList.add('d-none');
+      document.getElementById('modalErrorMsg').classList.add('d-none');
+    }
+
+    async function submitAuthKey() {
+      const inp = document.getElementById('modalKeyInput');
+      const btn = document.getElementById('modalSubmitBtn');
+      const spinner = document.getElementById('modalSpinner');
+      const key = (inp.value || '').trim();
+
+      if (!key) {
+        const errBox = document.getElementById('modalErrorMsg');
+        errBox.innerText = 'لطفاً کلید مدیریت را وارد کنید.';
+        errBox.classList.remove('d-none');
+        return;
+      }
+
+      btn.disabled = true;
+      spinner.classList.remove('d-none');
+
+      localStorage.setItem('reqabat_admin_key', key);
+      const success = await loadUsers();
+
+      btn.disabled = false;
+      spinner.classList.add('d-none');
+
+      if (success) {
+        hideAuthModal();
+      } else {
+        const errBox = document.getElementById('modalErrorMsg');
+        errBox.innerText = 'کلید مدیریت وارد شده نامعتبر است.';
+        errBox.classList.remove('d-none');
+      }
     }
 
     function sortUsersList(list) {
@@ -200,12 +247,12 @@
     }
 
     async function loadUsers() {
-      const spinner = document.getElementById('refreshSpinner');
-      const authBadge = document.getElementById('authStatusBadge');
-      if (spinner) spinner.classList.remove('d-none');
-      hideAlert();
-
       const key = getAdminKey();
+
+      if (!key) {
+        showAuthModal();
+        return false;
+      }
 
       try {
         const res = await fetch('/api/admin/users', {
@@ -215,20 +262,8 @@
         });
 
         if (res.status === 401) {
-          authBadge.className = 'badge bg-danger';
-          authBadge.innerText = 'احراز نشده';
-          showAlert('خطای دسترسی امنیتی: کلید مدیریت نامعتبر است یا وارد نشده است. اطلاعات کاربران بدون احراز هویت نمایش داده نمی‌شوند.');
-          document.getElementById('usersTbody').innerHTML = `
-            <tr>
-              <td colspan="4" class="text-center py-5">
-                <div class="text-danger mb-2"><i class="bi bi-shield-x fs-1"></i></div>
-                <h5 class="text-white mb-2">دسترسی به فهرست کاربران نیازمند کلید مدیریت است</h5>
-                <p class="text-secondary small mb-3">برای مشاهده فهرست کاربران و امتیازها، کلید معتبر ADMIN_KEY را در بالای صفحه وارد کنید.</p>
-              </td>
-            </tr>
-          `;
-          document.getElementById('usersCountBadge').innerText = '۰';
-          return;
+          showAuthModal('کلید مدیریت منقضی یا نامعتبر است.');
+          return false;
         }
 
         if (!res.ok) {
@@ -236,20 +271,16 @@
         }
 
         const data = await res.json();
-        authBadge.className = 'badge bg-success';
-        authBadge.innerText = 'مدیر احراز هویت‌شده';
+        hideAuthModal();
 
-        // Authoritative sorting by score descending
+        // Sort descending by total score
         cachedUsers = sortUsersList(data.users || []);
-        document.getElementById('usersCountBadge').innerText = cachedUsers.length;
         renderUsers(cachedUsers);
+        return true;
 
       } catch (err) {
-        authBadge.className = 'badge bg-warning text-dark';
-        authBadge.innerText = 'خطای اتصال';
-        showAlert(err.message || 'خطا در برقراری ارتباط با سرور.');
-      } finally {
-        if (spinner) spinner.classList.add('d-none');
+        console.error('Error loading users:', err);
+        return false;
       }
     }
 
@@ -293,14 +324,14 @@
         const id = (u.id || '').toLowerCase();
         return fullName.includes(q) || id.includes(q);
       });
-      // Renders filtered results re-numbering index from 1..N
+      // Renders filtered results re-numbering row numbers from 1
       renderUsers(filtered);
     }
 
     // Initial load
     loadUsers();
 
-    // Auto-refresh every 12 seconds
+    // Auto-refresh every 12 seconds with real data
     setInterval(loadUsers, 12000);
   </script>
 </body>
