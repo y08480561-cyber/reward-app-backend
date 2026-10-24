@@ -28,7 +28,7 @@
       background: linear-gradient(135deg, #FFB703, #FB8500);
       color: #0B192C;
       font-weight: 800;
-      padding: 6px 12px;
+      padding: 6px 14px;
       border-radius: 20px;
     }
     .table-dark {
@@ -63,15 +63,14 @@
       background-color: #0B192C;
       border: 1px solid #2E5077;
       color: #FFB703;
-      padding: 3px 8px;
+      padding: 4px 10px;
       border-radius: 6px;
-      font-size: 0.88rem;
+      font-size: 0.9rem;
+      letter-spacing: 0.5px;
     }
-    .phone-text {
-      direction: ltr;
-      display: inline-block;
-      font-family: monospace, monospace;
-      font-size: 0.95rem;
+    .row-index {
+      color: #94A3B8;
+      font-weight: 700;
     }
   </style>
 </head>
@@ -82,31 +81,29 @@
     <div class="container-fluid d-flex flex-wrap justify-content-between align-items-center gap-3">
       <div class="d-flex align-items-center gap-2 flex-wrap">
         <a href="/" class="btn btn-outline-light btn-sm me-2" title="بازگشت به پنل جامع مدیریت">
-          <i class="bi bi-arrow-right"></i> بازگشت به پنل اصلی
+          <i class="bi bi-arrow-right"></i> پنل اصلی
         </a>
         <i class="bi bi-shield-lock-fill text-warning fs-5"></i>
         <span class="fw-bold d-none d-sm-inline">احراز هویت مدیر:</span>
         <span id="authStatusBadge" class="badge bg-secondary">در حال بررسی...</span>
       </div>
       <div class="d-flex align-items-center gap-2 flex-grow-1 flex-sm-grow-0 justify-content-end">
-        <input type="password" id="adminKeyInput" class="form-control form-control-sm form-control-dark" style="max-width: 220px;" placeholder="کلید امنیتی مدیر (ADMIN_KEY)...">
+        <input type="password" id="adminKeyInput" class="form-control form-control-sm form-control-dark" style="max-width: 220px;" placeholder="کلید مدیریت (ADMIN_KEY)...">
         <button class="btn btn-sm btn-gold px-3 text-nowrap" onclick="saveAdminKey()">
-          <i class="bi bi-key-fill"></i> تایید کلید
+          <i class="bi bi-key-fill"></i> تایید
         </button>
       </div>
     </div>
   </header>
 
   <main class="container-fluid px-3 px-md-4 max-w-7xl pb-5">
-    <!-- Header of the Standalone Users Table -->
+    <!-- Standalone Header -->
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-3 border-bottom border-secondary gap-3">
       <div>
         <h2 class="gold-text mb-1">
-          <i class="bi bi-person-lines-fill text-warning"></i> فهرست کاربران واقعی
+          <i class="bi bi-trophy-fill text-warning me-1"></i> فهرست کاربران واقعی
         </h2>
-        <p class="text-secondary mb-0">
-          صفحه مستقل نمایش اطلاعات ثبت‌نامی و امتیاز کاربران (بدون بخش‌های آماری و گزارش‌های تبلیغاتی)
-        </p>
+        <small class="text-secondary">مرتب‌شده بر اساس بیشترین امتیاز (از بیشترین به کمترین)</small>
       </div>
       <div class="d-flex gap-2 align-items-center flex-wrap">
         <span class="badge bg-dark border border-secondary text-info px-3 py-2 fs-6">
@@ -122,15 +119,15 @@
     <!-- Alert Box -->
     <div id="alertBox" class="alert alert-danger d-none shadow-sm" role="alert"></div>
 
-    <!-- Standalone Users Card & Table -->
+    <!-- Standalone Users Table Card -->
     <div class="card p-3 p-md-4">
       <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-3">
         <div class="d-flex align-items-center gap-2">
-          <span class="badge bg-primary-subtle text-primary border border-primary px-3 py-1">دیتابیس اصلی پروژه</span>
-          <small class="text-secondary">مرتب‌شده بر اساس بیشترین امتیاز</small>
+          <span class="badge bg-primary-subtle text-primary border border-primary px-3 py-1">اطلاعات زنده سرور</span>
+          <small class="text-secondary">به‌روزرسانی خودکار هر ۱۲ ثانیه</small>
         </div>
         <div class="d-flex align-items-center gap-2">
-          <input type="text" id="userSearchInput" class="form-control form-control-dark" style="min-width: 240px;" placeholder="جستجو بر اساس نام، شماره یا شناسه..." onkeyup="filterUsers()">
+          <input type="text" id="userSearchInput" class="form-control form-control-dark" style="min-width: 260px;" placeholder="جستجو بر اساس نام یا شناسه..." onkeyup="filterUsers()">
         </div>
       </div>
 
@@ -138,17 +135,15 @@
         <table class="table table-dark table-hover table-striped rounded align-middle mb-0">
           <thead>
             <tr class="text-secondary border-secondary">
-              <th scope="col" style="width: 60px;">#</th>
-              <th scope="col">شناسه کاربر</th>
+              <th scope="col" style="width: 70px;">#</th>
+              <th scope="col" style="min-width: 140px;">شناسه کاربر</th>
               <th scope="col">نام و نام خانوادگی</th>
-              <th scope="col">شماره موبایل</th>
-              <th scope="col">مجموع امتیاز</th>
-              <th scope="col" style="width: 140px;">عملیات</th>
+              <th scope="col" style="min-width: 150px;">مجموع امتیاز</th>
             </tr>
           </thead>
           <tbody id="usersTbody">
             <tr>
-              <td colspan="6" class="text-center py-5 text-secondary">
+              <td colspan="4" class="text-center py-5 text-secondary">
                 <span class="spinner-border spinner-border-sm me-2 text-warning" role="status"></span>
                 در حال دریافت اطلاعات از سرور...
               </td>
@@ -188,10 +183,26 @@
       el.classList.add('d-none');
     }
 
+    function sortUsersList(list) {
+      return list.sort((a, b) => {
+        const scoreA = Number(a.score) || 0;
+        const scoreB = Number(b.score) || 0;
+        if (scoreB !== scoreA) {
+          return scoreB - scoreA;
+        }
+        const timeA = typeof a.registeredAt === 'number' ? a.registeredAt : (new Date(a.registeredAt || 0).getTime() || 0);
+        const timeB = typeof b.registeredAt === 'number' ? b.registeredAt : (new Date(b.registeredAt || 0).getTime() || 0);
+        if (timeA !== timeB) {
+          return timeA - timeB;
+        }
+        return String(a.id || '').localeCompare(String(b.id || ''));
+      });
+    }
+
     async function loadUsers() {
       const spinner = document.getElementById('refreshSpinner');
       const authBadge = document.getElementById('authStatusBadge');
-      spinner.classList.remove('d-none');
+      if (spinner) spinner.classList.remove('d-none');
       hideAlert();
 
       const key = getAdminKey();
@@ -206,13 +217,13 @@
         if (res.status === 401) {
           authBadge.className = 'badge bg-danger';
           authBadge.innerText = 'احراز نشده';
-          showAlert('خطای دسترسی امنیتی: کلید مدیریت نامعتبر است یا وارد نشده است. شماره تماس‌ها و اطلاعات کاربران بدون احراز هویت نمایش داده نمی‌شوند.');
+          showAlert('خطای دسترسی امنیتی: کلید مدیریت نامعتبر است یا وارد نشده است. اطلاعات کاربران بدون احراز هویت نمایش داده نمی‌شوند.');
           document.getElementById('usersTbody').innerHTML = `
             <tr>
-              <td colspan="6" class="text-center py-5">
+              <td colspan="4" class="text-center py-5">
                 <div class="text-danger mb-2"><i class="bi bi-shield-x fs-1"></i></div>
                 <h5 class="text-white mb-2">دسترسی به فهرست کاربران نیازمند کلید مدیریت است</h5>
-                <p class="text-secondary small mb-3">برای مشاهده شماره تماس‌ها و مشخصات، کلید معتبر ADMIN_KEY را در کادر بالای صفحه وارد کنید.</p>
+                <p class="text-secondary small mb-3">برای مشاهده فهرست کاربران و امتیازها، کلید معتبر ADMIN_KEY را در بالای صفحه وارد کنید.</p>
               </td>
             </tr>
           `;
@@ -228,7 +239,8 @@
         authBadge.className = 'badge bg-success';
         authBadge.innerText = 'مدیر احراز هویت‌شده';
 
-        cachedUsers = data.users || [];
+        // Authoritative sorting by score descending
+        cachedUsers = sortUsersList(data.users || []);
         document.getElementById('usersCountBadge').innerText = cachedUsers.length;
         renderUsers(cachedUsers);
 
@@ -237,7 +249,7 @@
         authBadge.innerText = 'خطای اتصال';
         showAlert(err.message || 'خطا در برقراری ارتباط با سرور.');
       } finally {
-        spinner.classList.add('d-none');
+        if (spinner) spinner.classList.add('d-none');
       }
     }
 
@@ -246,35 +258,28 @@
       if (!users || users.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="6" class="text-center py-5 text-secondary">
+            <td colspan="4" class="text-center py-5 text-secondary">
               <i class="bi bi-people fs-2 d-block mb-2 text-secondary"></i>
-              هیچ کاربر واقعی ثبت‌نام‌شده‌ای در پایگاه داده سرور یافت نشد.
+              هیچ کاربری در پایگاه داده سرور یافت نشد.
             </td>
           </tr>
         `;
         return;
       }
 
-      tbody.innerHTML = users.map((u, index) => `
-        <tr>
-          <td><span class="text-secondary fw-bold">${index + 1}</span></td>
-          <td><code class="user-id-badge">${u.id || '-'}</code></td>
-          <td class="fw-bold">${(u.firstName || '') + ' ' + (u.lastName || '')}</td>
-          <td>
-            <span class="phone-text text-light bg-dark px-2 py-1 rounded border border-secondary">
-              ${u.phoneNumber || '-'}
-            </span>
-          </td>
-          <td>
-            <span class="badge badge-gold fs-6">${u.score || 0} امتیاز</span>
-          </td>
-          <td>
-            <button class="btn btn-sm btn-outline-info" title="بازنشانی چرخه ۲۴ ساعته کاربر" onclick="resetUserCycle('${u.id}')">
-              <i class="bi bi-arrow-repeat"></i> ریست دوره
-            </button>
-          </td>
-        </tr>
-      `).join('');
+      tbody.innerHTML = users.map((u, index) => {
+        const fullName = ((u.firstName || '') + ' ' + (u.lastName || '')).trim() || 'کاربر بدون نام';
+        return `
+          <tr>
+            <td><span class="row-index">${index + 1}</span></td>
+            <td><code class="user-id-badge">${u.id || '-'}</code></td>
+            <td class="fw-bold">${fullName}</td>
+            <td>
+              <span class="badge badge-gold fs-6">${u.score || 0} امتیاز</span>
+            </td>
+          </tr>
+        `;
+      }).join('');
     }
 
     function filterUsers() {
@@ -283,44 +288,20 @@
         renderUsers(cachedUsers);
         return;
       }
-      const filtered = cachedUsers.filter(u => 
-        (u.firstName && u.firstName.toLowerCase().includes(q)) ||
-        (u.lastName && u.lastName.toLowerCase().includes(q)) ||
-        (u.phoneNumber && u.phoneNumber.includes(q)) ||
-        (u.id && u.id.toLowerCase().includes(q))
-      );
+      const filtered = cachedUsers.filter(u => {
+        const fullName = ((u.firstName || '') + ' ' + (u.lastName || '')).toLowerCase();
+        const id = (u.id || '').toLowerCase();
+        return fullName.includes(q) || id.includes(q);
+      });
+      // Renders filtered results re-numbering index from 1..N
       renderUsers(filtered);
-    }
-
-    async function resetUserCycle(userId) {
-      if (!confirm('آیا از بازنشانی چرخه ۲۴ ساعته کاربر با شناسه ' + userId + ' اطمینان دارید؟')) return;
-      const key = getAdminKey();
-      try {
-        const res = await fetch('/api/admin/cycle/reset', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-admin-key': key
-          },
-          body: JSON.stringify({ userId })
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          alert('چرخه ۲۴ ساعته کاربر با موفقیت بازنشانی شد.');
-          loadUsers();
-        } else {
-          alert('خطا در بازنشانی چرخه: ' + (data.error || 'دسترسی غیرمجاز'));
-        }
-      } catch (err) {
-        alert('خطای ارتباط با سرور: ' + err.message);
-      }
     }
 
     // Initial load
     loadUsers();
 
-    // Auto-refresh every 15 seconds
-    setInterval(loadUsers, 15000);
+    // Auto-refresh every 12 seconds
+    setInterval(loadUsers, 12000);
   </script>
 </body>
 </html>

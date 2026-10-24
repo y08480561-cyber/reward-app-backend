@@ -440,10 +440,27 @@ app.get('/api/admin/overview', requireAdminAuth, (req, res) => {
 
 // 6.1 Admin Users List API (Protected - Standalone Users Table)
 app.get('/api/admin/users', requireAdminAuth, (req, res) => {
-  const users = Array.from(db.users.values()).map(u => ({
-    ...u,
-    score: db.userScores.get(u.id)?.totalScore || 0
-  })).sort((a, b) => b.score - a.score);
+  const users = Array.from(db.users.values()).map(u => {
+    const regTime = u.registeredAt || u.createdAt || 0;
+    return {
+      id: u.id,
+      firstName: u.firstName || '',
+      lastName: u.lastName || '',
+      registeredAt: typeof regTime === 'number' ? regTime : (new Date(regTime).getTime() || 0),
+      score: db.userScores.get(u.id)?.totalScore || 0
+    };
+  }).sort((a, b) => {
+    // 1. Primary: totalScore descending (highest score first)
+    if (b.score !== a.score) {
+      return b.score - a.score;
+    }
+    // 2. Stable tie-breaker: registration time (earlier registration first)
+    if (a.registeredAt !== b.registeredAt) {
+      return a.registeredAt - b.registeredAt;
+    }
+    // 3. Deterministic fallback: user ID
+    return String(a.id || '').localeCompare(String(b.id || ''));
+  });
 
   return res.json({
     success: true,
