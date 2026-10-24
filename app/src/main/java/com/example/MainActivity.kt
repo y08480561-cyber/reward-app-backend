@@ -27,6 +27,8 @@ class MainActivity : ComponentActivity() {
                 val viewModel: MainViewModel = viewModel()
                 val uiState by viewModel.uiState.collectAsState()
                 val authState by viewModel.authUiState.collectAsState()
+                val healthResult by viewModel.healthCheckResult.collectAsState()
+                val isCheckingHealth by viewModel.isCheckingHealth.collectAsState()
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
@@ -52,7 +54,11 @@ class MainActivity : ComponentActivity() {
                                     onDirectLogin = { viewModel.loginOrRegister() },
                                     onOtpChange = { viewModel.onOtpCodeChange(it) },
                                     onRequestOtp = { viewModel.requestOtp() },
-                                    onVerifyOtp = { viewModel.verifyOtpAndSubmit() }
+                                    onVerifyOtp = { viewModel.verifyOtpAndSubmit() },
+                                    healthCheckResult = healthResult,
+                                    isCheckingHealth = isCheckingHealth,
+                                    onTestConnection = { viewModel.performServerHealthCheck() },
+                                    onDismissHealthCheck = { viewModel.dismissHealthCheck() }
                                 )
                             }
                             AppScreen.HOME -> {

@@ -30,6 +30,17 @@ sealed class Result<out T> {
     data class Error(val message: String, val code: Int = -1) : Result<Nothing>()
 }
 
+data class HealthCheckResult(
+    val isSuccessful: Boolean,
+    val httpStatusCode: Int = 0,
+    val latencyMs: Long = 0,
+    val serverStatus: String = "",
+    val uptimeSeconds: Double = 0.0,
+    val errorCategory: String? = null,
+    val message: String,
+    val tip: String = ""
+)
+
 class BackendRepository(
     private val context: Context,
     private val database: AppDatabase,
@@ -41,13 +52,85 @@ class BackendRepository(
     private val adLogDao = database.adLogDao()
     val supabaseClient = SupabaseApiClient(prefs)
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .build()
+    private val client = NetworkClientProvider.createResilientClient()
 
     // 24 hours in milliseconds
     private val CYCLE_DURATION_MS = 24 * 60 * 60 * 1000L
+
+    /**
+     * Test server reachability and diagnostics via GET /health.
+     * Retries once on transient timeout or connection drops (safe idempotent check).
+     */
+    suspend fun checkServerHealth(): HealthCheckResult = withContext(Dispatchers.IO) {
+        val url = "${prefs.serverUrl.trimEnd('/')}/health"
+        val request = Request.Builder()
+            .url(url)
+            .get()
+            .build()
+
+        var lastError: ClassifiedNetworkError? = null
+        var lastHttpCode = 0
+
+        for (attempt in 1..2) {
+            val startTime = System.currentTimeMillis()
+            try {
+                client.newCall(request).execute().use { response ->
+                    val latencyMs = System.currentTimeMillis() - startTime
+                    lastHttpCode = response.code
+                    val body = response.body?.string().orEmpty()
+
+                    if (response.isSuccessful) {
+                        val json = try { JSONObject(body) } catch (e: Exception) { null }
+                        val serverStatus = json?.optString("status") ?: "ok"
+                        val uptime = json?.optDouble("uptime") ?: 0.0
+
+                        return@withContext HealthCheckResult(
+                            isSuccessful = true,
+                            httpStatusCode = response.code,
+                            latencyMs = latencyMs,
+                            serverStatus = serverStatus,
+                            uptimeSeconds = uptime,
+                            errorCategory = null,
+                            message = "اتصال به سرور Render با موفقیت برقرار است (تاخیر: ${latencyMs}ms).",
+                            tip = "سرور آنلاین است و درخواست‌ها بدون اختلال پردازش می‌شوند."
+                        )
+                    } else {
+                        return@withContext HealthCheckResult(
+                            isSuccessful = false,
+                            httpStatusCode = response.code,
+                            latencyMs = latencyMs,
+                            errorCategory = "HTTP_${response.code}",
+                            message = "سرور کد وضعیت ${response.code} برگرداند.",
+                            tip = if (response.code in 502..504) "سرور ابری Render در حال شروع اولیه (Cold Start) است. لطفاً چند لحظه بعد مجدداً تلاش کنید." else "سرور پاسخ ناموفق ارسال کرد."
+                        )
+                    }
+                }
+            } catch (e: Exception) {
+                val classified = classifyNetworkException(e)
+                lastError = classified
+                if (attempt < 2 && (classified.category == NetworkErrorCategory.TIMEOUT_FAILURE || classified.category == NetworkErrorCategory.TCP_CONNECT_FAILURE)) {
+                    kotlinx.coroutines.delay(1200)
+                    continue
+                }
+            }
+        }
+
+        val err = lastError ?: ClassifiedNetworkError(
+            NetworkErrorCategory.GENERAL_NETWORK_ERROR,
+            "Unknown connection failure",
+            "خطای نامشخص در ارتباط با سرور",
+            "لطفاً ارتباط اینترنت خود را بررسی نمایید."
+        )
+
+        HealthCheckResult(
+            isSuccessful = false,
+            httpStatusCode = lastHttpCode,
+            latencyMs = 0,
+            errorCategory = err.category.code,
+            message = "${err.category.titlePersian}: ${err.userFacingMessage}",
+            tip = err.recommendedAction
+        )
+    }
 
     /**
      * Request OTP code via Render backend POST /api/auth/otp/request.
@@ -80,11 +163,12 @@ class BackendRepository(
                 } else {
                     val errJson = try { JSONObject(body) } catch(e: Exception) { null }
                     val msg = errJson?.optString("error") ?: "خطا در ارسال کد تایید از سرور"
-                    Result.Error(msg)
+                    Result.Error(msg, response.code)
                 }
             }
         } catch (e: Exception) {
-            Result.Error("خطای شبکه در ارتباط با سرور: ${e.localizedMessage}")
+            val classified = classifyNetworkException(e)
+            Result.Error("${classified.category.titlePersian} - ${classified.userFacingMessage} (${classified.recommendedAction})")
         }
     }
 
@@ -166,11 +250,12 @@ class BackendRepository(
                 } else {
                     val errJson = try { JSONObject(body) } catch (e: Exception) { null }
                     val msg = errJson?.optString("error") ?: "خطا در احراز هویت با سرور"
-                    Result.Error(msg)
+                    Result.Error(msg, response.code)
                 }
             }
         } catch (e: Exception) {
-            Result.Error("خطای شبکه در ارتباط با سرور: ${e.localizedMessage}")
+            val classified = classifyNetworkException(e)
+            Result.Error("${classified.category.titlePersian} - ${classified.userFacingMessage} (${classified.recommendedAction})")
         }
     }
 
@@ -258,11 +343,12 @@ class BackendRepository(
                 } else {
                     val errJson = try { JSONObject(body) } catch(e: Exception) { null }
                     val msg = errJson?.optString("error") ?: "کد تایید نامعتبر یا منقضی شده است."
-                    Result.Error(msg)
+                    Result.Error(msg, response.code)
                 }
             }
         } catch (e: Exception) {
-            Result.Error("خطای شبکه در تایید کد: ${e.localizedMessage}")
+            val classified = classifyNetworkException(e)
+            Result.Error("${classified.category.titlePersian} - ${classified.userFacingMessage} (${classified.recommendedAction})")
         }
     }
 
@@ -462,11 +548,13 @@ class BackendRepository(
                 } else {
                     val errJson = try { JSONObject(body) } catch (e: Exception) { null }
                     val msg = errJson?.optString("error") ?: "خطا در تایید تبلیغ توسط سرور"
-                    Result.Error(msg)
+                    Result.Error(msg, response.code)
                 }
             }
         } catch (e: Exception) {
-            Result.Error("خطای شبکه در ارتباط با سرور: ${e.localizedMessage}")
+            val classified = classifyNetworkException(e)
+            // Points are NOT retried automatically to prevent duplicate registrations
+            Result.Error("${classified.category.titlePersian}: ${classified.userFacingMessage}")
         }
     }
 
@@ -485,41 +573,47 @@ class BackendRepository(
         val currentScore = currentUser?.totalScore ?: prefs.totalScore
 
         val url = "${prefs.serverUrl.trimEnd('/')}/api/leaderboard"
-        try {
-            val request = Request.Builder()
-                .url(url)
-                .header("x-user-id", currentUserId)
-                .get()
-                .build()
+        for (attempt in 1..2) {
+            try {
+                val request = Request.Builder()
+                    .url(url)
+                    .header("x-user-id", currentUserId)
+                    .get()
+                    .build()
 
-            client.newCall(request).execute().use { response ->
-                val body = response.body?.string().orEmpty()
-                if (response.isSuccessful) {
-                    val json = JSONObject(body)
-                    val array = json.optJSONArray("leaderboard")
-                    if (array != null) {
-                        val list = mutableListOf<LeaderboardEntry>()
-                        for (i in 0 until array.length()) {
-                            val item = array.getJSONObject(i)
-                            list.add(
-                                LeaderboardEntry(
-                                    rank = item.optInt("rank", i + 1),
-                                    userId = item.optString("userId"),
-                                    displayName = item.optString("displayName", "کاربر مسابقه"),
-                                    totalScore = item.optInt("totalScore", 0),
-                                    isCurrentUser = item.optBoolean("isCurrentUser", item.optString("userId") == currentUserId),
-                                    adsCompletedToday = 0
+                client.newCall(request).execute().use { response ->
+                    val body = response.body?.string().orEmpty()
+                    if (response.isSuccessful) {
+                        val json = JSONObject(body)
+                        val array = json.optJSONArray("leaderboard")
+                        if (array != null) {
+                            val list = mutableListOf<LeaderboardEntry>()
+                            for (i in 0 until array.length()) {
+                                val item = array.getJSONObject(i)
+                                list.add(
+                                    LeaderboardEntry(
+                                        rank = item.optInt("rank", i + 1),
+                                        userId = item.optString("userId"),
+                                        displayName = item.optString("displayName", "کاربر مسابقه"),
+                                        totalScore = item.optInt("totalScore", 0),
+                                        isCurrentUser = item.optBoolean("isCurrentUser", item.optString("userId") == currentUserId),
+                                        adsCompletedToday = 0
+                                    )
                                 )
-                            )
-                        }
-                        if (list.isNotEmpty()) {
-                            return@withContext list
+                            }
+                            if (list.isNotEmpty()) {
+                                return@withContext list
+                            }
                         }
                     }
                 }
+            } catch (e: Exception) {
+                val classified = classifyNetworkException(e)
+                if (attempt < 2 && (classified.category == NetworkErrorCategory.TIMEOUT_FAILURE || classified.category == NetworkErrorCategory.TCP_CONNECT_FAILURE)) {
+                    kotlinx.coroutines.delay(1000)
+                    continue
+                }
             }
-        } catch (e: Exception) {
-            // Fall through to real current user record only
         }
 
         listOf(

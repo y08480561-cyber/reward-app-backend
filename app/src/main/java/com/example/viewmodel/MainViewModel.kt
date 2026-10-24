@@ -456,4 +456,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private val _healthCheckResult = MutableStateFlow<com.example.data.remote.HealthCheckResult?>(null)
+    val healthCheckResult: StateFlow<com.example.data.remote.HealthCheckResult?> = _healthCheckResult.asStateFlow()
+
+    private val _isCheckingHealth = MutableStateFlow(false)
+    val isCheckingHealth: StateFlow<Boolean> = _isCheckingHealth.asStateFlow()
+
+    fun performServerHealthCheck() {
+        viewModelScope.launch {
+            _isCheckingHealth.value = true
+            val res = backendRepository.checkServerHealth()
+            _healthCheckResult.value = res
+            _isCheckingHealth.value = false
+        }
+    }
+
+    fun dismissHealthCheck() {
+        _healthCheckResult.value = null
+    }
 }

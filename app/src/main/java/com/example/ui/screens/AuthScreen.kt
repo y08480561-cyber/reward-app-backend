@@ -24,25 +24,32 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.NetworkCheck
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.VpnKey
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.example.data.remote.HealthCheckResult
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -73,7 +80,11 @@ fun AuthScreen(
     onDirectLogin: () -> Unit,
     onOtpChange: (String) -> Unit,
     onRequestOtp: () -> Unit,
-    onVerifyOtp: () -> Unit
+    onVerifyOtp: () -> Unit,
+    healthCheckResult: HealthCheckResult? = null,
+    isCheckingHealth: Boolean = false,
+    onTestConnection: () -> Unit = {},
+    onDismissHealthCheck: () -> Unit = {}
 ) {
     val scrollState = rememberScrollState()
 
@@ -575,6 +586,32 @@ fun AuthScreen(
                     }
                 }
 
+                // Network Diagnostics Button (Especially for Hamrah Aval / MCI verification)
+                OutlinedButton(
+                    onClick = onTestConnection,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
+                        .testTag("btn_network_diagnostics"),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = NavyPrimary
+                    ),
+                    enabled = !isCheckingHealth
+                ) {
+                    if (isCheckingHealth) {
+                        CircularProgressIndicator(color = NavyPrimary, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("در حال بررسی اتصال به سرور Render…", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    } else {
+                        Icon(imageVector = Icons.Default.NetworkCheck, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("بررسی زنده وضعیت سرور (عیب‌یابی همراه اول)", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
                 // Trust Footer
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -589,13 +626,121 @@ fun AuthScreen(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "متصل به سرور Render | کاربران و امتیازها در پنل مدیریت ثبت می‌شوند.",
+                        text = "متصل به سرور Render | کاربران و امتیازها در دیتابیس سرور ثبت می‌شوند.",
                         fontSize = 11.sp,
                         color = Color(0xFF475569),
                         textAlign = TextAlign.Center
                     )
                 }
+
+                Spacer(modifier = Modifier.height(16.dp))
             }
+        }
+
+        // Server Health Check Diagnostics Modal
+        if (healthCheckResult != null) {
+            val res = healthCheckResult
+            AlertDialog(
+                onDismissRequest = onDismissHealthCheck,
+                shape = RoundedCornerShape(20.dp),
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = if (res.isSuccessful) Icons.Default.CheckCircle else Icons.Default.ErrorOutline,
+                            contentDescription = null,
+                            tint = if (res.isSuccessful) Color(0xFF16A34A) else ErrorRed,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (res.isSuccessful) "سرور در دسترس است" else "نتیجه عیب‌یابی اتصال سرور",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = NavyPrimary
+                        )
+                    }
+                },
+                text = {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (res.isSuccessful) Color(0xFFDCFCE7) else Color(0xFFFEE2E2))
+                                .padding(10.dp)
+                        ) {
+                            Column {
+                                Text(
+                                    text = res.message,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (res.isSuccessful) Color(0xFF15803D) else ErrorRed
+                                )
+                                if (res.isSuccessful) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "تاخیر رفت و برگشت: ${res.latencyMs} میلی‌ثانیه | کد HTTP: ${res.httpStatusCode}",
+                                        fontSize = 11.sp,
+                                        color = Color(0xFF166534)
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Text(
+                            text = "آدرس سرور:",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF64748B)
+                        )
+                        Text(
+                            text = "https://reward-app-backend-a9ze.onrender.com",
+                            fontSize = 11.sp,
+                            color = NavyPrimary
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        if (res.errorCategory != null) {
+                            Text(
+                                text = "دسته خطای شبکه: ${res.errorCategory}",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = ErrorRed
+                            )
+                        }
+
+                        if (res.tip.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color(0xFFFEF3C7))
+                                    .padding(8.dp)
+                            ) {
+                                Text(
+                                    text = "راهنمای همراه اول:\n${res.tip}",
+                                    fontSize = 11.sp,
+                                    color = Color(0xFF92400E),
+                                    lineHeight = 16.sp
+                                )
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = onDismissHealthCheck,
+                        colors = ButtonDefaults.buttonColors(containerColor = NavyPrimary),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("متوجه شدم", color = Color.White)
+                    }
+                }
+            )
         }
     }
 }

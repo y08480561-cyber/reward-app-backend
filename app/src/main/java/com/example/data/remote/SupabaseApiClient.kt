@@ -27,10 +27,7 @@ class SupabaseApiClient(
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
     }
 
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
-        .build()
+    private val client = NetworkClientProvider.createResilientClient()
 
     val isConfigured: Boolean
         get() = prefs.supabaseUrl.isNotBlank() && prefs.supabaseAnonKey.isNotBlank()
