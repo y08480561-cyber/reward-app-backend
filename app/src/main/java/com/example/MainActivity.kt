@@ -36,7 +36,18 @@ class MainActivity : ComponentActivity() {
                         if (uiState.currentScreen != AppScreen.AUTH) {
                             AppBottomNavigation(
                                 currentScreen = uiState.currentScreen,
-                                onScreenSelected = { screen -> viewModel.navigateTo(screen) }
+                                onScreenSelected = { screen ->
+                                    if (screen == AppScreen.LEADERBOARD) {
+                                        if (!com.example.ui.screens.isNetworkAvailable(this@MainActivity)) {
+                                            android.widget.Toast.makeText(
+                                                this@MainActivity,
+                                                "اتصال اینترنت برقرار نیست. لطفاً اتصال شبکه خود را بررسی کنید.",
+                                                android.widget.Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    }
+                                    viewModel.navigateTo(screen)
+                                }
                             )
                         }
                     }
@@ -79,7 +90,9 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
                             AppScreen.LEADERBOARD -> {
-                                LeaderboardScreen(entries = uiState.leaderboard)
+                                LeaderboardScreen(
+                                    onBack = { viewModel.navigateTo(AppScreen.SQUARES) }
+                                )
                             }
                             AppScreen.PRIZES -> {
                                 PrizesScreen(prizes = viewModel.backendRepository.getPrizes())
