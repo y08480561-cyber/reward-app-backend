@@ -14,6 +14,7 @@ import com.example.model.AdSquare
 import com.example.model.DailyCycle
 import com.example.model.SquareStatus
 import com.example.model.User
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -139,6 +140,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
             loadLeaderboard()
+            launch(Dispatchers.IO) {
+                tapsellAdsManager.initializeSdk()
+            }
         }
     }
 

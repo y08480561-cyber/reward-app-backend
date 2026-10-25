@@ -178,7 +178,6 @@ fun AppBottomNavigation(
     ) {
         val items = listOf(
             Triple(AppScreen.SQUARES, "۵۰ مربع", Icons.Default.GridView),
-            Triple(AppScreen.HOME, "خانه", Icons.Default.Home),
             Triple(AppScreen.LEADERBOARD, "رتبه‌بندی", Icons.Default.EmojiEvents),
             Triple(AppScreen.PRIZES, "جوایز", Icons.Default.CardGiftcard),
             Triple(AppScreen.PROFILE, "پروفایل", Icons.Default.Person)

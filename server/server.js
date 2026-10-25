@@ -3,10 +3,12 @@ const cors = require('cors');
 const path = require('path');
 const crypto = require('crypto');
 const fs = require('fs');
+const { Pool } = require('pg');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_API_KEY = process.env.ADMIN_KEY || "ReqabatAdmin2026";
+const DATABASE_URL = process.env.DATABASE_URL;
 
 app.use(cors());
 app.use(express.json());
@@ -22,72 +24,373 @@ app.get(['/admin', '/admin/dashboard'], (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Health check endpoint for Render
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok', uptime: process.uptime(), timestamp: Date.now() });
-});
+// ====================================================================
+// PostgreSQL Pool Configuration (Supabase PostgreSQL Integration)
+// ====================================================================
+let pool = null;
+let isDbConnected = false;
 
-// JSON File Persistent Storage
-const DB_FILE = path.join(__dirname, 'database.json');
-
-const db = {
-  users: new Map(),
-  userScores: new Map(),
-  dailyCycles: new Map(),
-  adSessions: new Map(),
-  squareStates: new Map(), // key: `${userId}:${cycleId}:${squareNumber}`
-  settings: {
-    tapsellAppKey: process.env.TAPSELL_APP_KEY || "sgedhqdbofphgpajkrqtahjkedbkokdlqiesotcmfqcklbamjaaiddqsqnihdtmobfidcb",
-    tapsellZoneId: process.env.TAPSELL_ZONE_ID || "6ad231b89140ba2215e772db",
-    cycleHours: 24,
-    pointsPerAd: 1
-  }
+const schemaInfo = {
+  userHasTotalScore: true,
+  userScoresUserIdCol: 'user_id',
+  userScoresScoreCol: 'total_score',
 };
 
-function loadDatabase() {
+// Mask sensitive password from connection URL for safe logging
+function getSanitizedDbUrl(rawUrl) {
+  if (!rawUrl) return 'NOT_CONFIGURED';
   try {
-    if (fs.existsSync(DB_FILE)) {
-      const raw = fs.readFileSync(DB_FILE, 'utf8');
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed.users)) {
-        parsed.users.forEach(u => db.users.set(u.id, u));
+    const parsed = new URL(rawUrl);
+    const maskedPassword = parsed.password ? '***' : '';
+    const portPart = parsed.port ? `:${parsed.port}` : '';
+    return `${parsed.protocol}//${parsed.username}${maskedPassword ? ':' + maskedPassword : ''}@${parsed.hostname}${portPart}${parsed.pathname}`;
+  } catch (e) {
+    return rawUrl.replace(/:\/\/(.*?):(.*?)@/, '://$1:***@');
+  }
+}
+
+// Check if URL uses direct host or recommended Session Pooler
+function checkSupabaseHostType(rawUrl) {
+  if (!rawUrl) return;
+  try {
+    const parsed = new URL(rawUrl);
+    const host = parsed.hostname;
+    if (host.includes('.pooler.supabase.com')) {
+      console.log(`[PostgreSQL Host Check] Using Supabase Connection Pooler (${host}:${parsed.port || 5432}). Full IPv4 compatibility with Render verified.`);
+    } else if (host.startsWith('db.') && host.endsWith('.supabase.co')) {
+      console.warn(`[PostgreSQL Host Warning] Host is direct domain "${host}". Direct Supabase connections are IPv6-only and may fail on Render with ETIMEDOUT or ENOTFOUND.`);
+      console.warn(`[PostgreSQL Host Recommendation] In Supabase -> Settings -> Database -> Connection string, select "Connection Pooler" (e.g. aws-0-[region].pooler.supabase.com:6543) and set that as DATABASE_URL in Render.`);
+    }
+  } catch (e) {
+    // Ignore parse error
+  }
+}
+
+function isValidUuid(str) {
+  if (typeof str !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+}
+
+if (DATABASE_URL) {
+  const isLocalhost = DATABASE_URL.includes('localhost') || DATABASE_URL.includes('127.0.0.1');
+  pool = new Pool({
+    connectionString: DATABASE_URL,
+    ssl: isLocalhost ? false : { rejectUnauthorized: false },
+    max: 10,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
+  });
+
+  pool.on('error', (err) => {
+    console.error('[PostgreSQL Pool Unexpected Error]', err.message);
+    isDbConnected = false;
+  });
+} else {
+  console.warn('[PostgreSQL Init] DATABASE_URL is not set in environment variables. Database operations will return HTTP 503 until configured in Render.');
+}
+
+// Database Connection Test and Schema Initialization
+async function testAndInitDatabase() {
+  console.log('====================================================');
+  console.log('[PostgreSQL] Initializing database subsystem...');
+
+  if (!DATABASE_URL || !pool) {
+    console.error('[PostgreSQL CRITICAL] DATABASE_URL is NOT set in environment variables!');
+    console.error('[PostgreSQL] Go to Render Dashboard -> Environment -> Add DATABASE_URL.');
+    console.log('====================================================');
+    isDbConnected = false;
+    return false;
+  }
+
+  const sanitized = getSanitizedDbUrl(DATABASE_URL);
+  console.log(`[PostgreSQL] Connection Target: ${sanitized}`);
+  checkSupabaseHostType(DATABASE_URL);
+
+  try {
+    console.log('[PostgreSQL] Testing live connection to PostgreSQL server...');
+    const client = await pool.connect();
+    const res = await client.query('SELECT NOW() as current_time, current_database() as db_name, version() as pg_version');
+    client.release();
+
+    isDbConnected = true;
+    console.log('[PostgreSQL SUCCESS] Successfully connected to database!');
+    console.log(`[PostgreSQL Database]: ${res.rows[0].db_name}`);
+    console.log(`[PostgreSQL Server Time]: ${res.rows[0].current_time}`);
+    console.log(`[PostgreSQL Engine]: ${res.rows[0].pg_version.split(' ')[0]} ${res.rows[0].pg_version.split(' ')[1]}`);
+
+    await initDatabaseTables();
+    await detectSchemaColumns();
+    await migrateFromLocalJsonIfExists();
+    console.log('====================================================');
+    return true;
+  } catch (err) {
+    isDbConnected = false;
+    console.error('====================================================');
+    console.error('[PostgreSQL CONNECTION FAILED] Unable to establish connection to PostgreSQL server!');
+    console.error(`[PostgreSQL Error Message]: ${err.message}`);
+    console.error(`[PostgreSQL Error Code]: ${err.code || 'N/A'}`);
+    if (err.message.includes('ETIMEDOUT') || err.message.includes('ENOTFOUND') || err.code === 'ECONNREFUSED') {
+      console.error('[PostgreSQL Network Advice] Render runs on IPv4 and cannot route to direct Supabase host (db.xxx.supabase.co).');
+      console.error('[PostgreSQL Network Advice] Use the Supabase Connection Pooler URI (aws-0-*.pooler.supabase.com:6543) in Render environment variables.');
+    }
+    console.error('====================================================');
+    return false;
+  }
+}
+
+// Ensure all required tables and indexes exist (safe and idempotent)
+async function initDatabaseTables() {
+  if (!pool || !isDbConnected) return;
+
+  const ddlQueries = [
+    // 1. Users table
+    `CREATE TABLE IF NOT EXISTS public.users (
+      id TEXT PRIMARY KEY,
+      first_name TEXT NOT NULL DEFAULT '',
+      last_name TEXT NOT NULL DEFAULT '',
+      phone_number TEXT NOT NULL UNIQUE,
+      total_score INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'active',
+      auth_method TEXT DEFAULT 'DIRECT_CREDENTIALS',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );`,
+    `CREATE INDEX IF NOT EXISTS idx_users_phone ON public.users(phone_number);`,
+    `CREATE INDEX IF NOT EXISTS idx_users_score ON public.users(total_score DESC);`,
+
+    // 2. User scores table (explicit score tracking)
+    `CREATE TABLE IF NOT EXISTS public.user_scores (
+      user_id TEXT PRIMARY KEY,
+      total_score INTEGER NOT NULL DEFAULT 0 CHECK (total_score >= 0),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );`,
+    `CREATE INDEX IF NOT EXISTS idx_user_scores_total ON public.user_scores(total_score DESC);`,
+
+    // 3. 24-Hour Cycles table
+    `CREATE TABLE IF NOT EXISTS public.daily_cycles (
+      cycle_id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      start_time BIGINT NOT NULL,
+      end_time BIGINT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'ACTIVE',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );`,
+    `CREATE INDEX IF NOT EXISTS idx_daily_cycles_user ON public.daily_cycles(user_id, start_time, end_time);`,
+
+    // 4. Square States table (50 squares per cycle per user)
+    `CREATE TABLE IF NOT EXISTS public.square_states (
+      state_key TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      cycle_id TEXT NOT NULL,
+      square_number INTEGER NOT NULL CHECK (square_number BETWEEN 1 AND 50),
+      status TEXT NOT NULL DEFAULT 'COMPLETED',
+      completed_at BIGINT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );`,
+    `CREATE INDEX IF NOT EXISTS idx_square_states_lookup ON public.square_states(user_id, cycle_id, square_number);`,
+
+    // 5. Ad Sessions log table (Anti-fraud & audit trail with unique token/nonce)
+    `CREATE TABLE IF NOT EXISTS public.ad_sessions (
+      session_id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      square_number INTEGER NOT NULL CHECK (square_number BETWEEN 1 AND 50),
+      cycle_id TEXT NOT NULL,
+      timestamp BIGINT NOT NULL,
+      ad_duration_seconds INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'COMPLETED',
+      token TEXT UNIQUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );`,
+    `CREATE INDEX IF NOT EXISTS idx_ad_sessions_user ON public.ad_sessions(user_id);`,
+    `CREATE INDEX IF NOT EXISTS idx_ad_sessions_token ON public.ad_sessions(token);`,
+
+    // 6. Leaderboard View (if not already existing as a table or view)
+    `DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'public' AND c.relname = 'leaderboard'
+      ) THEN
+        CREATE VIEW public.leaderboard AS
+        SELECT 
+          u.id AS user_id,
+          u.first_name,
+          u.last_name,
+          COALESCE(s.total_score, u.total_score, 0) AS total_score,
+          u.created_at,
+          ROW_NUMBER() OVER (ORDER BY COALESCE(s.total_score, u.total_score, 0) DESC, u.created_at ASC) AS rank
+        FROM public.users u
+        LEFT JOIN public.user_scores s ON u.id = s.user_id;
+      END IF;
+    END $$;`
+  ];
+
+  for (const q of ddlQueries) {
+    try {
+      await pool.query(q);
+    } catch (err) {
+      console.warn('[PostgreSQL DDL Notice]', err.message);
+    }
+  }
+  console.log('[PostgreSQL] Database tables and schema verified/initialized.');
+}
+
+// Inspect existing schema columns for seamless compatibility
+async function detectSchemaColumns() {
+  if (!pool || !isDbConnected) return;
+  try {
+    const res = await pool.query(`
+      SELECT table_name, column_name 
+      FROM information_schema.columns 
+      WHERE table_schema = 'public' 
+        AND table_name IN ('users', 'user_scores', 'leaderboard')
+    `);
+    const colMap = {};
+    for (const r of res.rows) {
+      if (!colMap[r.table_name]) colMap[r.table_name] = new Set();
+      colMap[r.table_name].add(r.column_name);
+    }
+    if (colMap['users']) {
+      schemaInfo.userHasTotalScore = colMap['users'].has('total_score');
+    }
+    if (colMap['user_scores']) {
+      schemaInfo.userScoresUserIdCol = colMap['user_scores'].has('user_id') ? 'user_id' : 'id';
+      schemaInfo.userScoresScoreCol = colMap['user_scores'].has('total_score') ? 'total_score' : 'score';
+    }
+    console.log('[PostgreSQL] Schema column mapping detected:', schemaInfo);
+  } catch (err) {
+    console.warn('[PostgreSQL Column Detection Warning]', err.message);
+  }
+}
+
+// Safe Migration from database.json without dropping or duplicating data
+const DB_FILE = path.join(__dirname, 'database.json');
+async function migrateFromLocalJsonIfExists() {
+  if (!pool || !isDbConnected) return;
+  try {
+    if (!fs.existsSync(DB_FILE)) return;
+    const raw = fs.readFileSync(DB_FILE, 'utf8');
+    const parsed = JSON.parse(raw);
+
+    let migratedUsers = 0;
+    let migratedScores = 0;
+
+    if (Array.isArray(parsed.users) && parsed.users.length > 0) {
+      for (const u of parsed.users) {
+        if (!u || !u.phoneNumber) continue;
+        const regDate = u.registeredAt ? new Date(u.registeredAt) : new Date();
+        const effectiveId = isValidUuid(u.id) ? u.id : crypto.randomUUID();
+        const res = await pool.query(
+          `INSERT INTO public.users (id, first_name, last_name, phone_number, auth_method, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, NOW())
+           ON CONFLICT (phone_number) DO NOTHING`,
+          [effectiveId, u.firstName || '', u.lastName || '', u.phoneNumber, u.authMethod || 'DIRECT_CREDENTIALS', regDate]
+        );
+        if (res.rowCount > 0) migratedUsers++;
       }
-      if (Array.isArray(parsed.userScores)) {
-        parsed.userScores.forEach(s => db.userScores.set(s.userId, s));
+    }
+
+    if (Array.isArray(parsed.userScores) && parsed.userScores.length > 0) {
+      for (const s of parsed.userScores) {
+        if (!s || !s.userId) continue;
+        const res = await pool.query(
+          `INSERT INTO public.user_scores (user_id, total_score, updated_at)
+           VALUES ($1, $2, NOW())
+           ON CONFLICT (user_id) DO NOTHING`,
+          [s.userId, s.totalScore || 0]
+        );
+        if (res.rowCount > 0) migratedScores++;
       }
-      if (Array.isArray(parsed.dailyCycles)) {
-        parsed.dailyCycles.forEach(c => db.dailyCycles.set(c.cycleId, c));
+    }
+
+    if (Array.isArray(parsed.dailyCycles) && parsed.dailyCycles.length > 0) {
+      for (const c of parsed.dailyCycles) {
+        if (!c || !c.cycleId) continue;
+        await pool.query(
+          `INSERT INTO public.daily_cycles (cycle_id, user_id, start_time, end_time, status)
+           VALUES ($1, $2, $3, $4, $5)
+           ON CONFLICT (cycle_id) DO NOTHING`,
+          [c.cycleId, c.userId, c.startTime, c.endTime, c.status || 'ACTIVE']
+        );
       }
-      if (Array.isArray(parsed.adSessions)) {
-        parsed.adSessions.forEach(a => db.adSessions.set(a.sessionId, a));
+    }
+
+    if (Array.isArray(parsed.squareStates) && parsed.squareStates.length > 0) {
+      for (const sq of parsed.squareStates) {
+        if (!sq || !sq.key) continue;
+        const parts = sq.key.split(':');
+        const userId = parts[0] || '';
+        const cycleId = parts[1] || '';
+        const squareNum = parseInt(parts[2], 10) || 1;
+        const completedAt = sq.value?.completedAt || Date.now();
+        await pool.query(
+          `INSERT INTO public.square_states (state_key, user_id, cycle_id, square_number, status, completed_at)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           ON CONFLICT (state_key) DO NOTHING`,
+          [sq.key, userId, cycleId, squareNum, sq.value?.status || 'COMPLETED', completedAt]
+        );
       }
-      if (Array.isArray(parsed.squareStates)) {
-        parsed.squareStates.forEach(sq => db.squareStates.set(sq.key, sq.value));
+    }
+
+    if (Array.isArray(parsed.adSessions) && parsed.adSessions.length > 0) {
+      for (const a of parsed.adSessions) {
+        if (!a || !a.sessionId) continue;
+        await pool.query(
+          `INSERT INTO public.ad_sessions (session_id, user_id, square_number, cycle_id, timestamp, ad_duration_seconds, status, token)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+           ON CONFLICT (session_id) DO NOTHING`,
+          [a.sessionId, a.userId, a.squareNumber || 1, a.cycleId || '', a.timestamp || Date.now(), a.adDurationSeconds || 0, a.status || 'COMPLETED', a.token || null]
+        );
       }
-      console.log(`[Database] Loaded ${db.users.size} users, ${db.adSessions.size} sessions from ${DB_FILE}`);
+    }
+
+    if (migratedUsers > 0 || migratedScores > 0) {
+      console.log(`[PostgreSQL Migration] Migrated ${migratedUsers} existing users and ${migratedScores} scores safely into Supabase.`);
     }
   } catch (err) {
-    console.error('[Database] Error reading database file:', err.message);
+    console.error('[PostgreSQL Migration Error]', err.message);
   }
 }
 
-function saveDatabase() {
-  try {
-    const data = {
-      users: Array.from(db.users.values()),
-      userScores: Array.from(db.userScores.values()),
-      dailyCycles: Array.from(db.dailyCycles.values()),
-      adSessions: Array.from(db.adSessions.values()),
-      squareStates: Array.from(db.squareStates.entries()).map(([key, value]) => ({ key, value }))
-    };
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), 'utf8');
-  } catch (err) {
-    console.error('[Database] Error saving database file:', err.message);
+// Strict Database Readiness Middleware:
+// If database connection is down, NEVER claim success or secretly write to a local file.
+function ensureDatabaseReady(req, res, next) {
+  if (!pool || !isDbConnected) {
+    return res.status(503).json({
+      success: false,
+      error: "اتصال به پایگاه داده ابری Supabase برقرار نیست. لطفاً متغیر محیطی DATABASE_URL را در پنل Render تنظیم نمایید.",
+      dbStatus: "DISCONNECTED",
+      tip: "در صورتی که از Render استفاده می‌کنید، از رشته اتصال Connection Pooler (پورت 6543 با هاست pooler.supabase.com) استفاده کنید."
+    });
   }
+  next();
 }
 
-// Initial load
-loadDatabase();
+// Health check endpoint for Render
+app.get('/health', async (req, res) => {
+  let dbStatus = 'disconnected';
+  if (pool) {
+    try {
+      await pool.query('SELECT 1');
+      dbStatus = 'connected';
+      isDbConnected = true;
+    } catch (e) {
+      dbStatus = 'disconnected';
+      isDbConnected = false;
+    }
+  }
+  res.status(200).json({
+    status: 'ok',
+    uptime: process.uptime(),
+    timestamp: Date.now(),
+    database: {
+      status: dbStatus,
+      configured: Boolean(DATABASE_URL),
+      target: DATABASE_URL ? getSanitizedDbUrl(DATABASE_URL) : 'NOT_SET'
+    }
+  });
+});
 
 // Admin Authentication Middleware
 function requireAdminAuth(req, res, next) {
@@ -102,29 +405,50 @@ function requireAdminAuth(req, res, next) {
   next();
 }
 
-// Helper: Ensure 24-hour cycle
-function getOrCreateActiveCycle(userId) {
+// Helper: Ensure 24-hour cycle in PostgreSQL
+async function getOrCreateActiveCycle(userId) {
   const now = Date.now();
   const CYCLE_MS = 24 * 60 * 60 * 1000;
-  let activeCycle = null;
-  for (const c of db.dailyCycles.values()) {
-    if (c.userId === userId && now >= c.startTime && now < c.endTime) {
-      activeCycle = c;
-      break;
-    }
-  }
-  if (!activeCycle) {
-    const cycleId = "CYC_" + Math.floor(now / 1000);
-    activeCycle = {
-      cycleId,
-      userId,
-      startTime: now,
-      endTime: now + CYCLE_MS,
-      status: "ACTIVE"
+
+  // 1. Check existing active cycle in database
+  const existing = await pool.query(
+    `SELECT cycle_id, user_id, start_time, end_time, status 
+     FROM public.daily_cycles 
+     WHERE user_id = $1 AND start_time <= $2 AND end_time > $2 
+     ORDER BY start_time DESC LIMIT 1`,
+    [userId, now]
+  );
+
+  if (existing.rows.length > 0) {
+    const row = existing.rows[0];
+    return {
+      cycleId: row.cycle_id,
+      userId: row.user_id,
+      startTime: Number(row.start_time),
+      endTime: Number(row.end_time),
+      status: row.status
     };
-    db.dailyCycles.set(cycleId, activeCycle);
   }
-  return activeCycle;
+
+  // 2. Generate and store new 24h cycle
+  const cycleId = "CYC_" + Math.floor(now / 1000);
+  const startTime = now;
+  const endTime = now + CYCLE_MS;
+
+  await pool.query(
+    `INSERT INTO public.daily_cycles (cycle_id, user_id, start_time, end_time, status)
+     VALUES ($1, $2, $3, $4, 'ACTIVE')
+     ON CONFLICT (cycle_id) DO NOTHING`,
+    [cycleId, userId, startTime, endTime]
+  );
+
+  return {
+    cycleId,
+    userId,
+    startTime,
+    endTime,
+    status: "ACTIVE"
+  };
 }
 
 // In-memory OTP storage with rate limiting and expiration
@@ -164,8 +488,10 @@ async function sendSmsViaKavenegar(phoneNumber, otp) {
   }
 }
 
-// 1. Direct Secure Authentication (No SMS dependency - Server-side validated)
-app.post('/api/auth/login', (req, res) => {
+// ====================================================================
+// 1. Direct Secure Authentication (Stored in PostgreSQL public.users)
+// ====================================================================
+app.post('/api/auth/login', ensureDatabaseReady, async (req, res) => {
   try {
     const { phoneNumber, password, firstName, lastName } = req.body;
     if (!phoneNumber || !/^09\d{9}$/.test(phoneNumber)) {
@@ -179,49 +505,103 @@ app.post('/api/auth/login', (req, res) => {
       return res.status(401).json({ error: "رمز عبور یا پین ورود نامعتبر است. رمز پیش‌فرض آزمایشی سرور: 2026" });
     }
 
-    let user = null;
-    for (const u of db.users.values()) {
-      if (u.phoneNumber === phoneNumber) {
-        user = u;
-        break;
+    // 1. Check if user already exists in public.users by phone_number (No duplicates!)
+    const userLookup = await pool.query(
+      `SELECT id, first_name, last_name, phone_number, created_at, auth_method
+       FROM public.users WHERE phone_number = $1 LIMIT 1`,
+      [phoneNumber]
+    );
+
+    let user;
+    if (userLookup.rows.length > 0) {
+      // Existing user found -> Update names if provided
+      const existing = userLookup.rows[0];
+      const newFName = (firstName && firstName.trim()) ? firstName.trim() : existing.first_name;
+      const newLName = (lastName && lastName.trim()) ? lastName.trim() : existing.last_name;
+
+      if (newFName !== existing.first_name || newLName !== existing.last_name) {
+        await pool.query(
+          `UPDATE public.users 
+           SET first_name = $1, last_name = $2, updated_at = NOW() 
+           WHERE id = $3`,
+          [newFName, newLName, existing.id]
+        );
       }
-    }
-    if (!user) {
-      const userId = "USR_" + crypto.randomBytes(4).toString('hex').toUpperCase();
+
+      user = {
+        id: existing.id,
+        firstName: newFName,
+        lastName: newLName,
+        phoneNumber: existing.phone_number,
+        registeredAt: new Date(existing.created_at).getTime(),
+        authMethod: existing.auth_method || "DIRECT_CREDENTIALS"
+      };
+      console.log(`[PostgreSQL Auth] Logged in existing user: ${user.id} (${phoneNumber})`);
+    } else {
+      // New user registration -> Generate UUID and insert
+      const userId = crypto.randomUUID();
+      const fName = (firstName || "کاربر").trim();
+      const lName = (lastName || "مسابقه").trim();
+
+      await pool.query(
+        `INSERT INTO public.users (id, first_name, last_name, phone_number, auth_method, total_score, status, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, 'DIRECT_CREDENTIALS', 0, 'active', NOW(), NOW())`,
+        [userId, fName, lName, phoneNumber]
+      );
+
+      // Initialize row in public.user_scores
+      await pool.query(
+        `INSERT INTO public.user_scores (user_id, total_score, updated_at)
+         VALUES ($1, 0, NOW())
+         ON CONFLICT (user_id) DO NOTHING`,
+        [userId]
+      );
+
       user = {
         id: userId,
-        firstName: (firstName || "کاربر").trim(),
-        lastName: (lastName || "مسابقه").trim(),
+        firstName: fName,
+        lastName: lName,
         phoneNumber,
-        authMethod: "DIRECT_CREDENTIALS",
-        registeredAt: Date.now()
+        registeredAt: Date.now(),
+        authMethod: "DIRECT_CREDENTIALS"
       };
-      db.users.set(userId, user);
-      db.userScores.set(userId, { userId, totalScore: 0, updatedAt: Date.now() });
-      saveDatabase();
-      console.log(`[Auth] Registered new user via direct login: ${user.id} (${phoneNumber})`);
-    } else {
-      if (firstName && firstName.trim()) user.firstName = firstName.trim();
-      if (lastName && lastName.trim()) user.lastName = lastName.trim();
-      saveDatabase();
-      console.log(`[Auth] Logged in existing user via direct login: ${user.id} (${phoneNumber})`);
+      console.log(`[PostgreSQL Auth] Registered new user in public.users: ${user.id} (${phoneNumber})`);
+    }
+
+    // Fetch score from public.user_scores
+    const scoreRes = await pool.query(
+      `SELECT total_score FROM public.user_scores WHERE user_id = $1`,
+      [user.id]
+    );
+    const score = scoreRes.rows.length > 0 ? Number(scoreRes.rows[0].total_score) : 0;
+
+    // Ensure score row exists
+    if (scoreRes.rows.length === 0) {
+      await pool.query(
+        `INSERT INTO public.user_scores (user_id, total_score, updated_at)
+         VALUES ($1, $2, NOW())
+         ON CONFLICT (user_id) DO NOTHING`,
+        [user.id, score]
+      );
     }
 
     const token = "SEC_JWT_" + crypto.createHash('sha256').update(`${user.id}:${phoneNumber}:${Date.now()}`).digest('hex');
-    const score = db.userScores.get(user.id)?.totalScore || 0;
-    const cycle = getOrCreateActiveCycle(user.id);
+    const cycle = await getOrCreateActiveCycle(user.id);
+
     return res.json({
       success: true,
       user: { ...user, totalScore: score, token },
       cycle
     });
   } catch (err) {
-    console.error('[Direct Login Error]', err);
-    return res.status(500).json({ error: "خطای سرور در احراز هویت." });
+    console.error('[Direct Login PostgreSQL Error]', err);
+    return res.status(500).json({ error: "خطای سرور در احراز هویت با پایگاه داده." });
   }
 });
 
-// 2. Auth: Request OTP (Supports live SMS or test fallback if SMS key not set)
+// ====================================================================
+// 2. Auth: Request OTP
+// ====================================================================
 app.post('/api/auth/otp/request', async (req, res) => {
   try {
     const { phoneNumber } = req.body;
@@ -239,10 +619,9 @@ app.post('/api/auth/otp/request', async (req, res) => {
     }
 
     const apiKey = process.env.KAVENEGAR_API_KEY || process.env.SMS_API_KEY;
-    const expiresAt = now + 5 * 60 * 1000; // 5 minutes expiry
+    const expiresAt = now + 5 * 60 * 1000;
 
     if (!apiKey) {
-      // In private test/dev mode without Kavenegar SMS credentials:
       const otp = "12345";
       otpStore.set(phoneNumber, {
         otp,
@@ -277,232 +656,429 @@ app.post('/api/auth/otp/request', async (req, res) => {
   }
 });
 
-// 2. Auth: Verify OTP & Login
-app.post('/api/auth/otp/verify', (req, res) => {
-  const { firstName, lastName, phoneNumber, otpCode } = req.body;
-  if (!phoneNumber || !otpCode) {
-    return res.status(400).json({ error: "اطلاعات ورودی ناقص است." });
-  }
+// ====================================================================
+// 2. Auth: Verify OTP & Login (Stored in PostgreSQL public.users)
+// ====================================================================
+app.post('/api/auth/otp/verify', ensureDatabaseReady, async (req, res) => {
+  try {
+    const { firstName, lastName, phoneNumber, otpCode } = req.body;
+    if (!phoneNumber || !otpCode) {
+      return res.status(400).json({ error: "اطلاعات ورودی ناقص است." });
+    }
 
-  const record = otpStore.get(phoneNumber);
-  if (!record) {
-    return res.status(400).json({ error: "کد تاییدی برای این شماره درخواست نشده یا منقضی شده است." });
-  }
+    const record = otpStore.get(phoneNumber);
+    if (!record) {
+      return res.status(400).json({ error: "کد تاییدی برای این شماره درخواست نشده یا منقضی شده است." });
+    }
 
-  if (Date.now() > record.expiresAt) {
+    if (Date.now() > record.expiresAt) {
+      otpStore.delete(phoneNumber);
+      return res.status(400).json({ error: "کد تایید منقضی شده است. لطفاً مجدداً درخواست کد کنید." });
+    }
+
+    if (record.otp !== otpCode.trim()) {
+      return res.status(400).json({ error: "کد تایید وارد شده اشتباه است." });
+    }
+
+    // OTP verified successfully -> clear record
     otpStore.delete(phoneNumber);
-    return res.status(400).json({ error: "کد تایید منقضی شده است. لطفاً مجدداً درخواست کد کنید." });
-  }
 
-  if (record.otp !== otpCode.trim()) {
-    return res.status(400).json({ error: "کد تایید وارد شده اشتباه است." });
-  }
+    // Check existing user in public.users
+    const userLookup = await pool.query(
+      `SELECT id, first_name, last_name, phone_number, created_at, auth_method
+       FROM public.users WHERE phone_number = $1 LIMIT 1`,
+      [phoneNumber]
+    );
 
-  // OTP verified successfully -> clear record
-  otpStore.delete(phoneNumber);
+    let user;
+    if (userLookup.rows.length > 0) {
+      const existing = userLookup.rows[0];
+      user = {
+        id: existing.id,
+        firstName: existing.first_name,
+        lastName: existing.last_name,
+        phoneNumber: existing.phone_number,
+        registeredAt: new Date(existing.created_at).getTime(),
+        authMethod: existing.auth_method || "SMS_OTP"
+      };
+    } else {
+      const userId = crypto.randomUUID();
+      const fName = (firstName || "کاربر").trim();
+      const lName = (lastName || "مسابقه").trim();
 
-  let user = null;
-  for (const u of db.users.values()) {
-    if (u.phoneNumber === phoneNumber) {
-      user = u;
-      break;
+      await pool.query(
+        `INSERT INTO public.users (id, first_name, last_name, phone_number, auth_method, total_score, status, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, 'SMS_OTP', 0, 'active', NOW(), NOW())`,
+        [userId, fName, lName, phoneNumber]
+      );
+
+      await pool.query(
+        `INSERT INTO public.user_scores (user_id, total_score, updated_at)
+         VALUES ($1, 0, NOW())
+         ON CONFLICT (user_id) DO NOTHING`,
+        [userId]
+      );
+
+      user = {
+        id: userId,
+        firstName: fName,
+        lastName: lName,
+        phoneNumber,
+        registeredAt: Date.now(),
+        authMethod: "SMS_OTP"
+      };
     }
-  }
-  if (!user) {
-    const userId = "USR_" + crypto.randomBytes(4).toString('hex').toUpperCase();
-    user = {
-      id: userId,
-      firstName: (firstName || "کاربر").trim(),
-      lastName: (lastName || "مسابقه").trim(),
-      phoneNumber,
-      registeredAt: Date.now()
-    };
-    db.users.set(userId, user);
-    db.userScores.set(userId, { userId, totalScore: 0, updatedAt: Date.now() });
-    saveDatabase();
-  }
 
-  const token = "SEC_JWT_" + crypto.createHash('sha256').update(`${user.id}:${phoneNumber}:${Date.now()}`).digest('hex');
-  const score = db.userScores.get(user.id)?.totalScore || 0;
-  const cycle = getOrCreateActiveCycle(user.id);
-  return res.json({
-    success: true,
-    user: { ...user, totalScore: score, token },
-    cycle
-  });
-});
+    const scoreRes = await pool.query(
+      `SELECT total_score FROM public.user_scores WHERE user_id = $1`,
+      [user.id]
+    );
+    const score = scoreRes.rows.length > 0 ? Number(scoreRes.rows[0].total_score) : 0;
 
-// 3. Get 24-hour Cycle and Squares status
-app.get('/api/squares', (req, res) => {
-  const userId = req.headers['x-user-id'] || req.query.userId;
-  if (!userId) return res.status(401).json({ error: "شناسه کاربر نامعتبر است." });
-  const cycle = getOrCreateActiveCycle(userId);
-  const squares = [];
-  for (let i = 1; i <= 50; i++) {
-    const key = `${userId}:${cycle.cycleId}:${i}`;
-    const state = db.squareStates.get(key);
-    squares.push({
-      squareNumber: i,
-      status: state ? state.status : "READY",
-      completedAt: state ? state.completedAt : null,
-      cycleId: cycle.cycleId,
-      pointsAwarded: state && state.status === "COMPLETED" ? 1 : 0
+    const token = "SEC_JWT_" + crypto.createHash('sha256').update(`${user.id}:${phoneNumber}:${Date.now()}`).digest('hex');
+    const cycle = await getOrCreateActiveCycle(user.id);
+
+    return res.json({
+      success: true,
+      user: { ...user, totalScore: score, token },
+      cycle
     });
+  } catch (err) {
+    console.error('[OTP Verify Error]', err);
+    return res.status(500).json({ error: "خطا در تایید کد و اتصال به پایگاه داده." });
   }
-  return res.json({ cycle, squares });
 });
 
-// 4. ATOMIC Ad Completion & Point Awarding (Anti-Cheat)
-app.post('/api/ads/complete', (req, res) => {
-  const userId = req.headers['x-user-id'] || req.body.userId;
-  const { squareNumber, rewardNonce, adDurationSeconds } = req.body;
-  if (!userId || !squareNumber || squareNumber < 1 || squareNumber > 50) {
-    return res.status(400).json({ error: "شماره مربع یا کاربر نامعتبر است." });
-  }
-  const cycle = getOrCreateActiveCycle(userId);
-  if (Date.now() >= cycle.endTime) {
-    return res.status(400).json({ error: "دوره ۲۴ ساعته منقضی شده است. جدول به‌روزرسانی شد." });
-  }
-  const squareKey = `${userId}:${cycle.cycleId}:${squareNumber}`;
-  if (db.squareStates.get(squareKey)?.status === "COMPLETED") {
-    return res.status(409).json({ error: "این مربع قبلاً در این دوره ۲۴ ساعته تکمیل شده است." });
-  }
-  if (adDurationSeconds < 5) {
-    return res.status(400).json({ error: "تبلیغ به طور کامل مشاهده نشده است." });
-  }
-  
-  const now = Date.now();
-  const sessionId = "ADS_" + crypto.randomBytes(6).toString('hex');
-  db.squareStates.set(squareKey, { status: "COMPLETED", completedAt: now });
-  const currentScoreObj = db.userScores.get(userId) || { userId, totalScore: 0, updatedAt: now };
-  currentScoreObj.totalScore += 1;
-  currentScoreObj.updatedAt = now;
-  db.userScores.set(userId, currentScoreObj);
-  db.adSessions.set(sessionId, {
-    sessionId,
-    userId,
-    squareNumber,
-    cycleId: cycle.cycleId,
-    timestamp: now,
-    adDurationSeconds,
-    status: "COMPLETED",
-    token: rewardNonce
-  });
-  saveDatabase();
+// ====================================================================
+// 3. Get 24-hour Cycle and Squares status from PostgreSQL
+// ====================================================================
+app.get('/api/squares', ensureDatabaseReady, async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'] || req.query.userId;
+    if (!userId) return res.status(401).json({ error: "شناسه کاربر نامعتبر است." });
 
-  return res.json({
-    success: true,
-    squareNumber,
-    awardedPoints: 1,
-    newTotalScore: currentScoreObj.totalScore,
-    message: "۱ امتیاز معتبر با موفقیت ثبت شد."
-  });
+    const cycle = await getOrCreateActiveCycle(userId);
+
+    // Fetch square states for this user and active cycle
+    const squareRes = await pool.query(
+      `SELECT square_number, status, completed_at 
+       FROM public.square_states 
+       WHERE user_id = $1 AND cycle_id = $2`,
+      [userId, cycle.cycleId]
+    );
+
+    const completedMap = new Map();
+    for (const row of squareRes.rows) {
+      completedMap.set(row.square_number, {
+        status: row.status,
+        completedAt: Number(row.completed_at)
+      });
+    }
+
+    const squares = [];
+    for (let i = 1; i <= 50; i++) {
+      const state = completedMap.get(i);
+      squares.push({
+        squareNumber: i,
+        status: state ? state.status : "READY",
+        completedAt: state ? state.completedAt : null,
+        cycleId: cycle.cycleId,
+        pointsAwarded: state && state.status === "COMPLETED" ? 1 : 0
+      });
+    }
+
+    return res.json({ cycle, squares });
+  } catch (err) {
+    console.error('[API Squares Error]', err);
+    return res.status(500).json({ error: "خطا در دریافت وضعیت مربع‌ها از پایگاه داده." });
+  }
 });
 
-// 5. Leaderboard API
-app.get('/api/leaderboard', (req, res) => {
-  const currentUserId = req.headers['x-user-id'] || req.query.userId;
-  const list = [];
-  for (const [userId, scoreObj] of db.userScores.entries()) {
-    const user = db.users.get(userId);
-    const maskedName = user ? `${user.firstName} ${user.lastName.substring(0, 2)}***` : "کاربر مسابقه";
-    list.push({
-      userId,
-      displayName: maskedName,
-      totalScore: scoreObj.totalScore,
-      isCurrentUser: userId === currentUserId
+// ====================================================================
+// 4. ATOMIC Ad Completion & Point Awarding (Anti-Cheat & Anti-Replay)
+// ====================================================================
+app.post('/api/ads/complete', ensureDatabaseReady, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const userId = req.headers['x-user-id'] || req.body.userId;
+    const { squareNumber, rewardNonce, adDurationSeconds } = req.body;
+
+    if (!userId || !squareNumber || squareNumber < 1 || squareNumber > 50) {
+      return res.status(400).json({ error: "شماره مربع یا کاربر نامعتبر است." });
+    }
+
+    if (adDurationSeconds < 5) {
+      return res.status(400).json({ error: "تبلیغ به طور کامل مشاهده نشده است." });
+    }
+
+    const cycle = await getOrCreateActiveCycle(userId);
+    const now = Date.now();
+    if (now >= cycle.endTime) {
+      return res.status(400).json({ error: "دوره ۲۴ ساعته منقضی شده است. جدول به‌روزرسانی شد." });
+    }
+
+    // 1. Anti-Replay Token (Reward Nonce) Check
+    if (rewardNonce) {
+      const nonceCheck = await client.query(
+        `SELECT session_id FROM public.ad_sessions WHERE token = $1 LIMIT 1`,
+        [rewardNonce]
+      );
+      if (nonceCheck.rows.length > 0) {
+        return res.status(409).json({ error: "این درخواست قبلاً ثبت شده است (توکن تکراری تبلیغ)." });
+      }
+    }
+
+    // 2. Check if square is already completed in current 24-hour cycle
+    const squareKey = `${userId}:${cycle.cycleId}:${squareNumber}`;
+    const squareCheck = await client.query(
+      `SELECT state_key FROM public.square_states WHERE state_key = $1 LIMIT 1`,
+      [squareKey]
+    );
+    if (squareCheck.rows.length > 0) {
+      return res.status(409).json({ error: "این مربع قبلاً در این دوره ۲۴ ساعته تکمیل شده است." });
+    }
+
+    // 3. BEGIN ATOMIC TRANSACTION
+    await client.query('BEGIN');
+
+    // Insert square state (locks the square for this cycle)
+    await client.query(
+      `INSERT INTO public.square_states (state_key, user_id, cycle_id, square_number, status, completed_at, created_at)
+       VALUES ($1, $2, $3, $4, 'COMPLETED', $5, NOW())`,
+      [squareKey, userId, cycle.cycleId, squareNumber, now]
+    );
+
+    // Insert ad session record with unique token
+    const sessionId = "ADS_" + crypto.randomBytes(6).toString('hex');
+    await client.query(
+      `INSERT INTO public.ad_sessions (session_id, user_id, square_number, cycle_id, timestamp, ad_duration_seconds, status, token, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, 'COMPLETED', $7, NOW())`,
+      [sessionId, userId, squareNumber, cycle.cycleId, now, adDurationSeconds, rewardNonce || null]
+    );
+
+    // Atomic increment in public.user_scores
+    const scoreUpdate = await client.query(
+      `INSERT INTO public.user_scores (user_id, total_score, updated_at)
+       VALUES ($1, 1, NOW())
+       ON CONFLICT (user_id) 
+       DO UPDATE SET total_score = public.user_scores.total_score + 1, updated_at = NOW()
+       RETURNING total_score`,
+      [userId]
+    );
+
+    const newScore = Number(scoreUpdate.rows[0].total_score);
+
+    // Keep public.users.total_score in sync if column exists
+    if (schemaInfo.userHasTotalScore) {
+      await client.query(
+        `UPDATE public.users SET total_score = $1, updated_at = NOW() WHERE id = $2`,
+        [newScore, userId]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    return res.json({
+      success: true,
+      squareNumber,
+      awardedPoints: 1,
+      newTotalScore: newScore,
+      message: "۱ امتیاز معتبر با موفقیت ثبت شد."
     });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[Ad Complete Transaction Error]', err);
+    return res.status(500).json({ error: "خطا در پردازش اتمیک امتیاز در پایگاه داده." });
+  } finally {
+    client.release();
   }
-  list.sort((a, b) => b.totalScore - a.totalScore);
-  const ranked = list.map((item, index) => ({ ...item, rank: index + 1 }));
-  return res.json({ leaderboard: ranked });
 });
 
-// 6. Admin Overview API (Protected)
-app.get('/api/admin/overview', requireAdminAuth, (req, res) => {
-  const sessions = Array.from(db.adSessions.values()).reverse().slice(0, 100);
-  const users = Array.from(db.users.values()).map(u => ({
-    ...u,
-    score: db.userScores.get(u.id)?.totalScore || 0
-  })).sort((a, b) => b.score - a.score);
+// ====================================================================
+// 5. Leaderboard API (Direct PostgreSQL Query)
+// ====================================================================
+app.get('/api/leaderboard', ensureDatabaseReady, async (req, res) => {
+  try {
+    const currentUserId = req.headers['x-user-id'] || req.query.userId;
 
-  const totalScoresSum = users.reduce((sum, u) => sum + (u.score || 0), 0);
+    const result = await pool.query(`
+      SELECT 
+        u.id AS user_id,
+        u.first_name,
+        u.last_name,
+        COALESCE(s.total_score, u.total_score, 0) AS total_score,
+        u.created_at
+      FROM public.users u
+      LEFT JOIN public.user_scores s ON u.id = s.user_id
+      ORDER BY total_score DESC, u.created_at ASC, u.id ASC
+      LIMIT 100
+    `);
 
-  return res.json({
-    totalUsers: users.length,
-    totalAdSessions: db.adSessions.size,
-    totalScoresSum,
-    settings: db.settings,
-    recentSessions: sessions,
-    users
-  });
+    const leaderboard = result.rows.map((row, index) => {
+      const fName = row.first_name || 'کاربر';
+      const lName = row.last_name || '';
+      const maskedName = lName.length > 2 
+        ? `${fName} ${lName.substring(0, 2)}***` 
+        : `${fName} ***`;
+      return {
+        rank: index + 1,
+        userId: row.user_id,
+        displayName: maskedName.trim(),
+        totalScore: Number(row.total_score),
+        isCurrentUser: row.user_id === currentUserId
+      };
+    });
+
+    return res.json({ leaderboard });
+  } catch (err) {
+    console.error('[API Leaderboard Error]', err);
+    return res.status(500).json({ error: "خطا در دریافت جدول امتیازات از پایگاه داده." });
+  }
 });
 
-// 6.1 Users Ranking Table API (Sanitized Read-Only for Standalone Users Page)
-app.get('/api/admin/users', (req, res) => {
-  // Secure Alternative Mechanism:
-  // 1. This endpoint provides strictly sanitized read-only ranking records (id, firstName, lastName, score).
-  // 2. Sensitive user data (phoneNumber, tokens, authMethod) and server secrets are NEVER returned here.
-  // 3. Mutating and privileged operations (/api/admin/overview with full phone numbers, /api/admin/cycle/reset)
-  //    remain strictly protected with `requireAdminAuth`.
-  const users = Array.from(db.users.values()).map(u => {
-    const regTime = u.registeredAt || u.createdAt || 0;
-    return {
+// ====================================================================
+// 6. Admin Overview API (Protected - Real PostgreSQL Data)
+// ====================================================================
+app.get('/api/admin/overview', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
+  try {
+    const usersRes = await pool.query(`
+      SELECT 
+        u.id,
+        u.first_name,
+        u.last_name,
+        u.phone_number,
+        u.created_at,
+        COALESCE(s.total_score, u.total_score, 0) AS score
+      FROM public.users u
+      LEFT JOIN public.user_scores s ON u.id = s.user_id
+      ORDER BY score DESC, u.created_at ASC
+    `);
+
+    const sessionsRes = await pool.query(`
+      SELECT session_id, user_id, square_number, cycle_id, timestamp, ad_duration_seconds, status, token
+      FROM public.ad_sessions
+      ORDER BY timestamp DESC
+      LIMIT 100
+    `);
+
+    const countRes = await pool.query(`SELECT COUNT(*) AS total_sessions FROM public.ad_sessions`);
+    const totalAdSessions = Number(countRes.rows[0].total_sessions);
+
+    const users = usersRes.rows.map(u => ({
       id: u.id,
-      firstName: u.firstName || '',
-      lastName: u.lastName || '',
-      registeredAt: typeof regTime === 'number' ? regTime : (new Date(regTime).getTime() || 0),
-      score: db.userScores.get(u.id)?.totalScore || 0
-    };
-  }).sort((a, b) => {
-    // 1. Primary: totalScore descending (highest score first)
-    if (b.score !== a.score) {
-      return b.score - a.score;
-    }
-    // 2. Stable tie-breaker: registration time (earlier registration first)
-    if (a.registeredAt !== b.registeredAt) {
-      return a.registeredAt - b.registeredAt;
-    }
-    // 3. Deterministic fallback: user ID
-    return String(a.id || '').localeCompare(String(b.id || ''));
-  });
+      firstName: u.first_name,
+      lastName: u.last_name,
+      phoneNumber: u.phone_number,
+      registeredAt: new Date(u.created_at).getTime(),
+      score: Number(u.score)
+    }));
 
-  return res.json({
-    success: true,
-    totalUsers: users.length,
-    users
-  });
+    const totalScoresSum = users.reduce((sum, u) => sum + (u.score || 0), 0);
+
+    return res.json({
+      totalUsers: users.length,
+      totalAdSessions,
+      totalScoresSum,
+      settings: {
+        tapsellAppKey: process.env.TAPSELL_APP_KEY || "sgedhqdbofphgpajkrqtahjkedbkokdlqiesotcmfqcklbamjaaiddqsqnihdtmobfidcb",
+        tapsellZoneId: process.env.TAPSELL_ZONE_ID || "6ad231b89140ba2215e772db",
+        cycleHours: 24,
+        pointsPerAd: 1
+      },
+      recentSessions: sessionsRes.rows.map(s => ({
+        sessionId: s.session_id,
+        userId: s.user_id,
+        squareNumber: s.square_number,
+        cycleId: s.cycle_id,
+        timestamp: Number(s.timestamp),
+        adDurationSeconds: s.ad_duration_seconds,
+        status: s.status,
+        token: s.token
+      })),
+      users
+    });
+  } catch (err) {
+    console.error('[API Admin Overview Error]', err);
+    return res.status(500).json({ error: "خطا در دریافت اطلاعات داشبورد مدیریت از پایگاه داده." });
+  }
 });
 
+// ====================================================================
+// 6.1 Users Ranking Table API (Sanitized Read-Only for Standalone Page)
+// ====================================================================
+app.get('/api/admin/users', ensureDatabaseReady, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        u.id,
+        u.first_name,
+        u.last_name,
+        u.created_at,
+        COALESCE(s.total_score, u.total_score, 0) AS total_score
+      FROM public.users u
+      LEFT JOIN public.user_scores s ON u.id = s.user_id
+      ORDER BY total_score DESC, u.created_at ASC, u.id ASC
+    `);
+
+    const users = result.rows.map(row => ({
+      id: row.id,
+      firstName: row.first_name || '',
+      lastName: row.last_name || '',
+      registeredAt: new Date(row.created_at).getTime() || 0,
+      score: Number(row.total_score)
+    }));
+
+    return res.json({
+      success: true,
+      totalUsers: users.length,
+      users
+    });
+  } catch (err) {
+    console.error('[API Admin Users Error]', err);
+    return res.status(500).json({ error: "خطا در بارگذاری جدول کاربران از پایگاه داده." });
+  }
+});
+
+// ====================================================================
 // 7. Admin Force Reset Cycle (Protected)
-app.post('/api/admin/cycle/reset', requireAdminAuth, (req, res) => {
+// ====================================================================
+app.post('/api/admin/cycle/reset', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
   try {
     const { userId } = req.body;
     if (!userId) return res.status(400).json({ error: "شناسه کاربر الزامی است." });
     const now = Date.now();
     const newCycleId = "CYC_" + Math.floor(now / 1000);
+    const endTime = now + (24 * 60 * 60 * 1000);
+
+    await pool.query(
+      `INSERT INTO public.daily_cycles (cycle_id, user_id, start_time, end_time, status)
+       VALUES ($1, $2, $3, $4, 'ACTIVE')
+       ON CONFLICT (cycle_id) DO UPDATE SET start_time = $3, end_time = $4, status = 'ACTIVE'`,
+      [newCycleId, userId, now, endTime]
+    );
+
     const cycle = {
       cycleId: newCycleId,
       userId,
       startTime: now,
-      endTime: now + (24 * 60 * 60 * 1000),
+      endTime,
       status: "ACTIVE"
     };
-    db.dailyCycles.set(newCycleId, cycle);
-    saveDatabase();
     return res.json({ success: true, newCycle: cycle });
   } catch (err) {
     console.error("Error in cycle reset:", err);
-    return res.status(500).json({ error: "خطای داخلی سرور" });
+    return res.status(500).json({ error: "خطای سرور در بازنشانی چرخه." });
   }
 });
 
-// Global Error Handler & Startup with 0.0.0.0 binding
+// Global Error Handler
 app.use((err, req, res, next) => {
   console.error('[Global Error]', err);
   res.status(500).json({ error: 'خطای داخلی سرور رخ داد.' });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`[Reqabat Va Jayezah Server] Successfully initialized and running on http://0.0.0.0:${PORT}`);
+// Startup Server with PostgreSQL Verification
+app.listen(PORT, '0.0.0.0', async () => {
+  console.log(`[Reqabat Va Jayezah Server] Running on http://0.0.0.0:${PORT}`);
+  await testAndInitDatabase();
 });

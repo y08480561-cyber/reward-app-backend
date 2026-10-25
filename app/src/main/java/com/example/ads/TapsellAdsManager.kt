@@ -52,31 +52,31 @@ class TapsellAdsManager(
     private var currentResponseId: String = ""
     private var isSdkInitialized = false
 
-    init {
-        initializeSdk()
-    }
-
     /**
-     * Initializes official Tapsell Plus SDK with configured App Key.
+     * Initializes official Tapsell Plus SDK with configured App Key safely and lazily.
      */
     fun initializeSdk() {
+        if (isSdkInitialized) return
         val appKey = prefs.tapsellAppKey.trim()
-        Log.d(TAG, "Initializing Tapsell Plus SDK with AppKey: ${appKey.take(10)}...")
+        if (appKey.isEmpty()) {
+            Log.w(TAG, "Tapsell AppKey is empty, skipping SDK init.")
+            return
+        }
+        Log.d(TAG, "Initializing Tapsell Plus SDK safely...")
         try {
-            TapsellPlus.setDebugMode(Log.INFO)
             TapsellPlus.initialize(context, appKey, object : TapsellPlusInitListener {
                 override fun onInitializeSuccess(adNetworks: AdNetworks?) {
                     isSdkInitialized = true
-                    Log.i(TAG, "Tapsell Plus SDK initialized successfully with user AppKey.")
+                    Log.i(TAG, "Tapsell Plus SDK initialized successfully.")
                 }
 
                 override fun onInitializeFailed(adNetworks: AdNetworks?, adNetworkError: AdNetworkError?) {
                     isSdkInitialized = false
-                    Log.e(TAG, "Tapsell Plus SDK initialization failed: ${adNetworkError?.errorMessage}")
+                    Log.w(TAG, "Tapsell Plus SDK init deferred: ${adNetworkError?.errorMessage}")
                 }
             })
         } catch (e: Exception) {
-            Log.e(TAG, "Exception during TapsellPlus.initialize", e)
+            Log.w(TAG, "Exception during TapsellPlus.initialize: ${e.message}")
         }
     }
 
@@ -94,6 +94,10 @@ class TapsellAdsManager(
         if (_adState.value is AdPlaybackState.Loading || _adState.value is AdPlaybackState.Playing) {
             Log.w(TAG, "Ad request ignored: An ad is already in progress.")
             return
+        }
+
+        if (!isSdkInitialized) {
+            initializeSdk()
         }
 
         activeSquare = squareNumber

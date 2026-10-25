@@ -8,18 +8,37 @@
 
     <!-- Package visibility queries for Advertising ID and app stores on Android 11+ (API 30+) -->
     <queries>
+        <!-- Google Play Services Advertising ID -->
         <intent>
             <action android:name="com.google.android.gms.ads.identifier.service.START" />
         </intent>
+        <package android:name="com.google.android.gms" />
+        <package android:name="com.android.vending" />
+
+        <!-- Cafe Bazaar Advertising ID Service -->
+        <intent>
+            <action android:name="com.farsitel.bazaar.service.AdvertisingIdService.BIND" />
+        </intent>
+        <package android:name="com.farsitel.bazaar" />
+
+        <!-- Myket Advertising ID Service -->
+        <intent>
+            <action android:name="ir.mservices.market.service.AdvertisingIdService.BIND" />
+        </intent>
+        <package android:name="com.myket.android" />
+
+        <!-- Huawei Mobile Services Advertising ID -->
+        <intent>
+            <action android:name="com.huawei.hms.ads.identifier.AIDL" />
+        </intent>
+        <package android:name="com.huawei.hwid" />
+
+        <!-- Browser Intents -->
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <category android:name="android.intent.category.BROWSABLE" />
             <data android:scheme="https" />
         </intent>
-        <package android:name="com.google.android.gms" />
-        <package android:name="com.android.vending" />
-        <package android:name="com.farsitel.bazaar" />
-        <package android:name="com.myket.android" />
     </queries>
 
     <application
