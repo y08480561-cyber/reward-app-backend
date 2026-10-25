@@ -309,9 +309,11 @@ fun LeaderboardScreen(
                             javaScriptEnabled = true
                             domStorageEnabled = true
                             useWideViewPort = true
-                            loadWithOverviewMode = true
+                            loadWithOverviewMode = false
                             displayZoomControls = false
-                            builtInZoomControls = true
+                            builtInZoomControls = false
+                            setSupportZoom(false)
+                            textZoom = 100
                             allowFileAccess = false
                             allowContentAccess = false
                             cacheMode = WebSettings.LOAD_DEFAULT

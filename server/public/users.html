@@ -2,103 +2,236 @@
 <html lang="fa" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
   <title>فهرست کاربران واقعی | رقابت کن، جایزه ببر</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <style>
+    * {
+      box-sizing: border-box;
+    }
     body {
-      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Vazirmatn", Tahoma, sans-serif;
       background-color: #0B192C;
       color: #F8FAFC;
       min-height: 100vh;
       margin: 0;
       padding: 0;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
     }
-    .card {
-      background-color: #1E3E62;
-      border: 1px solid #2E5077;
-      border-radius: 16px;
-      color: #fff;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    .page-wrapper {
+      width: 100%;
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 12px 10px;
     }
-    .gold-text {
+    @media (min-width: 576px) {
+      .page-wrapper {
+        padding: 24px 20px;
+      }
+    }
+    .header-bar {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    @media (min-width: 576px) {
+      .header-bar {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 18px;
+      }
+    }
+    .main-title {
+      font-size: 20px;
       color: #FFB703;
       font-weight: 800;
-      letter-spacing: -0.5px;
+      letter-spacing: -0.3px;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
-    .badge-gold {
-      background: linear-gradient(135deg, #FFB703, #FB8500);
-      color: #0B192C;
-      font-weight: 800;
-      padding: 6px 14px;
-      border-radius: 20px;
+    @media (min-width: 576px) {
+      .main-title {
+        font-size: 23px;
+      }
     }
-    .table-dark {
-      background-color: #152A44;
+    .search-wrapper {
+      width: 100%;
+    }
+    @media (min-width: 576px) {
+      .search-wrapper {
+        width: 280px;
+      }
     }
     .form-control-dark {
       background-color: #152A44;
       border: 1px solid #2E5077;
       color: #fff;
+      font-size: 13px;
+      border-radius: 10px;
+      padding: 8px 12px;
+      width: 100%;
+      height: 40px;
     }
     .form-control-dark:focus {
       background-color: #1E3E62;
       border-color: #FFB703;
       color: #fff;
-      box-shadow: 0 0 0 0.25rem rgba(255,183,3,0.25);
+      box-shadow: 0 0 0 0.2rem rgba(255,183,3,0.25);
     }
     .form-control-dark::placeholder {
       color: #94A3B8;
+      font-size: 12.5px;
+    }
+    .table-card {
+      background-color: #1E3E62;
+      border: 1px solid #2E5077;
+      border-radius: 14px;
+      padding: 6px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+      overflow: hidden;
+    }
+    @media (min-width: 576px) {
+      .table-card {
+        border-radius: 16px;
+        padding: 12px;
+      }
+    }
+    .table-responsive-custom {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      margin: 0;
+    }
+    .users-table {
+      width: 100%;
+      min-width: 320px;
+      margin-bottom: 0;
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 13px;
+    }
+    .users-table th {
+      background-color: #152A44;
+      color: #94A3B8;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 10px 6px;
+      border-bottom: 1px solid #2E5077;
+      white-space: nowrap;
+      text-align: center;
+    }
+    .users-table th.th-name {
+      text-align: right;
+    }
+    .users-table td {
+      padding: 9px 5px;
+      vertical-align: middle;
+      border-bottom: 1px solid rgba(46, 80, 119, 0.45);
+      color: #F8FAFC;
+      line-height: 1.35;
+    }
+    .users-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+    .users-table tbody tr:hover {
+      background-color: rgba(255, 183, 3, 0.05);
+    }
+    .col-rank {
+      width: 44px;
+      text-align: center;
+      font-weight: 700;
+      color: #94A3B8;
+      font-size: 13px;
+    }
+    .col-id {
+      width: 95px;
+      text-align: center;
+    }
+    .col-name {
+      text-align: right;
+      font-weight: 600;
+      font-size: 13px;
+      word-break: break-word;
+    }
+    .col-score {
+      width: 92px;
+      text-align: center;
     }
     .user-id-badge {
       background-color: #0B192C;
       border: 1px solid #2E5077;
       color: #FFB703;
-      padding: 4px 10px;
+      padding: 3px 6px;
       border-radius: 6px;
-      font-size: 0.9rem;
-      letter-spacing: 0.5px;
+      font-size: 11px;
+      letter-spacing: 0.3px;
+      display: inline-block;
+      direction: ltr;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      white-space: nowrap;
     }
-    .row-index {
-      color: #94A3B8;
-      font-weight: 700;
-      font-size: 0.95rem;
+    .badge-gold {
+      background: linear-gradient(135deg, #FFB703, #FB8500);
+      color: #0B192C;
+      font-weight: 800;
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 12px;
+      display: inline-block;
+      white-space: nowrap;
+    }
+    .rank-top-1 {
+      color: #FFD700 !important;
+      font-weight: 900;
+    }
+    .rank-top-2 {
+      color: #E2E8F0 !important;
+      font-weight: 800;
+    }
+    .rank-top-3 {
+      color: #F59E0B !important;
+      font-weight: 800;
     }
   </style>
 </head>
 <body>
 
-  <!-- Main Direct Users Table View -->
-  <main class="container-fluid px-3 px-md-4 max-w-7xl py-4">
-    <!-- Header with Title and Search -->
-    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
-      <h2 class="gold-text mb-0">
-        <i class="bi bi-trophy-fill text-warning me-2"></i>فهرست کاربران واقعی
+  <div class="page-wrapper">
+    <!-- Header with Title and Search (Responsive stack on mobile, inline on desktop) -->
+    <div class="header-bar">
+      <h2 class="main-title">
+        <i class="bi bi-trophy-fill text-warning"></i>
+        <span>فهرست کاربران واقعی</span>
       </h2>
-      <div class="d-flex align-items-center gap-2">
-        <input type="text" id="userSearchInput" class="form-control form-control-dark" style="min-width: 260px;" placeholder="جستجو بر اساس نام یا شناسه..." onkeyup="filterUsers()">
+      <div class="search-wrapper">
+        <input type="text" id="userSearchInput" class="form-control-dark" placeholder="جستجو بر اساس نام یا شناسه..." onkeyup="filterUsers()" autocomplete="off">
       </div>
     </div>
 
-    <!-- Alert Box (in case of network failure) -->
-    <div id="alertBox" class="alert alert-danger d-none shadow-sm" role="alert"></div>
+    <!-- Alert Box -->
+    <div id="alertBox" class="alert alert-danger d-none shadow-sm py-2 px-3 small mb-3" role="alert"></div>
 
-    <!-- Users Table Card -->
-    <div class="card p-3 p-md-4">
-      <div class="table-responsive">
-        <table class="table table-dark table-hover table-striped rounded align-middle mb-0">
+    <!-- Responsive Users Table Card -->
+    <div class="table-card">
+      <div class="table-responsive-custom">
+        <table class="users-table">
           <thead>
-            <tr class="text-secondary border-secondary">
-              <th scope="col" style="width: 110px;">شماره ردیف</th>
-              <th scope="col" style="min-width: 150px;">شناسه کاربر</th>
-              <th scope="col">نام و نام خانوادگی</th>
-              <th scope="col" style="min-width: 150px;">مجموع امتیاز</th>
+            <tr>
+              <th scope="col" class="col-rank">#</th>
+              <th scope="col" class="col-id">شناسه کاربر</th>
+              <th scope="col" class="th-name">نام و نام خانوادگی</th>
+              <th scope="col" class="col-score">مجموع امتیاز</th>
             </tr>
           </thead>
           <tbody id="usersTbody">
             <tr>
-              <td colspan="4" class="text-center py-5 text-secondary">
+              <td colspan="4" class="text-center py-4 text-secondary small">
                 <span class="spinner-border spinner-border-sm me-2 text-warning" role="status"></span>
                 در حال دریافت اطلاعات از سرور...
               </td>
@@ -107,7 +240,7 @@
         </table>
       </div>
     </div>
-  </main>
+  </div>
 
   <script>
     let cachedUsers = [];
@@ -191,8 +324,8 @@
       if (!users || users.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="4" class="text-center py-5 text-secondary">
-              <i class="bi bi-people fs-2 d-block mb-2 text-secondary"></i>
+            <td colspan="4" class="text-center py-4 text-secondary small">
+              <i class="bi bi-people fs-4 d-block mb-1 text-secondary"></i>
               هیچ کاربری در پایگاه داده سرور یافت نشد.
             </td>
           </tr>
@@ -201,14 +334,16 @@
       }
 
       tbody.innerHTML = users.map((u, index) => {
+        const rankNumber = index + 1;
+        const rankClass = rankNumber === 1 ? 'rank-top-1' : (rankNumber === 2 ? 'rank-top-2' : (rankNumber === 3 ? 'rank-top-3' : ''));
         const fullName = ((u.firstName || '') + ' ' + (u.lastName || '')).trim() || 'کاربر بدون نام';
         return `
           <tr>
-            <td><span class="row-index">${index + 1}</span></td>
-            <td><code class="user-id-badge">${u.id || '-'}</code></td>
-            <td class="fw-bold">${fullName}</td>
-            <td>
-              <span class="badge badge-gold fs-6">${u.score || 0} امتیاز</span>
+            <td class="col-rank ${rankClass}">${rankNumber}</td>
+            <td class="col-id"><span class="user-id-badge">${u.id || '-'}</span></td>
+            <td class="col-name">${fullName}</td>
+            <td class="col-score">
+              <span class="badge-gold">${u.score || 0} امتیاز</span>
             </td>
           </tr>
         `;
@@ -226,7 +361,6 @@
         const id = (u.id || '').toLowerCase();
         return fullName.includes(q) || id.includes(q);
       });
-      // Renders filtered results re-numbering row numbers from 1
       renderUsers(filtered);
     }
 
