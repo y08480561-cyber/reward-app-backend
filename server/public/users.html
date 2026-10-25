@@ -110,7 +110,7 @@
     }
     .users-table {
       width: 100%;
-      min-width: 320px;
+      min-width: 300px;
       margin-bottom: 0;
       border-collapse: separate;
       border-spacing: 0;
@@ -121,7 +121,7 @@
       color: #94A3B8;
       font-size: 12px;
       font-weight: 700;
-      padding: 10px 6px;
+      padding: 10px 8px;
       border-bottom: 1px solid #2E5077;
       white-space: nowrap;
       text-align: center;
@@ -130,7 +130,7 @@
       text-align: right;
     }
     .users-table td {
-      padding: 9px 5px;
+      padding: 10px 8px;
       vertical-align: middle;
       border-bottom: 1px solid rgba(46, 80, 119, 0.45);
       color: #F8FAFC;
@@ -143,15 +143,11 @@
       background-color: rgba(255, 183, 3, 0.05);
     }
     .col-rank {
-      width: 44px;
+      width: 50px;
       text-align: center;
       font-weight: 700;
       color: #94A3B8;
       font-size: 13px;
-    }
-    .col-id {
-      width: 95px;
-      text-align: center;
     }
     .col-name {
       text-align: right;
@@ -160,27 +156,14 @@
       word-break: break-word;
     }
     .col-score {
-      width: 92px;
+      width: 120px;
       text-align: center;
-    }
-    .user-id-badge {
-      background-color: #0B192C;
-      border: 1px solid #2E5077;
-      color: #FFB703;
-      padding: 3px 6px;
-      border-radius: 6px;
-      font-size: 11px;
-      letter-spacing: 0.3px;
-      display: inline-block;
-      direction: ltr;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      white-space: nowrap;
     }
     .badge-gold {
       background: linear-gradient(135deg, #FFB703, #FB8500);
       color: #0B192C;
       font-weight: 800;
-      padding: 4px 8px;
+      padding: 5px 10px;
       border-radius: 12px;
       font-size: 12px;
       display: inline-block;
@@ -203,14 +186,14 @@
 <body>
 
   <div class="page-wrapper">
-    <!-- Header with Title and Search (Responsive stack on mobile, inline on desktop) -->
+    <!-- Header with Title and Search -->
     <div class="header-bar">
       <h2 class="main-title">
         <i class="bi bi-trophy-fill text-warning"></i>
         <span>فهرست کاربران واقعی</span>
       </h2>
       <div class="search-wrapper">
-        <input type="text" id="userSearchInput" class="form-control-dark" placeholder="جستجو بر اساس نام یا شناسه..." onkeyup="filterUsers()" autocomplete="off">
+        <input type="text" id="userSearchInput" class="form-control-dark" placeholder="جستجو بر اساس نام..." onkeyup="filterUsers()" autocomplete="off">
       </div>
     </div>
 
@@ -224,14 +207,13 @@
           <thead>
             <tr>
               <th scope="col" class="col-rank">#</th>
-              <th scope="col" class="col-id">شناسه کاربر</th>
               <th scope="col" class="th-name">نام و نام خانوادگی</th>
               <th scope="col" class="col-score">مجموع امتیاز</th>
             </tr>
           </thead>
           <tbody id="usersTbody">
             <tr>
-              <td colspan="4" class="text-center py-4 text-secondary small">
+              <td colspan="3" class="text-center py-4 text-secondary small">
                 <span class="spinner-border spinner-border-sm me-2 text-warning" role="status"></span>
                 در حال دریافت اطلاعات از سرور...
               </td>
@@ -324,7 +306,7 @@
       if (!users || users.length === 0) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="4" class="text-center py-4 text-secondary small">
+            <td colspan="3" class="text-center py-4 text-secondary small">
               <i class="bi bi-people fs-4 d-block mb-1 text-secondary"></i>
               هیچ کاربری در پایگاه داده سرور یافت نشد.
             </td>
@@ -340,7 +322,6 @@
         return `
           <tr>
             <td class="col-rank ${rankClass}">${rankNumber}</td>
-            <td class="col-id"><span class="user-id-badge">${u.id || '-'}</span></td>
             <td class="col-name">${fullName}</td>
             <td class="col-score">
               <span class="badge-gold">${u.score || 0} امتیاز</span>
@@ -358,8 +339,7 @@
       }
       const filtered = cachedUsers.filter(u => {
         const fullName = ((u.firstName || '') + ' ' + (u.lastName || '')).toLowerCase();
-        const id = (u.id || '').toLowerCase();
-        return fullName.includes(q) || id.includes(q);
+        return fullName.includes(q);
       });
       renderUsers(filtered);
     }
