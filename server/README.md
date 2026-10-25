@@ -17,7 +17,7 @@
 ### نحوه تنظیم `DATABASE_URL` در Render
 ۱. وارد داشبورد [Supabase](https://supabase.com) شوید و پروژه خود را انتخاب کنید.
 ۲. به مسیر **Project Settings** > **Database** > **Connection string** بروید.
-۳. در بخش **URI**، رشته اتصال (Connection String) از نوع Transaction یا Session Pooler را کپی کنید (رمز پایگاه داده خود را در آن جایگزین کنید).
+۳. در بخش **URI**، حتماً گزینه **Connection Pooler** (با پورت 6543 و هاست `pooler.supabase.com`) را انتخاب کنید، زیرا Render روی شبکه IPv4 اجرا می‌شود و اتصال مستقیم با پورت 5432 با خطای ETIMEDOUT یا ENOTFOUND روبرو خواهد شد.
    نمونه فرمت:
    `postgresql://postgres.[PROJECT-REF]:[YOUR-PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres`
 ۴. وارد پنل سرویس وب خود در [Render](https://dashboard.render.com) شوید.
@@ -35,23 +35,21 @@ AUTH_PIN=2026
 DATABASE_URL=postgresql://postgres.xxx:password@aws-0-eu-central-1.pooler.supabase.com:6543/postgres
 TAPSELL_APP_KEY=sgedhqdbofphgpajkrqtahjkedbkokdlqiesotcmfqcklbamjaaiddqsqnihdtmobfidcb
 TAPSELL_ZONE_ID=6ad231b89140ba2215e772db
+KAVENEGAR_API_KEY=your_kavenegar_api_key_here
 ```
 
 ---
 
-## ۳. اجرای محلی سرور
-```bash
-cd server
-npm install
-npm start
-```
-سرور بر روی پورت ۳۰۰۰ اجرا می‌شود و پنل مدیریت تحت وب در آدرس `http://localhost:3000` و جدول رتبه‌بندی کاربران در `http://localhost:3000/admin/users` در دسترس خواهد بود.
+## ۳. اجرای اسکریپت Migration در Supabase (اختیاری و پیشنهادی)
+فایل `server/migration.sql` شامل دستورات امن `ADD COLUMN IF NOT EXISTS` و `CREATE TABLE IF NOT EXISTS` است که هیچ داده‌ای را حذف نمی‌کند.
+برای اطمینان از آماده بودن کامل جداول، می‌توانید محتوای فایل `server/migration.sql` را در بخش **SQL Editor** داشبورد Supabase اجرا فرمایید.
 
 ---
 
-## ۴. چرخه ۲۴ ساعته و قوانین ضد تقلب
-- دوره ۲۴ ساعته به صورت مستقل برای هر کاربر با `startTime` و `endTime` سروری در پایگاه داده مدیریت می‌شود.
-- پس از اتمام ۲۴ ساعت، ۵۰ مربع به صورت خودکار بازنشانی می‌شوند ولی مجموع امتیازات پیشین کاربر دست‌نخورده در `public.user_scores` باقی می‌ماند.
-- هر مربع در هر دوره تنها ۱ بار مجاز به دریافت ۱ امتیاز است و درخواست‌های تکراری با کد خطای ۴۰۹ رد می‌شوند.
-- هر تاییدیه تبلیغ با توکن یکتا (Nonce) در `public.ad_sessions` بررسی می‌شود تا از Replay Attack و ثبت چندباره امتیاز با یک تبلیغ جلوگیری شود.
-- عملیات افزایش امتیاز و ثبت لاگ درون یک تراکنش اتمیک (`BEGIN ... COMMIT`) پایگاه داده اجرا می‌شود.
+## ۴. روش به‌روزرسانی کدها در GitHub و Render
+۱. فایل‌های پوشه `server/` به خصوص `server/server.js` و `server/migration.sql` را در مخزن گیت‌هاب پروژه جایگزین (Commit & Push) نمایید.
+۲. سرویس Render به صورت خودکار تغییرات را از گیت‌هاب دریافت کرده و Build جدید را دیپلوی می‌کند.
+۳. پس از دیپلوی، در بخش Logs پیام موفقیت‌آمیز زیر نمایش داده می‌شود:
+   ```text
+   [PostgreSQL SUCCESS] Successfully connected to database!
+   ```

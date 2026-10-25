@@ -138,12 +138,12 @@ async function testAndInitDatabase() {
   }
 }
 
-// Ensure all required tables and indexes exist (safe and idempotent)
+// Ensure all required tables and columns exist (safe, idempotent, non-destructive)
 async function initDatabaseTables() {
   if (!pool || !isDbConnected) return;
 
   const ddlQueries = [
-    // 1. Users table
+    // 1. Ensure public.users exists and has all expected columns
     `CREATE TABLE IF NOT EXISTS public.users (
       id TEXT PRIMARY KEY,
       first_name TEXT NOT NULL DEFAULT '',
@@ -151,11 +151,16 @@ async function initDatabaseTables() {
       phone_number TEXT NOT NULL UNIQUE,
       total_score INTEGER NOT NULL DEFAULT 0,
       status TEXT NOT NULL DEFAULT 'active',
-      auth_method TEXT DEFAULT 'DIRECT_CREDENTIALS',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );`,
-    `CREATE INDEX IF NOT EXISTS idx_users_phone ON public.users(phone_number);`,
+    // Safe schema additions to guarantee no 42703 column errors
+    `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS total_score INTEGER NOT NULL DEFAULT 0;`,
+    `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';`,
+    `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS auth_method TEXT DEFAULT 'DIRECT_CREDENTIALS';`,
+    `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();`,
+    `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone_unique ON public.users(phone_number);`,
     `CREATE INDEX IF NOT EXISTS idx_users_score ON public.users(total_score DESC);`,
 
     // 2. User scores table (explicit score tracking)
@@ -281,11 +286,12 @@ async function migrateFromLocalJsonIfExists() {
         if (!u || !u.phoneNumber) continue;
         const regDate = u.registeredAt ? new Date(u.registeredAt) : new Date();
         const effectiveId = isValidUuid(u.id) ? u.id : crypto.randomUUID();
+        // Strictly uses existing columns only (id, first_name, last_name, phone_number, total_score, status, created_at, updated_at)
         const res = await pool.query(
-          `INSERT INTO public.users (id, first_name, last_name, phone_number, auth_method, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, NOW())
+          `INSERT INTO public.users (id, first_name, last_name, phone_number, total_score, status, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, 0, 'active', $5, NOW())
            ON CONFLICT (phone_number) DO NOTHING`,
-          [effectiveId, u.firstName || '', u.lastName || '', u.phoneNumber, u.authMethod || 'DIRECT_CREDENTIALS', regDate]
+          [effectiveId, u.firstName || '', u.lastName || '', u.phoneNumber, regDate]
         );
         if (res.rowCount > 0) migratedUsers++;
       }
@@ -505,9 +511,10 @@ app.post('/api/auth/login', ensureDatabaseReady, async (req, res) => {
       return res.status(401).json({ error: "رمز عبور یا پین ورود نامعتبر است. رمز پیش‌فرض آزمایشی سرور: 2026" });
     }
 
-    // 1. Check if user already exists in public.users by phone_number (No duplicates!)
+    // 1. Check if user already exists in public.users by phone_number
+    // (Only query guaranteed existing columns: id, first_name, last_name, phone_number, created_at, status)
     const userLookup = await pool.query(
-      `SELECT id, first_name, last_name, phone_number, created_at, auth_method
+      `SELECT id, first_name, last_name, phone_number, created_at, status
        FROM public.users WHERE phone_number = $1 LIMIT 1`,
       [phoneNumber]
     );
@@ -516,6 +523,11 @@ app.post('/api/auth/login', ensureDatabaseReady, async (req, res) => {
     if (userLookup.rows.length > 0) {
       // Existing user found -> Update names if provided
       const existing = userLookup.rows[0];
+
+      if (existing.status && existing.status !== 'active') {
+        return res.status(403).json({ error: "حساب کاربری شما مسدود یا غیرفعال است." });
+      }
+
       const newFName = (firstName && firstName.trim()) ? firstName.trim() : existing.first_name;
       const newLName = (lastName && lastName.trim()) ? lastName.trim() : existing.last_name;
 
@@ -534,18 +546,18 @@ app.post('/api/auth/login', ensureDatabaseReady, async (req, res) => {
         lastName: newLName,
         phoneNumber: existing.phone_number,
         registeredAt: new Date(existing.created_at).getTime(),
-        authMethod: existing.auth_method || "DIRECT_CREDENTIALS"
+        authMethod: "DIRECT_CREDENTIALS"
       };
       console.log(`[PostgreSQL Auth] Logged in existing user: ${user.id} (${phoneNumber})`);
     } else {
-      // New user registration -> Generate UUID and insert
+      // New user registration -> Generate standard UUID and insert into public.users
       const userId = crypto.randomUUID();
       const fName = (firstName || "کاربر").trim();
       const lName = (lastName || "مسابقه").trim();
 
       await pool.query(
-        `INSERT INTO public.users (id, first_name, last_name, phone_number, auth_method, total_score, status, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, 'DIRECT_CREDENTIALS', 0, 'active', NOW(), NOW())`,
+        `INSERT INTO public.users (id, first_name, last_name, phone_number, total_score, status, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, 0, 'active', NOW(), NOW())`,
         [userId, fName, lName, phoneNumber]
       );
 
@@ -600,13 +612,24 @@ app.post('/api/auth/login', ensureDatabaseReady, async (req, res) => {
 });
 
 // ====================================================================
-// 2. Auth: Request OTP
+// 2. Auth: Request OTP (Strict Real Mode - No Hardcoded Test OTP)
 // ====================================================================
 app.post('/api/auth/otp/request', async (req, res) => {
   try {
     const { phoneNumber } = req.body;
     if (!phoneNumber || !/^09\d{9}$/.test(phoneNumber)) {
       return res.status(400).json({ error: "شماره موبایل وارد شده باید ۱۱ رقمی و با 09 شروع شود." });
+    }
+
+    const apiKey = process.env.KAVENEGAR_API_KEY || process.env.SMS_API_KEY;
+
+    // If SMS service is not configured, do NOT provide fake/static OTP in production
+    if (!apiKey) {
+      console.warn(`[SMS Gateway] Cannot send OTP: No SMS API key configured in environment.`);
+      return res.status(503).json({
+        success: false,
+        error: "سرویس پیامکی روی سرور فعال نیست. لطفاً با رمز عبور (ورود مستقیم) وارد شوید یا متغیر KAVENEGAR_API_KEY را در تنظیمات Render وارد نمایید."
+      });
     }
 
     // Rate limiting check: max 5 requests per 5 minutes
@@ -618,25 +641,7 @@ app.post('/api/auth/otp/request', async (req, res) => {
       }
     }
 
-    const apiKey = process.env.KAVENEGAR_API_KEY || process.env.SMS_API_KEY;
     const expiresAt = now + 5 * 60 * 1000;
-
-    if (!apiKey) {
-      const otp = "12345";
-      otpStore.set(phoneNumber, {
-        otp,
-        expiresAt,
-        requestsCount: (existing?.requestsCount || 0) + 1,
-        lastRequestedAt: now
-      });
-      console.log(`[SMS-GATEWAY] No SMS_API_KEY set. In-memory OTP set for ${phoneNumber}: 12345`);
-      return res.json({
-        success: true,
-        message: "حالت بدون پیامک: کد تأیید ورود ۱۲۳۴۵ است.",
-        debugOtp: "12345"
-      });
-    }
-
     const otp = crypto.randomInt(10000, 100000).toString();
     await sendSmsViaKavenegar(phoneNumber, otp);
 
@@ -648,7 +653,7 @@ app.post('/api/auth/otp/request', async (req, res) => {
       lastRequestedAt: now
     });
 
-    console.log(`[SMS-GATEWAY] OTP successfully dispatched via Kavenegar to ${phoneNumber.substring(0, 4)}***`);
+    console.log(`[SMS Gateway] OTP successfully dispatched via Kavenegar to ${phoneNumber.substring(0, 4)}***`);
     return res.json({ success: true, message: "کد تایید با موفقیت به شماره همراه شما ارسال شد." });
   } catch (err) {
     console.error('[SMS Error]', err.message);
@@ -685,7 +690,7 @@ app.post('/api/auth/otp/verify', ensureDatabaseReady, async (req, res) => {
 
     // Check existing user in public.users
     const userLookup = await pool.query(
-      `SELECT id, first_name, last_name, phone_number, created_at, auth_method
+      `SELECT id, first_name, last_name, phone_number, created_at, status
        FROM public.users WHERE phone_number = $1 LIMIT 1`,
       [phoneNumber]
     );
@@ -693,13 +698,18 @@ app.post('/api/auth/otp/verify', ensureDatabaseReady, async (req, res) => {
     let user;
     if (userLookup.rows.length > 0) {
       const existing = userLookup.rows[0];
+
+      if (existing.status && existing.status !== 'active') {
+        return res.status(403).json({ error: "حساب کاربری شما مسدود یا غیرفعال است." });
+      }
+
       user = {
         id: existing.id,
         firstName: existing.first_name,
         lastName: existing.last_name,
         phoneNumber: existing.phone_number,
         registeredAt: new Date(existing.created_at).getTime(),
-        authMethod: existing.auth_method || "SMS_OTP"
+        authMethod: "SMS_OTP"
       };
     } else {
       const userId = crypto.randomUUID();
@@ -707,8 +717,8 @@ app.post('/api/auth/otp/verify', ensureDatabaseReady, async (req, res) => {
       const lName = (lastName || "مسابقه").trim();
 
       await pool.query(
-        `INSERT INTO public.users (id, first_name, last_name, phone_number, auth_method, total_score, status, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, 'SMS_OTP', 0, 'active', NOW(), NOW())`,
+        `INSERT INTO public.users (id, first_name, last_name, phone_number, total_score, status, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, 0, 'active', NOW(), NOW())`,
         [userId, fName, lName, phoneNumber]
       );
 
