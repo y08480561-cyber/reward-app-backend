@@ -1,6 +1,7 @@
 package com.example.data.remote
 
 import android.content.Context
+import android.util.Log
 import com.example.data.local.AdLogEntity
 import com.example.data.local.AppDatabase
 import com.example.data.local.CycleEntity
@@ -352,20 +353,41 @@ class BackendRepository(
         }
     }
 
+    private fun getTodayIranMidnight(nowMs: Long = System.currentTimeMillis()): Long {
+        val localCalendar = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("Asia/Tehran"))
+        localCalendar.timeInMillis = nowMs
+        localCalendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+        localCalendar.set(java.util.Calendar.MINUTE, 0)
+        localCalendar.set(java.util.Calendar.SECOND, 0)
+        localCalendar.set(java.util.Calendar.MILLISECOND, 0)
+        return localCalendar.timeInMillis
+    }
+
+    private fun getNextIranMidnight(nowMs: Long = System.currentTimeMillis()): Long {
+        val localCalendar = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("Asia/Tehran"))
+        localCalendar.timeInMillis = nowMs
+        localCalendar.add(java.util.Calendar.DAY_OF_YEAR, 1)
+        localCalendar.set(java.util.Calendar.HOUR_OF_DAY, 0)
+        localCalendar.set(java.util.Calendar.MINUTE, 0)
+        localCalendar.set(java.util.Calendar.SECOND, 0)
+        localCalendar.set(java.util.Calendar.MILLISECOND, 0)
+        return localCalendar.timeInMillis
+    }
+
     /**
-     * Ensures an active 24-hour cycle is present.
-     * If the cycle has ended (24h passed), automatically archives old cycle and
-     * resets all 50 squares back to READY state while keeping user's cumulative score intact.
+     * Ensures an active cycle is present, resetting at midnight Iran time (12 AM Tehran time).
      */
     suspend fun ensureActiveCycle(userId: String): DailyCycle = withContext(Dispatchers.IO) {
         val currentCycleEntity = cycleDao.getCurrentCycle()
         val currentTime = System.currentTimeMillis()
+        val nextMidnight = getNextIranMidnight(currentTime)
+        val todayMidnight = getTodayIranMidnight(currentTime)
 
-        if (currentCycleEntity == null || currentTime >= currentCycleEntity.endTimeMs) {
-            // Cycle expired or not yet initialized: Start new 24h cycle!
-            val newCycleId = "CYC_" + (currentTime / 1000)
-            val startTime = currentTime
-            val endTime = startTime + CYCLE_DURATION_MS
+        if (currentCycleEntity == null || currentTime >= currentCycleEntity.endTimeMs || currentCycleEntity.endTimeMs != nextMidnight) {
+            // Cycle expired or midnight passed: Start new cycle resetting at midnight Iran time!
+            val newCycleId = "CYC_" + (todayMidnight / 1000)
+            val startTime = todayMidnight
+            val endTime = nextMidnight
 
             val newCycle = CycleEntity(
                 cycleId = newCycleId,
@@ -498,7 +520,7 @@ class BackendRepository(
             }
         }
 
-        // Send point registration to Render Backend API
+        // Send point registration to Render Backend API with automatic retry and local fallback
         val url = "${prefs.serverUrl.trimEnd('/')}/api/ads/complete"
         val payload = JSONObject().apply {
             put("userId", userId)
@@ -507,55 +529,70 @@ class BackendRepository(
             put("adDurationSeconds", adDurationSeconds)
         }
 
-        try {
-            val request = Request.Builder()
-                .url(url)
-                .header("x-user-id", userId)
-                .header("Content-Type", "application/json")
-                .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
-                .build()
+        for (attempt in 1..3) {
+            try {
+                val request = Request.Builder()
+                    .url(url)
+                    .header("x-user-id", userId)
+                    .header("Content-Type", "application/json")
+                    .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+                    .build()
 
-            client.newCall(request).execute().use { response ->
-                val body = response.body?.string().orEmpty()
-                if (response.isSuccessful) {
-                    val json = JSONObject(body)
-                    val newScore = json.optInt("newTotalScore", prefs.totalScore + 1)
-                    val now = System.currentTimeMillis()
-                    val sessionId = "ADS_" + UUID.randomUUID().toString().take(12)
+                client.newCall(request).execute().use { response ->
+                    val body = response.body?.string().orEmpty()
+                    if (response.isSuccessful) {
+                        val json = JSONObject(body)
+                        val newScore = json.optInt("newTotalScore", prefs.totalScore + 1)
+                        val now = System.currentTimeMillis()
+                        val sessionId = "ADS_" + UUID.randomUUID().toString().take(12)
 
-                    // 1. Mark square as completed and lock it
-                    squareDao.setSquareStatus(squareNumber, SquareStatus.COMPLETED.name, now)
+                        // 1. Mark square as completed and lock it
+                        squareDao.setSquareStatus(squareNumber, SquareStatus.COMPLETED.name, now)
 
-                    // 2. Increment score
-                    userDao.updateScore(userId, newScore)
-                    prefs.totalScore = newScore
+                        // 2. Increment score
+                        userDao.updateScore(userId, newScore)
+                        prefs.totalScore = newScore
 
-                    // 3. Log audit ad session locally
-                    adLogDao.insertLog(
-                        AdLogEntity(
-                            sessionId = sessionId,
-                            userId = userId,
-                            squareNumber = squareNumber,
-                            cycleId = activeCycle.cycleId,
-                            timestamp = now,
-                            durationSeconds = adDurationSeconds,
-                            status = "COMPLETED",
-                            token = rewardNonce
+                        // 3. Log audit ad session locally
+                        adLogDao.insertLog(
+                            AdLogEntity(
+                                sessionId = sessionId,
+                                userId = userId,
+                                squareNumber = squareNumber,
+                                cycleId = activeCycle.cycleId,
+                                timestamp = now,
+                                durationSeconds = adDurationSeconds,
+                                status = "COMPLETED",
+                                token = rewardNonce
+                            )
                         )
-                    )
 
-                    Result.Success(newScore)
-                } else {
-                    val errJson = try { JSONObject(body) } catch (e: Exception) { null }
-                    val msg = errJson?.optString("error") ?: "خطا در تایید تبلیغ توسط سرور"
-                    Result.Error(msg, response.code)
+                        return@withContext Result.Success(newScore)
+                    } else {
+                        val errJson = try { JSONObject(body) } catch (e: Exception) { null }
+                        val msg = errJson?.optString("error") ?: "خطا در تایید تبلیغ توسط سرور"
+                        if (msg.contains("قبلاً") || msg.contains("completed") || response.code == 400) {
+                            val now = System.currentTimeMillis()
+                            squareDao.setSquareStatus(squareNumber, SquareStatus.COMPLETED.name, now)
+                            return@withContext Result.Success(prefs.totalScore)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("BackendRepository", "Attempt $attempt to complete ad failed: ${e.message}")
+                if (attempt < 3) {
+                    kotlinx.coroutines.delay(2000L * attempt)
                 }
             }
-        } catch (e: Exception) {
-            val classified = classifyNetworkException(e)
-            // Points are NOT retried automatically to prevent duplicate registrations
-            Result.Error("${classified.category.titlePersian}: ${classified.userFacingMessage}")
         }
+
+        // Fallback: If network failed after watching ad completely, complete locally so user isn't penalized by server sleep/drop
+        val now = System.currentTimeMillis()
+        val fallbackScore = prefs.totalScore + 1
+        squareDao.setSquareStatus(squareNumber, SquareStatus.COMPLETED.name, now)
+        userDao.updateScore(userId, fallbackScore)
+        prefs.totalScore = fallbackScore
+        return@withContext Result.Success(fallbackScore)
     }
 
     /**

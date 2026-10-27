@@ -127,18 +127,35 @@ fun SquaresScreen(
                         )
                     }
 
+                    val remainingMs = cycle?.remainingMs ?: 0L
+                    val hours = (remainingMs / (1000 * 60 * 60))
+                    val minutes = (remainingMs / (1000 * 60)) % 60
+                    val seconds = (remainingMs / 1000) % 60
+                    val countdownStr = String.format("%02d:%02d:%02d", hours, minutes, seconds).toPersianDigits()
+
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
                             .background(NavyPrimary)
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                            .border(1.dp, GoldAccent.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = "۵۰ مربع",
-                            color = GoldLight,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "ریست ساعت ۱۲ شب",
+                                color = GoldLight,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Spacer(modifier = Modifier.height(1.dp))
+                            Text(
+                                text = countdownStr,
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        }
                     }
                 }
 
@@ -221,22 +238,22 @@ fun SquareCard(
         isCompleted -> Color(0xFFECFDF5)
         isLoading || isPlaying -> Color(0xFFFEF3C7)
         isFailed -> Color(0xFFFEF2F2)
-        else -> CardSurface
+        else -> Color.White
     }
 
     val borderColor = when {
         isCompleted -> SuccessGreen
         isLoading || isPlaying -> GoldAccent
         isFailed -> ErrorRed
-        else -> Color(0xFFCBD5E1)
+        else -> NavySecondary.copy(alpha = 0.45f)
     }
 
     Surface(
         modifier = Modifier
             .aspectRatio(1f)
-            .shadow(if (isCompleted) 1.dp else 2.dp, RoundedCornerShape(12.dp))
-            .clip(RoundedCornerShape(12.dp))
-            .border(1.5.dp, borderColor, RoundedCornerShape(12.dp))
+            .shadow(4.dp, RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(14.dp))
+            .border(2.5.dp, borderColor, RoundedCornerShape(14.dp))
             .clickable(enabled = !isCompleted && !isLoading && !isPlaying) { onClick() }
             .testTag("square_item_${square.squareNumber}"),
         color = cardBackground
@@ -252,8 +269,8 @@ fun SquareCard(
             when {
                 isLoading -> {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.5.dp,
                         color = Color(0xFFB45309)
                     )
                 }
@@ -262,7 +279,7 @@ fun SquareCard(
                         imageVector = Icons.Default.PlayArrow,
                         contentDescription = null,
                         tint = GoldAccent,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
                 isCompleted -> {
@@ -270,7 +287,7 @@ fun SquareCard(
                         imageVector = Icons.Default.CheckCircle,
                         contentDescription = null,
                         tint = SuccessGreen,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
                 isFailed -> {
@@ -278,7 +295,7 @@ fun SquareCard(
                         imageVector = Icons.Default.Warning,
                         contentDescription = null,
                         tint = ErrorRed,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                 }
                 else -> {
@@ -286,7 +303,7 @@ fun SquareCard(
                         imageVector = Icons.Default.PlayArrow,
                         contentDescription = null,
                         tint = NavyPrimary,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }
@@ -296,8 +313,8 @@ fun SquareCard(
             // Square Name and Number
             Text(
                 text = "مربع ${square.squareNumber.toPersianDigits()}",
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.ExtraBold,
                 color = if (isCompleted) SuccessGreen else NavyPrimary,
                 textAlign = TextAlign.Center
             )
@@ -311,13 +328,13 @@ fun SquareCard(
                     isFailed -> "تلاش مجدد"
                     else -> "۱ امتیاز"
                 },
-                fontSize = 8.sp,
-                fontWeight = if (isCompleted) FontWeight.Bold else FontWeight.SemiBold,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
                 color = when {
                     isCompleted -> SuccessGreen
                     isLoading || isPlaying -> Color(0xFFB45309)
                     isFailed -> ErrorRed
-                    else -> Color(0xFF64748B)
+                    else -> NavySecondary
                 },
                 textAlign = TextAlign.Center
             )

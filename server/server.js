@@ -411,10 +411,22 @@ function requireAdminAuth(req, res, next) {
   next();
 }
 
-// Helper: Ensure 24-hour cycle in PostgreSQL
+function getIranMidnightBounds(nowMs = Date.now()) {
+  const d = new Date(nowMs);
+  const tzString = d.toLocaleString('en-US', { timeZone: 'Asia/Tehran' });
+  const tzDate = new Date(tzString);
+  const todayTehran = new Date(tzDate.getFullYear(), tzDate.getMonth(), tzDate.getDate(), 0, 0, 0, 0);
+  const tomorrowTehran = new Date(tzDate.getFullYear(), tzDate.getMonth(), tzDate.getDate() + 1, 0, 0, 0, 0);
+  const offsetMs = 3.5 * 3600 * 1000;
+  const startTime = todayTehran.getTime() - offsetMs;
+  const endTime = tomorrowTehran.getTime() - offsetMs;
+  return { startTime, endTime };
+}
+
+// Helper: Ensure cycle resetting at midnight Iran time (12 AM Tehran time) in PostgreSQL
 async function getOrCreateActiveCycle(userId) {
   const now = Date.now();
-  const CYCLE_MS = 24 * 60 * 60 * 1000;
+  const { startTime, endTime } = getIranMidnightBounds(now);
 
   // 1. Check existing active cycle in database
   const existing = await pool.query(
@@ -427,24 +439,25 @@ async function getOrCreateActiveCycle(userId) {
 
   if (existing.rows.length > 0) {
     const row = existing.rows[0];
-    return {
-      cycleId: row.cycle_id,
-      userId: row.user_id,
-      startTime: Number(row.start_time),
-      endTime: Number(row.end_time),
-      status: row.status
-    };
+    const rowEnd = Number(row.end_time);
+    if (now < rowEnd) {
+      return {
+        cycleId: row.cycle_id,
+        userId: row.user_id,
+        startTime: Number(row.start_time),
+        endTime: rowEnd,
+        status: row.status
+      };
+    }
   }
 
-  // 2. Generate and store new 24h cycle
-  const cycleId = "CYC_" + Math.floor(now / 1000);
-  const startTime = now;
-  const endTime = now + CYCLE_MS;
+  // 2. Generate and store new cycle expiring at midnight Iran time
+  const cycleId = "CYC_" + Math.floor(startTime / 1000);
 
   await pool.query(
     `INSERT INTO public.daily_cycles (cycle_id, user_id, start_time, end_time, status)
      VALUES ($1, $2, $3, $4, 'ACTIVE')
-     ON CONFLICT (cycle_id) DO NOTHING`,
+     ON CONFLICT (cycle_id) DO UPDATE SET start_time = $3, end_time = $4, status = 'ACTIVE'`,
     [cycleId, userId, startTime, endTime]
   );
 
