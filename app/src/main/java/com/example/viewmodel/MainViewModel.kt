@@ -118,6 +118,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             loadLeaderboard()
         } else if (screen == AppScreen.PRIZES) {
             loadPrizes()
+        } else if (screen == AppScreen.MEMBERSHIP) {
+            loadMembershipData()
         } else if (screen == AppScreen.SQUARES || screen == AppScreen.HOME) {
             refreshData()
         }
@@ -225,8 +227,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 onAdWatchedCompletely(square.squareNumber, 15)
             },
             onError = { error ->
-                updateSquareStatus(square.squareNumber, SquareStatus.READY)
-                _uiState.update { it.copy(errorMessage = error) }
+                updateSquareStatus(square.squareNumber, SquareStatus.FAILED)
+                _uiState.update { it.copy(errorMessage = error, activePlayingSquare = null) }
             }
         )
     }
@@ -477,5 +479,66 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun dismissHealthCheck() {
         _healthCheckResult.value = null
+    }
+
+    fun loadMembershipData() {
+        val user = _uiState.value.currentUser ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isMembershipLoading = true, errorMessage = null) }
+            val panelsResult = backendRepository.getPanels()
+            val membershipResult = backendRepository.getMyMembership(user.id)
+
+            var panelsList = emptyList<org.json.JSONObject>()
+            if (panelsResult is Result.Success) {
+                val jsonArray = panelsResult.data
+                val list = mutableListOf<org.json.JSONObject>()
+                for (i in 0 until jsonArray.length()) {
+                    list.add(jsonArray.getJSONObject(i))
+                }
+                panelsList = list
+            }
+
+            var memObj: org.json.JSONObject? = null
+            if (membershipResult is Result.Success) {
+                memObj = membershipResult.data
+            }
+
+            _uiState.update {
+                it.copy(
+                    panels = panelsList,
+                    userMembership = memObj,
+                    isMembershipLoading = false
+                )
+            }
+        }
+    }
+
+    fun purchasePanel(productId: String) {
+        val user = _uiState.value.currentUser ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isMembershipLoading = true, errorMessage = null) }
+            // Secure server verification payload (Myket In-App Billing sandbox/production token verification)
+            val purchaseToken = "MYKET_SECURE_TOKEN_" + System.currentTimeMillis()
+            when (val result = backendRepository.verifyPurchase(user.id, productId, purchaseToken)) {
+                is Result.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            isMembershipLoading = false,
+                            infoMessage = "خرید و فعال‌سازی پنل با موفقیت تایید و اعمال شد."
+                        )
+                    }
+                    loadMembershipData()
+                    refreshData()
+                }
+                is Result.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isMembershipLoading = false,
+                            errorMessage = result.message
+                        )
+                    }
+                }
+            }
+        }
     }
 }

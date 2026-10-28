@@ -741,6 +741,73 @@ class BackendRepository(
         )
     }
 
+    suspend fun getPanels(): Result<org.json.JSONArray> = withContext(Dispatchers.IO) {
+        val url = "${prefs.serverUrl.trimEnd('/')}/api/panels"
+        try {
+            val request = Request.Builder().url(url).get().build()
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (response.isSuccessful) {
+                    val json = JSONObject(body)
+                    val panels = json.optJSONArray("panels") ?: org.json.JSONArray()
+                    Result.Success(panels)
+                } else {
+                    Result.Error("خطا در دریافت اطلاعات پنل‌ها از سرور")
+                }
+            }
+        } catch (e: Exception) {
+            Result.Error("خطای شبکه در دریافت پنل‌ها: ${e.message}")
+        }
+    }
+
+    suspend fun getMyMembership(userId: String): Result<JSONObject> = withContext(Dispatchers.IO) {
+        val url = "${prefs.serverUrl.trimEnd('/')}/api/panels/me?userId=$userId"
+        try {
+            val request = Request.Builder().url(url).header("x-user-id", userId).get().build()
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (response.isSuccessful) {
+                    val json = JSONObject(body)
+                    Result.Success(json)
+                } else {
+                    Result.Error("خطا در دریافت وضعیت پنل کاربر")
+                }
+            }
+        } catch (e: Exception) {
+            Result.Error("خطای شبکه در دریافت وضعیت پنل: ${e.message}")
+        }
+    }
+
+    suspend fun verifyPurchase(userId: String, productId: String, purchaseToken: String): Result<JSONObject> = withContext(Dispatchers.IO) {
+        val url = "${prefs.serverUrl.trimEnd('/')}/api/purchases/verify"
+        val payload = JSONObject().apply {
+            put("userId", userId)
+            put("productId", productId)
+            put("purchaseToken", purchaseToken)
+            put("orderId", "MYKET_ORD_" + System.currentTimeMillis())
+        }
+        try {
+            val request = Request.Builder()
+                .url(url)
+                .header("x-user-id", userId)
+                .header("Content-Type", "application/json")
+                .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+                .build()
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (response.isSuccessful) {
+                    val json = JSONObject(body)
+                    Result.Success(json)
+                } else {
+                    val errJson = try { JSONObject(body) } catch (e: Exception) { null }
+                    Result.Error(errJson?.optString("error") ?: "خطا در تایید خرید از سرور")
+                }
+            }
+        } catch (e: Exception) {
+            Result.Error("خطای شبکه در تایید خرید: ${e.message}")
+        }
+    }
+
     private fun sha256(input: String): String {
         val bytes = MessageDigest.getInstance("SHA-256").digest(input.toByteArray())
         return bytes.joinToString("") { "%02x".format(it) }

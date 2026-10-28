@@ -99,8 +99,25 @@ class MainActivity : ComponentActivity() {
                             }
                             AppScreen.PROFILE -> {
                                 uiState.currentUser?.let { user ->
-                                    ProfileScreen(user = user, onLogout = { viewModel.logout() })
+                                    ProfileScreen(
+                                        user = user,
+                                        onLogout = { viewModel.logout() },
+                                        onNavigateToMembership = { viewModel.navigateTo(AppScreen.MEMBERSHIP) }
+                                    )
                                 }
+                            }
+                            AppScreen.MEMBERSHIP -> {
+                                MembershipScreen(
+                                    panels = uiState.panels,
+                                    userMembership = uiState.userMembership,
+                                    isLoading = uiState.isMembershipLoading,
+                                    cycle = uiState.dailyCycle,
+                                    errorMessage = uiState.errorMessage,
+                                    infoMessage = uiState.infoMessage,
+                                    onRefresh = { viewModel.loadMembershipData() },
+                                    onPurchase = { productId -> viewModel.purchasePanel(productId) },
+                                    onDismissMessage = { viewModel.clearMessages() }
+                                )
                             }
                         }
                     }

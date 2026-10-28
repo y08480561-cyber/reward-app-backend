@@ -23,16 +23,10 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccessTime
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -43,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -53,18 +48,14 @@ import androidx.compose.ui.unit.sp
 import com.example.model.AdSquare
 import com.example.model.DailyCycle
 import com.example.model.SquareStatus
-import com.example.ui.components.formatRemainingTimePersian
 import com.example.ui.components.toPersianDigits
 import com.example.ui.theme.CardSurface
 import com.example.ui.theme.ErrorRed
 import com.example.ui.theme.GoldAccent
 import com.example.ui.theme.GoldLight
-import com.example.ui.theme.NavyLight
 import com.example.ui.theme.NavyPrimary
 import com.example.ui.theme.NavySecondary
 import com.example.ui.theme.SuccessGreen
-import com.example.ui.theme.TextPrimary
-import com.example.ui.theme.TextSecondary
 
 @Composable
 fun SquaresScreen(
@@ -94,17 +85,17 @@ fun SquaresScreen(
             .fillMaxSize()
             .background(Color(0xFFF8FAFC))
     ) {
-        // Top Sticky Banner: 50 Squares Progress
+        // Top Sticky Banner: 50 Squares Progress & Midnight Iran Countdown
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .shadow(4.dp),
+                .shadow(6.dp, RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)),
             color = CardSurface
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .padding(horizontal = 16.dp, vertical = 14.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -114,8 +105,8 @@ fun SquaresScreen(
                     Column {
                         Text(
                             text = "۵۰ مربع جایزه‌دار",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.ExtraBold,
                             color = NavyPrimary
                         )
                         Spacer(modifier = Modifier.height(2.dp))
@@ -123,7 +114,7 @@ fun SquaresScreen(
                             text = "${completedCount.toPersianDigits()} تکمیل شده • ${remainingCount.toPersianDigits()} باقیمانده",
                             fontSize = 12.sp,
                             color = SuccessGreen,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.Bold
                         )
                     }
 
@@ -135,10 +126,14 @@ fun SquaresScreen(
 
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(NavyPrimary)
-                            .border(1.dp, GoldAccent.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(
+                                Brush.horizontalGradient(
+                                    listOf(NavyPrimary, NavySecondary)
+                                )
+                            )
+                            .border(1.5.dp, GoldAccent.copy(alpha = 0.6f), RoundedCornerShape(14.dp))
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -146,33 +141,33 @@ fun SquaresScreen(
                                 text = "ریست ساعت ۱۲ شب",
                                 color = GoldLight,
                                 fontSize = 9.sp,
-                                fontWeight = FontWeight.Medium
+                                fontWeight = FontWeight.SemiBold
                             )
                             Spacer(modifier = Modifier.height(1.dp))
                             Text(
                                 text = countdownStr,
                                 color = Color.White,
-                                fontSize = 11.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.ExtraBold
                             )
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 val progressFraction = (completedCount.toFloat() / 50f).coerceIn(0f, 1f)
                 LinearProgressIndicator(
                     progress = { progressFraction },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(6.dp)
-                        .clip(RoundedCornerShape(3.dp)),
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(4.dp)),
                     color = SuccessGreen,
                     trackColor = Color(0xFFE2E8F0)
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 // Legend row
                 Row(
@@ -187,12 +182,12 @@ fun SquaresScreen(
             }
         }
 
-        // 50 Squares Grid
+        // 50 Squares Professional Grid
         LazyVerticalGrid(
             columns = GridCells.Fixed(5),
-            contentPadding = PaddingValues(10.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier
                 .fillMaxSize()
                 .weight(1f)
@@ -215,12 +210,12 @@ fun LegendItem(label: String, bgColor: Color, textColor: Color) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
             modifier = Modifier
-                .size(8.dp)
+                .size(9.dp)
                 .clip(CircleShape)
                 .background(textColor)
         )
         Spacer(modifier = Modifier.width(4.dp))
-        Text(text = label, fontSize = 10.sp, color = Color(0xFF64748B))
+        Text(text = label, fontSize = 10.sp, color = Color(0xFF64748B), fontWeight = FontWeight.Medium)
     }
 }
 
@@ -245,18 +240,23 @@ fun SquareCard(
         isCompleted -> SuccessGreen
         isLoading || isPlaying -> GoldAccent
         isFailed -> ErrorRed
-        else -> NavySecondary.copy(alpha = 0.45f)
+        else -> NavySecondary.copy(alpha = 0.35f)
     }
 
     Surface(
         modifier = Modifier
             .aspectRatio(1f)
-            .shadow(4.dp, RoundedCornerShape(14.dp))
-            .clip(RoundedCornerShape(14.dp))
-            .border(2.5.dp, borderColor, RoundedCornerShape(14.dp))
+            .shadow(
+                elevation = if (isCompleted) 2.dp else 5.dp,
+                shape = RoundedCornerShape(16.dp),
+                spotColor = borderColor
+            )
+            .clip(RoundedCornerShape(16.dp))
+            .border(2.5.dp, borderColor, RoundedCornerShape(16.dp))
             .clickable(enabled = !isCompleted && !isLoading && !isPlaying) { onClick() }
             .testTag("square_item_${square.squareNumber}"),
-        color = cardBackground
+        color = cardBackground,
+        shape = RoundedCornerShape(16.dp)
     ) {
         Column(
             modifier = Modifier
@@ -269,7 +269,7 @@ fun SquareCard(
             when {
                 isLoading -> {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
+                        modifier = Modifier.size(20.dp),
                         strokeWidth = 2.5.dp,
                         color = Color(0xFFB45309)
                     )
@@ -279,7 +279,7 @@ fun SquareCard(
                         imageVector = Icons.Default.PlayArrow,
                         contentDescription = null,
                         tint = GoldAccent,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 }
                 isCompleted -> {
@@ -287,28 +287,36 @@ fun SquareCard(
                         imageVector = Icons.Default.CheckCircle,
                         contentDescription = null,
                         tint = SuccessGreen,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 }
                 isFailed -> {
                     Icon(
-                        imageVector = Icons.Default.Warning,
+                        imageVector = Icons.Default.Refresh,
                         contentDescription = null,
                         tint = ErrorRed,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
                 else -> {
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = null,
-                        tint = NavyPrimary,
-                        modifier = Modifier.size(18.dp)
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(26.dp)
+                            .clip(CircleShape)
+                            .background(NavyPrimary.copy(alpha = 0.08f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            tint = NavyPrimary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(2.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
             // Square Name and Number
             Text(

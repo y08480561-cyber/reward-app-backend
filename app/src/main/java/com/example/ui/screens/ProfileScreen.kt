@@ -66,7 +66,8 @@ import com.example.viewmodel.AppScreen
 @Composable
 fun ProfileScreen(
     user: User,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onNavigateToMembership: () -> Unit
 ) {
     var showLogoutDialog by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
@@ -141,6 +142,46 @@ fun ProfileScreen(
                         fontWeight = FontWeight.Medium
                     )
                 }
+            }
+        }
+
+        // Membership Management Banner Button
+        Button(
+            onClick = onNavigateToMembership,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(54.dp)
+                .shadow(4.dp, RoundedCornerShape(16.dp))
+                .testTag("btn_goto_membership"),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = GoldAccent)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = null,
+                        tint = NavyPrimary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "پنل‌های عضویت و ارتقای ضریب امتیاز",
+                        color = NavyPrimary,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 14.sp
+                    )
+                }
+                Text(
+                    text = "مشاهده",
+                    color = NavyPrimary,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp
+                )
             }
         }
 

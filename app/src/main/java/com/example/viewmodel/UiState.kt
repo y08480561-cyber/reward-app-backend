@@ -13,7 +13,8 @@ enum class AppScreen {
     SQUARES,
     LEADERBOARD,
     PRIZES,
-    PROFILE
+    PROFILE,
+    MEMBERSHIP
 }
 
 enum class AuthMode {
@@ -49,5 +50,9 @@ data class MainUiState(
     // Ad Playback
     val activePlayingSquare: Int? = null,
     // Celebratory reward dialog
-    val awardedPointsModal: Int? = null
+    val awardedPointsModal: Int? = null,
+    // Membership panels
+    val panels: List<org.json.JSONObject> = emptyList(),
+    val userMembership: org.json.JSONObject? = null,
+    val isMembershipLoading: Boolean = false
 )
