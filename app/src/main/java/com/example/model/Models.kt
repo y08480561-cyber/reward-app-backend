@@ -10,7 +10,9 @@ data class User(
     val phoneNumber: String,
     val totalScore: Int = 0,
     val token: String = "",
-    val registeredAt: Long = System.currentTimeMillis()
+    val registeredAt: Long = System.currentTimeMillis(),
+    val panelType: String = "free",
+    val multiplier: Int = 1
 ) {
     val fullName: String
         get() = "$firstName $lastName".trim()

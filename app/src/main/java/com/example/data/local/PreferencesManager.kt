@@ -107,6 +107,13 @@ class PreferencesManager(context: Context) {
             .apply()
     }
 
+    fun saveMembershipSession(panelType: String, multiplier: Int) {
+        prefs.edit()
+            .putString("panel_type", panelType)
+            .putInt("multiplier", multiplier)
+            .apply()
+    }
+
     fun clearSession() {
         prefs.edit()
             .putBoolean(KEY_IS_LOGGED_IN, false)
@@ -116,6 +123,8 @@ class PreferencesManager(context: Context) {
             .putString(KEY_PHONE, "")
             .putString(KEY_AUTH_TOKEN, "")
             .putInt(KEY_TOTAL_SCORE, 0)
+            .putString("panel_type", "free")
+            .putInt("multiplier", 1)
             .apply()
     }
 }

@@ -501,6 +501,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             var memObj: org.json.JSONObject? = null
             if (membershipResult is Result.Success) {
                 memObj = membershipResult.data
+                val membership = memObj.optJSONObject("membership")
+                if (membership != null) {
+                    val pType = membership.optString("panelType", "free")
+                    val mult = membership.optInt("multiplier", 1)
+                    val updatedUser = user.copy(panelType = pType, multiplier = mult)
+                    _uiState.update { it.copy(currentUser = updatedUser) }
+                    prefs.saveMembershipSession(pType, mult)
+                }
             }
 
             _uiState.update {
