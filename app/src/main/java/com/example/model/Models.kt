@@ -126,3 +126,27 @@ data class CompetitionInfo(
     val totalScore: Int = 0
 )
 
+/**
+ * Announcement banner displayed at the top of the Home Screen
+ */
+data class HomeAnnouncement(
+    val id: String,
+    val title: String,
+    val content: String,
+    val type: String = "ANNOUNCEMENT",
+    val isActive: Boolean = true,
+    val competitionId: String? = null,
+    val competitionTitle: String? = null,
+    val startsAtMs: Long? = null,
+    val endsAtMs: Long? = null,
+    val createdAtMs: Long = System.currentTimeMillis(),
+    val updatedAtMs: Long = System.currentTimeMillis()
+) {
+    val remainingMs: Long?
+        get() = endsAtMs?.let { (it - System.currentTimeMillis()).coerceAtLeast(0L) }
+
+    val isEnded: Boolean
+        get() = endsAtMs?.let { System.currentTimeMillis() >= it } ?: false
+}
+
+

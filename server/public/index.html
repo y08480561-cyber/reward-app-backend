@@ -12,13 +12,24 @@
     .gold-text { color: #FFB703; font-weight: bold; }
     .badge-gold { background: linear-gradient(135deg, #FFB703, #FB8500); color: #0B192C; font-weight: 800; padding: 6px 12px; border-radius: 20px; }
     .table-dark { background-color: #152A44; }
-    .form-control-dark { background-color: #152A44; border: 1px solid #2E5077; color: #fff; }
-    .form-control-dark:focus { background-color: #1E3E62; border-color: #FFB703; color: #fff; box-shadow: 0 0 0 0.25rem rgba(255,183,3,0.25); }
+    .form-control-dark, .form-select-dark { background-color: #152A44; border: 1px solid #2E5077; color: #fff; }
+    .form-control-dark:focus, .form-select-dark:focus { background-color: #1E3E62; border-color: #FFB703; color: #fff; box-shadow: 0 0 0 0.25rem rgba(255,183,3,0.25); }
     .btn-gold { background: linear-gradient(135deg, #FFB703, #FB8500); color: #0B192C; font-weight: bold; border: none; }
     .btn-gold:hover { background: linear-gradient(135deg, #FB8500, #FFB703); color: #0B192C; }
     .auth-bar { background-color: #152A44; border-bottom: 2px solid #2E5077; }
     .comp-banner { background: linear-gradient(135deg, #152A44 0%, #1E3E62 100%); border: 2px solid #FFB703; border-radius: 18px; }
+    .ann-banner { background: linear-gradient(135deg, #182C47 0%, #224263 100%); border: 1.5px solid #38BDF8; border-radius: 18px; }
     .modal-dark .modal-content { background-color: #152A44; color: #fff; border: 1px solid #2E5077; border-radius: 18px; }
+    
+    /* Mobile App Banner Simulation */
+    .app-preview-box {
+      background: linear-gradient(135deg, #0B192C 0%, #1E3E62 100%);
+      border: 1.5px solid #FFB703;
+      border-radius: 16px;
+      padding: 14px 16px;
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+    }
   </style>
 </head>
 <body>
@@ -43,7 +54,7 @@
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-3 border-bottom border-secondary gap-3">
       <div>
         <h2 class="gold-text mb-1"><i class="bi bi-trophy-fill text-warning"></i> پنل مدیریت زنده «رقابت کن، جایزه ببر»</h2>
-        <p class="text-secondary mb-0">نمایش داده‌های واقعی از سرور، مدیریت مسابقات دوره‌ای و آرشیو دائمی نتایج</p>
+        <p class="text-secondary mb-0">مدیریت مسابقات دوره‌ای، پیام‌ها و اطلاعیه‌های صفحه اصلی و پایش آنلاین رویدادها</p>
       </div>
       <div class="d-flex gap-2 flex-wrap">
         <a href="/admin/users" class="btn btn-outline-warning fw-bold px-3 py-2" title="مشاهده جدول کاربران در صفحه مستقل">
@@ -71,18 +82,86 @@
           <p class="text-secondary mb-0">
             <i class="bi bi-calendar3"></i> زمان شروع: <span id="activeCompStartedAt" class="text-white">-</span>
             <span class="mx-2">|</span>
-            <i class="bi bi-info-circle"></i> وضعیت امتیازها: <span class="text-info">کاربران با امتیاز صفر شروع و به رقابت ادامه می‌دهند.</span>
+            <i class="bi bi-hourglass-split"></i> مهلت پایان: <span id="activeCompEndedAt" class="text-warning">نامحدود / تعیین نشده</span>
+            <span class="mx-2">|</span>
+            <i class="bi bi-info-circle"></i> وضعیت امتیازها: <span class="text-info">کاربران با امتیاز صفر شروع کرده و رقابت می‌کنند.</span>
           </p>
         </div>
         <div class="d-flex gap-2 align-items-center flex-wrap">
-          <button class="btn btn-lg btn-danger fw-bold px-4 py-3 shadow" data-bs-toggle="modal" data-bs-target="#startCompModal">
+          <button class="btn btn-lg btn-danger fw-bold px-4 py-3 shadow" onclick="openStartCompModal()">
             <i class="bi bi-arrow-repeat me-1"></i> شروع مسابقه جدید
           </button>
         </div>
       </div>
     </div>
 
-    <!-- 2. Stats Overview -->
+    <!-- 2. Home Announcements Management Section (NEW) -->
+    <div class="card ann-banner p-4 mb-4 shadow">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3 pb-2 border-bottom border-secondary">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-megaphone-fill text-info fs-4"></i>
+          <div>
+            <h4 class="mb-0 text-white fw-bold">مدیریت پیام و اطلاعیه صفحه اصلی اپلیکیشن</h4>
+            <small class="text-secondary">کنترل پیام‌های بالای صفحه اصلی، اعلام شروع دوره، مهلت پایان و برندگان</small>
+          </div>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          <button class="btn btn-outline-info fw-bold btn-sm px-3 py-2" onclick="openAnnouncementModal()">
+            <i class="bi bi-plus-circle me-1"></i> ایجاد پیام جدید
+          </button>
+        </div>
+      </div>
+
+      <!-- Active Announcement Details Card -->
+      <div id="activeAnnCard" class="card p-3 mb-3" style="background-color: #122338; border: 1px solid #38BDF8;">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+          <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-success" id="activeAnnStatusBadge"><i class="bi bi-check-circle-fill"></i> در حال نمایش در صفحه اصلی</span>
+            <span class="badge bg-primary" id="activeAnnTypeBadge">اطلاعیه</span>
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-warning" onclick="editCurrentActiveAnn()">
+              <i class="bi bi-pencil-square"></i> ویرایش پیام
+            </button>
+            <button class="btn btn-sm btn-outline-danger" id="toggleActiveAnnBtn" onclick="toggleCurrentActiveAnn()">
+              <i class="bi bi-eye-slash"></i> غیرفعال‌سازی
+            </button>
+          </div>
+        </div>
+        <h5 class="gold-text mb-2" id="activeAnnTitle">-</h5>
+        <p class="text-white mb-2" id="activeAnnContent" style="white-space: pre-line;">-</p>
+        <div class="d-flex flex-wrap gap-3 text-secondary small">
+          <div><i class="bi bi-clock-history"></i> زمان ثبت: <span id="activeAnnStartsAt" class="text-white">-</span></div>
+          <div><i class="bi bi-hourglass-bottom text-warning"></i> زمان پایان اعلام‌شده: <span id="activeAnnEndsAt" class="text-warning">مشخص نشده</span></div>
+        </div>
+      </div>
+
+      <!-- Announcements History Table -->
+      <div class="mt-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="text-secondary small fw-bold"><i class="bi bi-clock-history"></i> سوابق و آرشیو پیام‌های صفحه اصلی</span>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-dark table-hover table-striped rounded align-middle mb-0">
+            <thead>
+              <tr class="text-secondary small">
+                <th>عنوان پیام</th>
+                <th>نوع</th>
+                <th>وضعیت</th>
+                <th>مهلت پایان</th>
+                <th>تاریخ ثبت</th>
+                <th>عملیات</th>
+              </tr>
+            </thead>
+            <tbody id="announcementsTbody">
+              <tr><td colspan="6" class="text-center py-3 text-secondary">در حال دریافت سوابق پیام‌ها...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Stats Overview -->
     <div class="row g-3 mb-4">
       <div class="col-md-3">
         <div class="card p-3">
@@ -114,7 +193,7 @@
       </div>
     </div>
 
-    <!-- 3. Tables (Active Users & Ad Sessions) -->
+    <!-- 4. Tables (Active Users & Ad Sessions) -->
     <div class="row g-4 mb-4">
       <!-- Users Table -->
       <div class="col-lg-6">
@@ -171,7 +250,7 @@
       </div>
     </div>
 
-    <!-- 4. Historical Competitions Archive & Audit Logs -->
+    <!-- 5. Historical Competitions Archive & Audit Logs -->
     <div class="row g-4 mb-5">
       <!-- Archived Competitions -->
       <div class="col-lg-7">
@@ -226,29 +305,130 @@
     </div>
   </div>
 
-  <!-- Modal: Start New Competition -->
-  <div class="modal fade modal-dark" id="startCompModal" tabindex="-1" aria-labelledby="startCompModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+  <!-- Modal: Create / Edit Home Announcement -->
+  <div class="modal fade modal-dark" id="announcementModal" tabindex="-1" aria-labelledby="announcementModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
       <div class="modal-content">
         <div class="modal-header border-secondary">
-          <h5 class="modal-title gold-text" id="startCompModalLabel"><i class="bi bi-exclamation-triangle-fill text-danger me-2"></i> شروع مسابقه جدید و آرشیو نتایج</h5>
+          <h5 class="modal-title text-info fw-bold" id="announcementModalLabel"><i class="bi bi-megaphone-fill me-2"></i> مدیریت پیام و اطلاعیه صفحه اصلی</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="بستن"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="editAnnId" value="">
+
+          <div class="row g-3">
+            <div class="col-md-8">
+              <label class="form-label text-secondary small fw-bold">عنوان پیام:</label>
+              <input type="text" id="annTitleInput" class="form-control form-control-dark" placeholder="مثلاً: آغاز مسابقه دوره دوم با جوایز ویژه!" oninput="updateLivePreview()">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label text-secondary small fw-bold">نوع پیام:</label>
+              <select id="annTypeSelect" class="form-select form-select-dark" onchange="updateLivePreview()">
+                <option value="ANNOUNCEMENT">اطلاعیه عمومی</option>
+                <option value="COMPETITION_START">شروع مسابقه</option>
+                <option value="COMPETITION_END">اعلام زمان پایان</option>
+                <option value="WINNERS">اعلام برندگان</option>
+                <option value="CUSTOM">پیام دلخواه و ویژه</option>
+              </select>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label text-secondary small fw-bold">متن کامل پیام صفحه اصلی:</label>
+              <textarea id="annContentInput" rows="3" class="form-control form-control-dark" placeholder="متن توضیحات پیام را اینجا وارد کنید..." oninput="updateLivePreview()"></textarea>
+            </div>
+
+            <div class="col-md-7">
+              <label class="form-label text-secondary small fw-bold">تاریخ و ساعت پایان مسابقه (اختیاری جهت نمایش زمان باقیمانده):</label>
+              <input type="datetime-local" id="annEndsAtInput" class="form-control form-control-dark" onchange="updateLivePreview()">
+            </div>
+            <div class="col-md-5 d-flex align-items-end gap-1 flex-wrap">
+              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setQuickEndDate(3)">+۳ روز</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setQuickEndDate(7)">+۷ روز</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setQuickEndDate(14)">+۱۴ روز</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setQuickEndDate(30)">+۳۰ روز</button>
+              <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearEndDate()">حذف مهلت</button>
+            </div>
+
+            <div class="col-12 mt-2">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="annIsActiveSwitch" checked onchange="updateLivePreview()">
+                <label class="form-check-label text-white fw-bold" for="annIsActiveSwitch">انتشار و نمایش مستقیم در صفحه اصلی کاربران</label>
+              </div>
+            </div>
+
+            <!-- Live Preview in App Simulation -->
+            <div class="col-12 mt-3">
+              <label class="form-label text-warning small fw-bold"><i class="bi bi-phone"></i> پیش‌نمایش زنده در صفحه اصلی اپلیکیشن:</label>
+              <div class="app-preview-box" id="livePreviewContainer">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <div class="d-flex align-items-center gap-2">
+                    <span id="previewBadgeType" class="badge bg-warning text-dark fw-bold">اطلاعیه</span>
+                    <strong id="previewTitle" class="gold-text">عنوان پیام</strong>
+                  </div>
+                  <span id="previewEndDateBadge" class="badge bg-danger d-none">مهلت: ۲ روز باقیمانده</span>
+                </div>
+                <p id="previewContent" class="mb-0 text-white small" style="white-space: pre-line;">متن پیام در اینجا نمایش داده می‌شود...</p>
+              </div>
+              <small class="text-secondary mt-1 d-block">این کادر دقیقاً ظاهر کارتی است که در بالای صفحه اصلی اپلیکیشن اندروید قرار می‌گیرد.</small>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer border-secondary">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">انصراف</button>
+          <button type="button" id="saveAnnBtn" class="btn btn-gold px-4" onclick="submitAnnouncementForm()">
+            <span id="saveAnnSpinner" class="spinner-border spinner-border-sm d-none me-1" role="status"></span>
+            ذخیره و انتشار پیام
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Start New Competition with Integrated Announcement -->
+  <div class="modal fade modal-dark" id="startCompModal" tabindex="-1" aria-labelledby="startCompModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-header border-secondary">
+          <h5 class="modal-title gold-text" id="startCompModalLabel"><i class="bi bi-exclamation-triangle-fill text-danger me-2"></i> شروع مسابقه جدید، آرشیو امتیازها و انتشار پیام آغاز</h5>
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="بستن"></button>
         </div>
         <div class="modal-body">
           <div class="alert alert-warning border-0 small mb-3">
-            <strong>توجه بسیار مهم:</strong> با شروع مسابقه جدید، رتبه و امتیازهای تمام کاربران در مسابقه فعلی به‌صورت <strong>دائمی در جدول آرشیو PostgreSQL</strong> ذخیره می‌شوند. سپس امتیاز مسابقه جدید برای همه کاربران <strong>صفر</strong> خواهد شد.
+            <strong>توجه بسیار مهم:</strong> با شروع مسابقه جدید، رتبه و امتیازهای تمام کاربران در مسابقه فعلی به‌صورت <strong>دائمی در جدول آرشیو PostgreSQL</strong> ذخیره می‌شوند و امتیاز کاربران در دوره جدید از <strong>صفر</strong> آغاز می‌گردد.
             <hr class="my-2">
-            <strong>نکته امنیتی:</strong> حساب‌های کاربری، شماره‌های موبایل و خریدهای پلن عضویت کاربران <strong>حفظ خواهند شد</strong> و نیازی به ورود مجدد ندارند.
+            <strong>نکته امنیتی:</strong> حساب‌های کاربری، شماره‌های موبایل و خریدهای پلن عضویت کاربران <strong>حفظ خواهند شد</strong>.
           </div>
 
-          <div class="mb-3">
-            <label class="form-label text-secondary">عنوان مسابقه جدید (اختیاری):</label>
-            <input type="text" id="newCompTitleInput" class="form-control form-control-dark" placeholder="مثلاً: مسابقه شماره ۲ (جایزه پلی‌استیشن ۵ و سفر کیش)">
-          </div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label text-secondary small fw-bold">عنوان دوره مسابقه جدید:</label>
+              <input type="text" id="newCompTitleInput" class="form-control form-control-dark" placeholder="مثلاً: مسابقه شماره ۲ (جایزه پلی‌استیشن ۵)" oninput="updateCompModalPreview()">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label text-secondary small fw-bold">تاریخ و ساعت پایان مسابقه جدید:</label>
+              <input type="datetime-local" id="newCompEndDateInput" class="form-control form-control-dark" onchange="updateCompModalPreview()">
+            </div>
 
-          <div class="mb-3">
-            <label class="form-label text-warning fw-bold">جهت تایید قطعی، عبارت «شروع مسابقه جدید» را تایپ کنید:</label>
-            <input type="text" id="confirmationPhraseInput" class="form-control form-control-dark" placeholder="شروع مسابقه جدید" onkeyup="checkConfirmationPhrase()">
+            <div class="col-12">
+              <label class="form-label text-secondary small fw-bold">پیام آغاز مسابقه برای صفحه اصلی اپلیکیشن:</label>
+              <textarea id="newCompAnnContentInput" rows="2" class="form-control form-control-dark" placeholder="متن پیام آغاز مسابقه جدید..." oninput="updateCompModalPreview()"></textarea>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label text-warning small fw-bold"><i class="bi bi-phone"></i> پیش‌نمایش اطلاعیه شروع دوره در اپلیکیشن:</label>
+              <div class="app-preview-box" id="newCompPreviewContainer">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <span class="badge bg-success text-white fw-bold">شروع مسابقه</span>
+                  <strong id="newCompPreviewTitle" class="gold-text">شروع مسابقه شماره ۲</strong>
+                </div>
+                <p id="newCompPreviewContent" class="mb-0 text-white small">دوره جدید مسابقه آغاز شد! با مشاهده تبلیغات امتیاز کسب کرده و برنده جوایز شوید.</p>
+              </div>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label text-danger fw-bold">جهت تایید قطعی، عبارت «شروع مسابقه جدید» را تایپ کنید:</label>
+              <input type="text" id="confirmationPhraseInput" class="form-control form-control-dark border-danger" placeholder="شروع مسابقه جدید" onkeyup="checkConfirmationPhrase()">
+            </div>
           </div>
         </div>
         <div class="modal-footer border-secondary">
@@ -301,8 +481,12 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     let cachedUsers = [];
+    let cachedAnnouncements = [];
+    let currentActiveAnn = null;
+    let currentActiveComp = null;
     let bootstrapStartModal = null;
     let bootstrapArchiveModal = null;
+    let bootstrapAnnModal = null;
 
     document.addEventListener('DOMContentLoaded', () => {
       const sModalEl = document.getElementById('startCompModal');
@@ -310,6 +494,9 @@
 
       const aModalEl = document.getElementById('viewArchiveModal');
       if (aModalEl) bootstrapArchiveModal = new bootstrap.Modal(aModalEl);
+
+      const annModalEl = document.getElementById('announcementModal');
+      if (annModalEl) bootstrapAnnModal = new bootstrap.Modal(annModalEl);
     });
 
     function getAdminKey() {
@@ -344,6 +531,197 @@
         btn.removeAttribute('disabled');
       } else {
         btn.setAttribute('disabled', 'true');
+      }
+    }
+
+    function openStartCompModal() {
+      document.getElementById('confirmationPhraseInput').value = '';
+      document.getElementById('confirmStartCompBtn').setAttribute('disabled', 'true');
+      const nextNum = currentActiveComp ? (currentActiveComp.competitionNumber + 1) : 2;
+      document.getElementById('newCompTitleInput').value = `مسابقه دوره ${nextNum} (جوایز ارزنده)`;
+      
+      // Default end date: 14 days from now
+      const d = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+      document.getElementById('newCompEndDateInput').value = d.toISOString().slice(0, 16);
+      document.getElementById('newCompAnnContentInput').value = `دوره ${nextNum} مسابقه «رقابت کن، جایزه ببر» آغاز شد! با مشاهده تبلیغات و تکمیل ۵۰ مربع روزانه امتیاز کسب کنید و برنده جوایز ویژه شوید.`;
+      
+      updateCompModalPreview();
+      if (bootstrapStartModal) bootstrapStartModal.show();
+    }
+
+    function updateCompModalPreview() {
+      const title = document.getElementById('newCompTitleInput').value.trim() || 'شروع مسابقه جدید';
+      const content = document.getElementById('newCompAnnContentInput').value.trim() || 'دوره جدید مسابقه آغاز شد.';
+      document.getElementById('newCompPreviewTitle').innerText = title;
+      document.getElementById('newCompPreviewContent').innerText = content;
+    }
+
+    function setQuickEndDate(days) {
+      const d = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+      document.getElementById('annEndsAtInput').value = d.toISOString().slice(0, 16);
+      updateLivePreview();
+    }
+
+    function clearEndDate() {
+      document.getElementById('annEndsAtInput').value = '';
+      updateLivePreview();
+    }
+
+    function openAnnouncementModal(annId = null) {
+      document.getElementById('editAnnId').value = '';
+      if (!annId) {
+        document.getElementById('announcementModalLabel').innerHTML = '<i class="bi bi-plus-circle-fill text-info me-2"></i> ایجاد پیام جدید برای صفحه اصلی';
+        document.getElementById('annTitleInput').value = '';
+        document.getElementById('annContentInput').value = '';
+        document.getElementById('annTypeSelect').value = 'ANNOUNCEMENT';
+        document.getElementById('annEndsAtInput').value = '';
+        document.getElementById('annIsActiveSwitch').checked = true;
+      } else {
+        const ann = cachedAnnouncements.find(a => a.id === annId);
+        if (ann) {
+          document.getElementById('announcementModalLabel').innerHTML = '<i class="bi bi-pencil-square text-warning me-2"></i> ویرایش پیام صفحه اصلی';
+          document.getElementById('editAnnId').value = ann.id;
+          document.getElementById('annTitleInput').value = ann.title;
+          document.getElementById('annContentInput').value = ann.content;
+          document.getElementById('annTypeSelect').value = ann.type || 'ANNOUNCEMENT';
+          document.getElementById('annEndsAtInput').value = ann.endsAt ? new Date(ann.endsAt).toISOString().slice(0, 16) : '';
+          document.getElementById('annIsActiveSwitch').checked = ann.isActive;
+        }
+      }
+      updateLivePreview();
+      if (bootstrapAnnModal) bootstrapAnnModal.show();
+    }
+
+    function editCurrentActiveAnn() {
+      if (currentActiveAnn) {
+        openAnnouncementModal(currentActiveAnn.id);
+      } else {
+        openAnnouncementModal();
+      }
+    }
+
+    function updateLivePreview() {
+      const title = document.getElementById('annTitleInput').value.trim() || 'عنوان پیام';
+      const content = document.getElementById('annContentInput').value.trim() || 'متن کامل پیام در این قسمت قرار می‌گیرد...';
+      const type = document.getElementById('annTypeSelect').value;
+      const endsAt = document.getElementById('annEndsAtInput').value;
+      const isActive = document.getElementById('annIsActiveSwitch').checked;
+
+      document.getElementById('previewTitle').innerText = title;
+      document.getElementById('previewContent').innerText = content;
+
+      const badgeType = document.getElementById('previewBadgeType');
+      const typeLabels = {
+        'ANNOUNCEMENT': { text: 'اطلاعیه', cls: 'bg-primary' },
+        'COMPETITION_START': { text: 'شروع مسابقه', cls: 'bg-success' },
+        'COMPETITION_END': { text: 'پایان مسابقه', cls: 'bg-danger' },
+        'WINNERS': { text: 'اعلام برندگان', cls: 'bg-warning text-dark' },
+        'CUSTOM': { text: 'پیام ویژه', cls: 'bg-info text-dark' }
+      };
+      const info = typeLabels[type] || { text: 'اطلاعیه', cls: 'bg-primary' };
+      badgeType.className = `badge ${info.cls} fw-bold`;
+      badgeType.innerText = info.text;
+
+      const endBadge = document.getElementById('previewEndDateBadge');
+      if (endsAt) {
+        const diffMs = new Date(endsAt).getTime() - Date.now();
+        if (diffMs > 0) {
+          const days = Math.floor(diffMs / (24 * 3600 * 1000));
+          const hours = Math.floor((diffMs % (24 * 3600 * 1000)) / (3600 * 1000));
+          endBadge.innerText = days > 0 ? `مهلت: ${days} روز و ${hours} ساعت باقیمانده` : `مهلت: ${hours} ساعت باقیمانده`;
+          endBadge.classList.remove('d-none');
+        } else {
+          endBadge.innerText = 'زمان پایان سپری شده';
+          endBadge.classList.remove('d-none');
+        }
+      } else {
+        endBadge.classList.add('d-none');
+      }
+
+      const container = document.getElementById('livePreviewContainer');
+      if (!isActive) {
+        container.style.opacity = '0.45';
+        container.style.filter = 'grayscale(60%)';
+      } else {
+        container.style.opacity = '1';
+        container.style.filter = 'none';
+      }
+    }
+
+    async function submitAnnouncementForm() {
+      const title = document.getElementById('annTitleInput').value.trim();
+      const content = document.getElementById('annContentInput').value.trim();
+      if (!title || !content) {
+        alert('لطفاً عنوان و متن پیام را وارد کنید.');
+        return;
+      }
+
+      const id = document.getElementById('editAnnId').value.trim() || undefined;
+      const type = document.getElementById('annTypeSelect').value;
+      const endsAtRaw = document.getElementById('annEndsAtInput').value;
+      const endsAt = endsAtRaw ? new Date(endsAtRaw).getTime() : null;
+      const isActive = document.getElementById('annIsActiveSwitch').checked;
+      const key = getAdminKey();
+
+      const btn = document.getElementById('saveAnnBtn');
+      const spinner = document.getElementById('saveAnnSpinner');
+      btn.setAttribute('disabled', 'true');
+      spinner.classList.remove('d-none');
+
+      try {
+        const res = await fetch('/api/admin/announcements', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-key': key
+          },
+          body: JSON.stringify({
+            id,
+            title,
+            content,
+            type,
+            isActive,
+            endsAt
+          })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          if (bootstrapAnnModal) bootstrapAnnModal.hide();
+          loadDashboard();
+        } else {
+          alert('خطا در ذخیره پیام: ' + (data.error || 'عملیات ناموفق بود'));
+        }
+      } catch (err) {
+        alert('خطای ارتباط با سرور: ' + err.message);
+      } finally {
+        spinner.classList.add('d-none');
+        btn.removeAttribute('disabled');
+      }
+    }
+
+    async function toggleCurrentActiveAnn() {
+      if (!currentActiveAnn) return;
+      await toggleAnnouncement(currentActiveAnn.id);
+    }
+
+    async function toggleAnnouncement(annId) {
+      const key = getAdminKey();
+      try {
+        const res = await fetch(`/api/admin/announcements/${annId}/toggle`, {
+          method: 'PATCH',
+          headers: {
+            'x-admin-key': key
+          }
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadDashboard();
+        } else {
+          alert('خطا: ' + (data.error || 'عملیات ناموفق بود'));
+        }
+      } catch (err) {
+        alert('خطای ارتباط: ' + err.message);
       }
     }
 
@@ -386,11 +764,26 @@
 
         // Active Competition
         if (data.activeCompetition) {
+          currentActiveComp = data.activeCompetition;
           document.getElementById('activeCompNumber').innerText = 'دوره ' + data.activeCompetition.competitionNumber;
           document.getElementById('activeCompTitle').innerText = data.activeCompetition.title;
           const startDate = new Date(data.activeCompetition.startedAt);
           document.getElementById('activeCompStartedAt').innerText = startDate.toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+          if (data.activeCompetition.endedAt) {
+            const endDate = new Date(data.activeCompetition.endedAt);
+            document.getElementById('activeCompEndedAt').innerText = endDate.toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+          } else {
+            document.getElementById('activeCompEndedAt').innerText = 'نامحدود / تعیین نشده';
+          }
         }
+
+        // Active Announcement
+        currentActiveAnn = data.activeAnnouncement;
+        renderActiveAnnouncement(currentActiveAnn);
+
+        // All Announcements
+        cachedAnnouncements = data.announcements || [];
+        renderAnnouncements(cachedAnnouncements);
 
         // Past Competitions
         const pastComps = data.pastCompetitions || [];
@@ -414,10 +807,97 @@
       }
     }
 
+    function renderActiveAnnouncement(ann) {
+      const card = document.getElementById('activeAnnCard');
+      const toggleBtn = document.getElementById('toggleActiveAnnBtn');
+      if (!ann) {
+        document.getElementById('activeAnnStatusBadge').className = 'badge bg-secondary';
+        document.getElementById('activeAnnStatusBadge').innerHTML = '<i class="bi bi-dash-circle"></i> بدون پیام فعال';
+        document.getElementById('activeAnnTypeBadge').className = 'badge bg-dark d-none';
+        document.getElementById('activeAnnTitle').innerText = 'در حال حاضر هیچ پیامی در بالای صفحه اصلی فعال نیست.';
+        document.getElementById('activeAnnContent').innerText = 'برای نمایش اطلاعیه یا پیام جدید به کاربران اپلیکیشن، روی دکمه «ایجاد پیام جدید» کلیک کنید.';
+        document.getElementById('activeAnnStartsAt').innerText = '-';
+        document.getElementById('activeAnnEndsAt').innerText = '-';
+        toggleBtn.classList.add('d-none');
+        return;
+      }
+
+      toggleBtn.classList.remove('d-none');
+      document.getElementById('activeAnnStatusBadge').className = ann.isActive ? 'badge bg-success' : 'badge bg-danger';
+      document.getElementById('activeAnnStatusBadge').innerHTML = ann.isActive ? '<i class="bi bi-check-circle-fill"></i> در حال نمایش در صفحه اصلی' : '<i class="bi bi-eye-slash-fill"></i> غیرفعال شده';
+
+      const typeLabels = {
+        'ANNOUNCEMENT': 'اطلاعیه',
+        'COMPETITION_START': 'شروع مسابقه',
+        'COMPETITION_END': 'پایان مسابقه',
+        'WINNERS': 'اعلام برندگان',
+        'CUSTOM': 'پیام ویژه'
+      };
+      document.getElementById('activeAnnTypeBadge').classList.remove('d-none');
+      document.getElementById('activeAnnTypeBadge').innerText = typeLabels[ann.type] || 'اطلاعیه';
+
+      document.getElementById('activeAnnTitle').innerText = ann.title;
+      document.getElementById('activeAnnContent').innerText = ann.content;
+      document.getElementById('activeAnnStartsAt').innerText = new Date(ann.updatedAt || ann.startsAt).toLocaleDateString('fa-IR', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      
+      if (ann.endsAt) {
+        const endDate = new Date(ann.endsAt);
+        document.getElementById('activeAnnEndsAt').innerText = endDate.toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      } else {
+        document.getElementById('activeAnnEndsAt').innerText = 'تعیین نشده';
+      }
+
+      toggleBtn.innerHTML = ann.isActive ? '<i class="bi bi-eye-slash"></i> غیرفعال‌سازی' : '<i class="bi bi-eye"></i> فعال‌سازی';
+      toggleBtn.className = ann.isActive ? 'btn btn-sm btn-outline-danger' : 'btn btn-sm btn-outline-success';
+    }
+
+    function renderAnnouncements(list) {
+      const tbody = document.getElementById('announcementsTbody');
+      if (!list || list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-3 text-secondary"><i class="bi bi-info-circle"></i> هیچ پیامی ثبت نشده است.</td></tr>';
+        return;
+      }
+
+      const typeLabels = {
+        'ANNOUNCEMENT': 'اطلاعیه',
+        'COMPETITION_START': 'شروع مسابقه',
+        'COMPETITION_END': 'پایان مسابقه',
+        'WINNERS': 'اعلام برندگان',
+        'CUSTOM': 'پیام ویژه'
+      };
+
+      tbody.innerHTML = list.map(a => {
+        const endDateStr = a.endsAt ? new Date(a.endsAt).toLocaleDateString('fa-IR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+        const updatedStr = new Date(a.updatedAt).toLocaleDateString('fa-IR', { month: 'short', day: 'numeric' });
+        const statusBadge = a.isActive ? '<span class="badge bg-success">فعال</span>' : '<span class="badge bg-secondary">غیرفعال</span>';
+        const toggleBtnText = a.isActive ? '<i class="bi bi-pause-fill"></i>' : '<i class="bi bi-play-fill"></i>';
+
+        return `
+          <tr>
+            <td class="fw-bold">${a.title}</td>
+            <td><small class="badge bg-dark border border-secondary">${typeLabels[a.type] || a.type}</small></td>
+            <td>${statusBadge}</td>
+            <td><small class="text-warning">${endDateStr}</small></td>
+            <td><small class="text-secondary">${updatedStr}</small></td>
+            <td>
+              <div class="d-flex gap-1">
+                <button class="btn btn-sm btn-outline-warning" title="ویرایش پیام" onclick="openAnnouncementModal('${a.id}')">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-info" title="تغییر وضعیت فعال/غیرفعال" onclick="toggleAnnouncement('${a.id}')">
+                  ${toggleBtnText}
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
     function renderArchivedCompetitions(comps) {
       const tbody = document.getElementById('archivedCompsTbody');
       if (!comps || comps.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-secondary"><i class="bi bi-info-circle"></i> هنوز هیچ مسابقه‌ای به پایان نرسیده و آرشیو نشده است. مسابقه جاری نخستین دوره می‌باشد.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-secondary"><i class="bi bi-info-circle"></i> هنوز هیچ مسابقه‌ای به پایان نرسیده و آرشیو نشده است.</td></tr>';
         return;
       }
 
@@ -499,6 +979,10 @@
       }
 
       const newTitle = document.getElementById('newCompTitleInput').value.trim();
+      const endDateRaw = document.getElementById('newCompEndDateInput').value;
+      const endDate = endDateRaw ? new Date(endDateRaw).toISOString() : null;
+      const annContent = document.getElementById('newCompAnnContentInput').value.trim();
+
       const key = getAdminKey();
       const btn = document.getElementById('confirmStartCompBtn');
       const spinner = document.getElementById('startCompSpinner');
@@ -515,7 +999,10 @@
           },
           body: JSON.stringify({
             confirmationPhrase: phrase,
-            newTitle: newTitle
+            newTitle,
+            endDate,
+            announcementTitle: newTitle ? `آغاز ${newTitle}` : undefined,
+            announcementContent: annContent || undefined
           })
         });
 
@@ -523,8 +1010,6 @@
         if (data.success) {
           alert('عملیات با موفقیت انجام شد!\n' + data.message);
           if (bootstrapStartModal) bootstrapStartModal.hide();
-          document.getElementById('confirmationPhraseInput').value = '';
-          document.getElementById('newCompTitleInput').value = '';
           loadDashboard();
         } else {
           alert('خطا در شروع مسابقه جدید: ' + (data.error || 'عملیات ناموفق بود'));

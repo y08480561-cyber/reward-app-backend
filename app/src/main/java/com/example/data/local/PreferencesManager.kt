@@ -114,6 +114,10 @@ class PreferencesManager(context: Context) {
             .apply()
     }
 
+    var cachedAnnouncementJson: String
+        get() = prefs.getString("cached_announcement_json", "") ?: ""
+        set(value) = prefs.edit().putString("cached_announcement_json", value).apply()
+
     fun clearSession() {
         prefs.edit()
             .putBoolean(KEY_IS_LOGGED_IN, false)

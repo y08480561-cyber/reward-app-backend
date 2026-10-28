@@ -845,6 +845,77 @@ class BackendRepository(
         }
     }
 
+    suspend fun getActiveAnnouncement(): Result<com.example.model.HomeAnnouncement?> = withContext(Dispatchers.IO) {
+        val url = "${prefs.serverUrl.trimEnd('/')}/api/announcement/active"
+        try {
+            val request = Request.Builder().url(url).get().build()
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (response.isSuccessful) {
+                    val json = JSONObject(body)
+                    val annObj = json.optJSONObject("announcement")
+                    if (annObj != null) {
+                        val announcement = com.example.model.HomeAnnouncement(
+                            id = annObj.optString("id"),
+                            title = annObj.optString("title"),
+                            content = annObj.optString("content"),
+                            type = annObj.optString("type", "ANNOUNCEMENT"),
+                            isActive = annObj.optBoolean("isActive", true),
+                            competitionId = annObj.optString("competitionId").takeIf { it.isNotBlank() },
+                            competitionTitle = annObj.optString("competitionTitle").takeIf { it.isNotBlank() },
+                            startsAtMs = if (annObj.has("startsAt") && !annObj.isNull("startsAt")) annObj.optLong("startsAt") else null,
+                            endsAtMs = if (annObj.has("endsAt") && !annObj.isNull("endsAt")) annObj.optLong("endsAt") else null,
+                            createdAtMs = annObj.optLong("createdAt", System.currentTimeMillis()),
+                            updatedAtMs = annObj.optLong("updatedAt", System.currentTimeMillis())
+                        )
+                        prefs.cachedAnnouncementJson = annObj.toString()
+                        Result.Success(announcement)
+                    } else {
+                        prefs.cachedAnnouncementJson = ""
+                        Result.Success(null)
+                    }
+                } else {
+                    val cached = parseCachedAnnouncement()
+                    if (cached != null) {
+                        Result.Success(cached)
+                    } else {
+                        Result.Error("سرور در دریافت پیام صفحه اصلی کد ${response.code} ارسال کرد.")
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            val cached = parseCachedAnnouncement()
+            if (cached != null) {
+                Result.Success(cached)
+            } else {
+                Result.Error("خطای ارتباط با سرور در دریافت اطلاعیه: ${e.message}")
+            }
+        }
+    }
+
+    fun parseCachedAnnouncement(): com.example.model.HomeAnnouncement? {
+        val raw = prefs.cachedAnnouncementJson
+        if (raw.isBlank()) return null
+        return try {
+            val annObj = JSONObject(raw)
+            com.example.model.HomeAnnouncement(
+                id = annObj.optString("id"),
+                title = annObj.optString("title"),
+                content = annObj.optString("content"),
+                type = annObj.optString("type", "ANNOUNCEMENT"),
+                isActive = annObj.optBoolean("isActive", true),
+                competitionId = annObj.optString("competitionId").takeIf { it.isNotBlank() },
+                competitionTitle = annObj.optString("competitionTitle").takeIf { it.isNotBlank() },
+                startsAtMs = if (annObj.has("startsAt") && !annObj.isNull("startsAt")) annObj.optLong("startsAt") else null,
+                endsAtMs = if (annObj.has("endsAt") && !annObj.isNull("endsAt")) annObj.optLong("endsAt") else null,
+                createdAtMs = annObj.optLong("createdAt", System.currentTimeMillis()),
+                updatedAtMs = annObj.optLong("updatedAt", System.currentTimeMillis())
+            )
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     private fun sha256(input: String): String {
         val bytes = MessageDigest.getInstance("SHA-256").digest(input.toByteArray())
         return bytes.joinToString("") { "%02x".format(it) }

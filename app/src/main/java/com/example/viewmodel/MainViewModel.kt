@@ -67,9 +67,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             totalScore = prefs.totalScore,
             token = prefs.authToken
         )
+        val cachedAnn = backendRepository.parseCachedAnnouncement()
         _uiState.update {
             it.copy(
                 currentUser = user,
+                activeAnnouncement = cachedAnn,
                 currentScreen = AppScreen.PROFILE
             )
         }
@@ -147,12 +149,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
 
+            // Fetch active announcement from server (with offline cached fallback)
+            val annResult = backendRepository.getActiveAnnouncement()
+            val activeAnn = if (annResult is Result.Success) annResult.data else _uiState.value.activeAnnouncement
+
             _uiState.update {
                 it.copy(
                     dailyCycle = cycle,
                     squares = squares,
                     prizes = prizes,
                     activeCompetition = activeComp ?: it.activeCompetition,
+                    activeAnnouncement = activeAnn,
                     currentUser = updatedUser,
                     isLoading = false
                 )

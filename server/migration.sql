@@ -131,3 +131,21 @@ CREATE INDEX IF NOT EXISTS idx_comp_logs_created ON public.competition_logs(crea
 ALTER TABLE public.ad_sessions ADD COLUMN IF NOT EXISTS competition_id TEXT;
 CREATE INDEX IF NOT EXISTS idx_ad_sessions_competition ON public.ad_sessions(competition_id);
 
+-- ۱۱. جدول پیام‌ها و اطلاعیه‌های صفحه اصلی اپلیکیشن
+CREATE TABLE IF NOT EXISTS public.home_announcements (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'ANNOUNCEMENT',
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    competition_id TEXT REFERENCES public.competitions(id) ON DELETE SET NULL,
+    starts_at TIMESTAMPTZ,
+    ends_at TIMESTAMPTZ,
+    created_by TEXT NOT NULL DEFAULT 'admin',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_announcements_active ON public.home_announcements(is_active, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_announcements_comp ON public.home_announcements(competition_id);
+
+

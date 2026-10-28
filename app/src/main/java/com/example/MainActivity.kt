@@ -77,6 +77,8 @@ class MainActivity : ComponentActivity() {
                                     HomeScreen(
                                         user = user,
                                         cycle = uiState.dailyCycle,
+                                        competition = uiState.activeCompetition,
+                                        announcement = uiState.activeAnnouncement,
                                         userRank = 1,
                                         onNavigate = { screen -> viewModel.navigateTo(screen) }
                                     )
@@ -86,6 +88,7 @@ class MainActivity : ComponentActivity() {
                                 SquaresScreen(
                                     squares = uiState.squares,
                                     cycle = uiState.dailyCycle,
+                                    announcement = uiState.activeAnnouncement,
                                     onSquareClick = { act, square -> viewModel.onSquareClicked(act, square) }
                                 )
                             }

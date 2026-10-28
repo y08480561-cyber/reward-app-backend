@@ -57,10 +57,14 @@ import com.example.ui.theme.NavyPrimary
 import com.example.ui.theme.NavySecondary
 import com.example.ui.theme.SuccessGreen
 
+import com.example.ui.components.HomeAnnouncementBanner
+import com.example.model.HomeAnnouncement
+
 @Composable
 fun SquaresScreen(
     squares: List<AdSquare>,
     cycle: DailyCycle?,
+    announcement: HomeAnnouncement? = null,
     onSquareClick: (Activity, AdSquare) -> Unit
 ) {
     val context = LocalContext.current
@@ -180,6 +184,14 @@ fun SquaresScreen(
                     LegendItem("تلاش مجدد", Color(0xFFFEE2E2), ErrorRed)
                 }
             }
+        }
+
+        // Active Announcement Banner at top of page (Before main grid content)
+        if (announcement != null && announcement.isActive) {
+            HomeAnnouncementBanner(
+                announcement = announcement,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+            )
         }
 
         // 50 Squares Professional Grid

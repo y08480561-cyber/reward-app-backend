@@ -53,4 +53,41 @@ class ExampleUnitTest {
     assertEquals("09339509691", userAfter.phoneNumber)
     assertEquals("مجتبی چراغ‌زاده", userAfter.fullName)
   }
+
+  @Test
+  fun homeAnnouncement_activeAndCountdownCalculations() {
+    val futureEnd = System.currentTimeMillis() + 86400000L * 2 // 2 days in future
+    val announcement = com.example.model.HomeAnnouncement(
+      id = "ann_101",
+      title = "آغاز مرحله نهایی مسابقه ۲",
+      content = "جوایز ویژه برای ۵ نفر اول جدول رده‌بندی",
+      type = "COMPETITION_START",
+      isActive = true,
+      endsAtMs = futureEnd
+    )
+
+    assertEquals("ann_101", announcement.id)
+    assertEquals(true, announcement.isActive)
+    assertEquals("COMPETITION_START", announcement.type)
+    assertNotNull(announcement.remainingMs)
+    assertTrue("Should have remaining time", (announcement.remainingMs ?: 0L) > 0)
+    assertFalse("Should not be ended", announcement.isEnded)
+  }
+
+  @Test
+  fun homeAnnouncement_expiredCalculation() {
+    val pastEnd = System.currentTimeMillis() - 5000L // 5 seconds ago
+    val announcement = com.example.model.HomeAnnouncement(
+      id = "ann_102",
+      title = "مسابقه پایان یافت",
+      content = "تبریک به برندگان",
+      type = "WINNERS",
+      isActive = true,
+      endsAtMs = pastEnd
+    )
+
+    assertTrue("Should be marked as ended", announcement.isEnded)
+    assertEquals(0L, announcement.remainingMs)
+  }
 }
+

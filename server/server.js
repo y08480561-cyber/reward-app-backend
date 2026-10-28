@@ -300,7 +300,24 @@ async function initDatabaseTables() {
 
     // 12. Ad Sessions competition reference
     `ALTER TABLE public.ad_sessions ADD COLUMN IF NOT EXISTS competition_id TEXT;`,
-    `CREATE INDEX IF NOT EXISTS idx_ad_sessions_competition ON public.ad_sessions(competition_id);`
+    `CREATE INDEX IF NOT EXISTS idx_ad_sessions_competition ON public.ad_sessions(competition_id);`,
+
+    // 13. Home Announcements Table
+    `CREATE TABLE IF NOT EXISTS public.home_announcements (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      type TEXT NOT NULL DEFAULT 'ANNOUNCEMENT',
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      competition_id TEXT REFERENCES public.competitions(id) ON DELETE SET NULL,
+      starts_at TIMESTAMPTZ,
+      ends_at TIMESTAMPTZ,
+      created_by TEXT NOT NULL DEFAULT 'admin',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );`,
+    `CREATE INDEX IF NOT EXISTS idx_announcements_active ON public.home_announcements(is_active, updated_at DESC);`,
+    `CREATE INDEX IF NOT EXISTS idx_announcements_comp ON public.home_announcements(competition_id);`
   ];
 
   for (const q of ddlQueries) {
@@ -326,6 +343,24 @@ async function initDatabaseTables() {
     }
   } catch (err) {
     console.warn('[PostgreSQL Init Competition Warning]', err.message);
+  }
+
+  // Ensure default active home announcement exists
+  try {
+    const annCheck = await pool.query(`SELECT id FROM public.home_announcements LIMIT 1`);
+    if (annCheck.rows.length === 0) {
+      const defaultAnnId = 'ANN_DEFAULT_1';
+      await pool.query(
+        `INSERT INTO public.home_announcements 
+          (id, title, content, type, is_active, competition_id, starts_at, created_by, created_at, updated_at)
+         VALUES ($1, 'آغاز مسابقه بزرگ دوره‌ای!', 'به مسابقه «رقابت کن، جایزه ببر» خوش آمدید! با تکمیل روزانه ۵۰ مربع تبلیغاتی تپسل امتیاز کسب کنید و شانس برنده شدن آیفون ۱۶ و کنسول پلی‌استیشن را افزایش دهید.', 'COMPETITION_START', true, 'COMP_1', NOW(), 'admin', NOW(), NOW())
+         ON CONFLICT (id) DO NOTHING`,
+        [defaultAnnId]
+      );
+      console.log('[PostgreSQL] Initial default home announcement seeded.');
+    }
+  } catch (err) {
+    console.warn('[PostgreSQL Init Announcement Warning]', err.message);
   }
 
   console.log('[PostgreSQL] Database tables and schema verified/initialized.');
@@ -1215,10 +1250,38 @@ app.get('/api/admin/overview', requireAdminAuth, ensureDatabaseReady, async (req
       LIMIT 10
     `);
 
+    // Home Announcements
+    const activeAnnRes = await pool.query(`SELECT * FROM public.home_announcements WHERE is_active = true ORDER BY updated_at DESC LIMIT 1`);
+    const activeAnnouncement = activeAnnRes.rows.length > 0 ? {
+      id: activeAnnRes.rows[0].id,
+      title: activeAnnRes.rows[0].title,
+      content: activeAnnRes.rows[0].content,
+      type: activeAnnRes.rows[0].type,
+      isActive: Boolean(activeAnnRes.rows[0].is_active),
+      competitionId: activeAnnRes.rows[0].competition_id,
+      startsAt: activeAnnRes.rows[0].starts_at ? new Date(activeAnnRes.rows[0].starts_at).getTime() : null,
+      endsAt: activeAnnRes.rows[0].ends_at ? new Date(activeAnnRes.rows[0].ends_at).getTime() : null,
+      updatedAt: new Date(activeAnnRes.rows[0].updated_at).getTime()
+    } : null;
+
+    const allAnnRes = await pool.query(`SELECT * FROM public.home_announcements ORDER BY updated_at DESC LIMIT 20`);
+
     return res.json({
       totalUsers: users.length,
       totalAdSessions,
       totalScoresSum,
+      activeAnnouncement,
+      announcements: allAnnRes.rows.map(a => ({
+        id: a.id,
+        title: a.title,
+        content: a.content,
+        type: a.type,
+        isActive: Boolean(a.is_active),
+        competitionId: a.competition_id,
+        startsAt: a.starts_at ? new Date(a.starts_at).getTime() : null,
+        endsAt: a.ends_at ? new Date(a.ends_at).getTime() : null,
+        updatedAt: new Date(a.updated_at).getTime()
+      })),
       activeCompetition: activeComp ? {
         id: activeComp.id,
         competitionNumber: Number(activeComp.competition_number),
@@ -1612,15 +1675,18 @@ app.post('/api/admin/competition/start-new', requireAdminAuth, ensureDatabaseRea
       `, [prevId, prevNumber, prevTitle, participantsCount, totalScoreArchived]);
     }
 
+    const { confirmationPhrase, newTitle, endDate, announcementTitle, announcementContent } = req.body || {};
+
     // 4. Create new ACTIVE competition
     const nextNumber = prevNumber + 1;
     const newCompId = `COMP_${nextNumber}_${Date.now()}`;
     const competitionTitle = (newTitle && newTitle.trim()) ? newTitle.trim() : `مسابقه شماره ${nextNumber}`;
+    const competitionEndDate = endDate ? new Date(endDate) : null;
 
     await client.query(`
-      INSERT INTO public.competitions (id, competition_number, title, status, started_at, created_by, created_at)
-      VALUES ($1, $2, $3, 'ACTIVE', NOW(), 'admin', NOW())
-    `, [newCompId, nextNumber, competitionTitle]);
+      INSERT INTO public.competitions (id, competition_number, title, status, started_at, ended_at, created_by, created_at)
+      VALUES ($1, $2, $3, 'ACTIVE', NOW(), $4, 'admin', NOW())
+    `, [newCompId, nextNumber, competitionTitle, competitionEndDate]);
 
     // 5. Reset all user scores to 0
     await client.query(`UPDATE public.user_scores SET total_score = 0, updated_at = NOW()`);
@@ -1631,7 +1697,21 @@ app.post('/api/admin/competition/start-new', requireAdminAuth, ensureDatabaseRea
     // 6. Delete all square states so all 50 squares reset to READY
     await client.query(`DELETE FROM public.square_states`);
 
-    // 7. Insert audit log
+    // 7. Automatically publish linked Home Announcement for the new competition
+    await client.query(`UPDATE public.home_announcements SET is_active = false`);
+    const newAnnId = `ANN_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+    const annTitle = (announcementTitle && announcementTitle.trim()) ? announcementTitle.trim() : `شروع ${competitionTitle}`;
+    const annBody = (announcementContent && announcementContent.trim()) 
+      ? announcementContent.trim() 
+      : `دوره جدید مسابقه («${competitionTitle}») آغاز شد! با مشاهده تبلیغات و تکمیل ۵۰ مربع روزانه امتیاز کسب کرده و برنده جوایز ارزنده شوید.`;
+
+    await client.query(`
+      INSERT INTO public.home_announcements 
+        (id, title, content, type, is_active, competition_id, starts_at, ends_at, created_by, created_at, updated_at)
+      VALUES ($1, $2, $3, 'COMPETITION_START', true, $4, NOW(), $5, 'admin', NOW(), NOW())
+    `, [newAnnId, annTitle, annBody, newCompId, competitionEndDate]);
+
+    // 8. Insert audit log
     const logId = `CLOG_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
     const rawAdminKey = req.headers['x-admin-key'] || req.query.adminKey || 'ADMIN';
     const maskedKey = rawAdminKey.length > 4 ? rawAdminKey.substring(0, 4) + '***' : '***';
@@ -1649,16 +1729,16 @@ app.post('/api/admin/competition/start-new', requireAdminAuth, ensureDatabaseRea
       competitionTitle,
       participantsCount,
       totalScoreArchived,
-      `پایان مسابقه شماره ${prevNumber} با ${participantsCount} شرکت‌کننده و آرشیو ${totalScoreArchived} امتیاز. شروع مسابقه جدید «${competitionTitle}».`
+      `پایان مسابقه شماره ${prevNumber} با ${participantsCount} شرکت‌کننده و آرشیو ${totalScoreArchived} امتیاز. شروع مسابقه جدید «${competitionTitle}» و انتشار اطلاعیه صفحه اصلی.`
     ]);
 
     await client.query('COMMIT');
 
-    console.log(`[Admin Competition] Successfully started competition ${nextNumber} ("${competitionTitle}"). Previous competition (${prevTitle}) archived with ${participantsCount} participants and ${totalScoreArchived} points.`);
+    console.log(`[Admin Competition] Successfully started competition ${nextNumber} ("${competitionTitle}") with announcement "${annTitle}".`);
 
     return res.json({
       success: true,
-      message: `مسابقه قبلی (${prevTitle}) با موفقیت به پایان رسید و نتایج آن در آرشیو دائمی ثبت شد. مسابقه جدید «${competitionTitle}» با امتیاز صفر برای تمام کاربران آغاز گردید.`,
+      message: `مسابقه قبلی (${prevTitle}) با موفقیت به پایان رسید و نتایج آن در آرشیو دائمی ثبت شد. مسابقه جدید «${competitionTitle}» با امتیاز صفر برای تمام کاربران و اطلاعیه صفحه اصلی منتشر گردید.`,
       archivedCompetition: {
         id: prevId,
         competitionNumber: prevNumber,
@@ -1671,7 +1751,16 @@ app.post('/api/admin/competition/start-new', requireAdminAuth, ensureDatabaseRea
         competitionNumber: nextNumber,
         title: competitionTitle,
         status: 'ACTIVE',
-        startedAt: Date.now()
+        startedAt: Date.now(),
+        endedAt: competitionEndDate ? competitionEndDate.getTime() : null
+      },
+      newAnnouncement: {
+        id: newAnnId,
+        title: annTitle,
+        content: annBody,
+        type: 'COMPETITION_START',
+        isActive: true,
+        endsAt: competitionEndDate ? competitionEndDate.getTime() : null
       }
     });
 
@@ -1682,6 +1771,217 @@ app.post('/api/admin/competition/start-new', requireAdminAuth, ensureDatabaseRea
   } finally {
     isCompetitionResetting = false;
     client.release();
+  }
+});
+
+// ====================================================================
+// 9. Home Announcements Management APIs
+// ====================================================================
+
+// 9.1 Public API: Get Active Announcement for App Home Screen
+app.get('/api/announcement/active', ensureDatabaseReady, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        a.id, 
+        a.title, 
+        a.content, 
+        a.type, 
+        a.is_active, 
+        a.competition_id, 
+        a.starts_at, 
+        a.ends_at, 
+        a.created_at, 
+        a.updated_at,
+        c.title AS competition_title
+      FROM public.home_announcements a
+      LEFT JOIN public.competitions c ON a.competition_id = c.id
+      WHERE a.is_active = true
+      ORDER BY a.updated_at DESC
+      LIMIT 1
+    `);
+
+    const serverNow = Date.now();
+
+    if (result.rows.length === 0) {
+      return res.json({
+        success: true,
+        announcement: null,
+        serverTime: serverNow
+      });
+    }
+
+    const r = result.rows[0];
+    return res.json({
+      success: true,
+      announcement: {
+        id: r.id,
+        title: r.title,
+        content: r.content,
+        type: r.type,
+        isActive: Boolean(r.is_active),
+        competitionId: r.competition_id,
+        competitionTitle: r.competition_title || null,
+        startsAt: r.starts_at ? new Date(r.starts_at).getTime() : null,
+        endsAt: r.ends_at ? new Date(r.ends_at).getTime() : null,
+        createdAt: new Date(r.created_at).getTime(),
+        updatedAt: new Date(r.updated_at).getTime()
+      },
+      serverTime: serverNow
+    });
+  } catch (err) {
+    console.error('[API Active Announcement Error]', err);
+    return res.status(500).json({ error: "خطا در دریافت پیام فعال صفحه اصلی." });
+  }
+});
+
+// 9.2 Admin API: List All Announcements
+app.get('/api/admin/announcements', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        a.id, 
+        a.title, 
+        a.content, 
+        a.type, 
+        a.is_active, 
+        a.competition_id, 
+        a.starts_at, 
+        a.ends_at, 
+        a.created_by,
+        a.created_at, 
+        a.updated_at,
+        c.title AS competition_title
+      FROM public.home_announcements a
+      LEFT JOIN public.competitions c ON a.competition_id = c.id
+      ORDER BY a.updated_at DESC
+      LIMIT 50
+    `);
+
+    const announcements = result.rows.map(r => ({
+      id: r.id,
+      title: r.title,
+      content: r.content,
+      type: r.type,
+      isActive: Boolean(r.is_active),
+      competitionId: r.competition_id,
+      competitionTitle: r.competition_title || null,
+      startsAt: r.starts_at ? new Date(r.starts_at).getTime() : null,
+      endsAt: r.ends_at ? new Date(r.ends_at).getTime() : null,
+      createdBy: r.created_by,
+      createdAt: new Date(r.created_at).getTime(),
+      updatedAt: new Date(r.updated_at).getTime()
+    }));
+
+    return res.json({
+      success: true,
+      announcements
+    });
+  } catch (err) {
+    console.error('[API Admin Announcements Error]', err);
+    return res.status(500).json({ error: "خطا در دریافت فهرست پیام‌های صفحه اصلی." });
+  }
+});
+
+// 9.3 Admin API: Create or Update Announcement (Independent of Competition Reset)
+app.post('/api/admin/announcements', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
+  try {
+    const { id, title, content, type, isActive, competitionId, startsAt, endsAt } = req.body || {};
+
+    if (!title || !title.trim()) {
+      return res.status(400).json({ error: "عنوان پیام نمی‌تواند خالی باشد." });
+    }
+    if (!content || !content.trim()) {
+      return res.status(400).json({ error: "متن پیام نمی‌تواند خالی باشد." });
+    }
+
+    const cleanTitle = title.trim();
+    const cleanContent = content.trim();
+    const cleanType = type || 'ANNOUNCEMENT';
+    const activeBool = isActive !== false; // defaults to true
+    const startsAtDate = startsAt ? new Date(startsAt) : new Date();
+    const endsAtDate = endsAt ? new Date(endsAt) : null;
+
+    // If activating this announcement, deactivate other announcements to ensure single primary active banner
+    if (activeBool) {
+      await pool.query(`UPDATE public.home_announcements SET is_active = false WHERE id != COALESCE($1, '')`, [id || '']);
+    }
+
+    let savedId = id;
+    if (id) {
+      // Update existing
+      const updateRes = await pool.query(`
+        UPDATE public.home_announcements 
+        SET title = $1, content = $2, type = $3, is_active = $4, competition_id = $5, starts_at = $6, ends_at = $7, updated_at = NOW()
+        WHERE id = $8
+        RETURNING id
+      `, [cleanTitle, cleanContent, cleanType, activeBool, competitionId || null, startsAtDate, endsAtDate, id]);
+
+      if (updateRes.rows.length === 0) {
+        return res.status(404).json({ error: "پیام مورد نظر جهت ویرایش یافت نشد." });
+      }
+    } else {
+      // Insert new
+      savedId = `ANN_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+      await pool.query(`
+        INSERT INTO public.home_announcements 
+          (id, title, content, type, is_active, competition_id, starts_at, ends_at, created_by, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'admin', NOW(), NOW())
+      `, [savedId, cleanTitle, cleanContent, cleanType, activeBool, competitionId || null, startsAtDate, endsAtDate]);
+    }
+
+    return res.json({
+      success: true,
+      message: activeBool ? "پیام با موفقیت ذخیره و در صفحه اصلی منتشر شد." : "پیام با موفقیت ذخیره شد (غیرفعال).",
+      announcement: {
+        id: savedId,
+        title: cleanTitle,
+        content: cleanContent,
+        type: cleanType,
+        isActive: activeBool,
+        competitionId: competitionId || null,
+        startsAt: startsAtDate.getTime(),
+        endsAt: endsAtDate ? endsAtDate.getTime() : null,
+        updatedAt: Date.now()
+      }
+    });
+  } catch (err) {
+    console.error('[API Save Announcement Error]', err);
+    return res.status(500).json({ error: "خطا در ذخیره‌سازی پیام در پایگاه داده." });
+  }
+});
+
+// 9.4 Admin API: Toggle Announcement Active State
+app.patch('/api/admin/announcements/:id/toggle', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
+  try {
+    const annId = req.params.id;
+    const checkRes = await pool.query(`SELECT is_active FROM public.home_announcements WHERE id = $1 LIMIT 1`, [annId]);
+    if (checkRes.rows.length === 0) {
+      return res.status(404).json({ error: "پیام یافت نشد." });
+    }
+
+    const currentStatus = Boolean(checkRes.rows[0].is_active);
+    const newStatus = !currentStatus;
+
+    if (newStatus) {
+      // Deactivate all others
+      await pool.query(`UPDATE public.home_announcements SET is_active = false`);
+    }
+
+    await pool.query(`
+      UPDATE public.home_announcements 
+      SET is_active = $1, updated_at = NOW() 
+      WHERE id = $2
+    `, [newStatus, annId]);
+
+    return res.json({
+      success: true,
+      isActive: newStatus,
+      message: newStatus ? "پیام با موفقیت در صفحه اصلی فعال شد." : "نمایش پیام در صفحه اصلی غیرفعال گردید."
+    });
+  } catch (err) {
+    console.error('[API Toggle Announcement Error]', err);
+    return res.status(500).json({ error: "خطا در تغییر وضعیت پیام در پایگاه داده." });
   }
 });
 

@@ -56,5 +56,7 @@ data class MainUiState(
     val userMembership: org.json.JSONObject? = null,
     val isMembershipLoading: Boolean = false,
     // Active Competition
-    val activeCompetition: com.example.model.CompetitionInfo? = null
+    val activeCompetition: com.example.model.CompetitionInfo? = null,
+    // Active Home Announcement
+    val activeAnnouncement: com.example.model.HomeAnnouncement? = null
 )
