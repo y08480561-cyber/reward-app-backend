@@ -808,6 +808,43 @@ class BackendRepository(
         }
     }
 
+    suspend fun getCurrentCompetition(userId: String?): Result<Pair<com.example.model.CompetitionInfo, Int>> = withContext(Dispatchers.IO) {
+        val url = "${prefs.serverUrl.trimEnd('/')}/api/competition/current"
+        try {
+            val reqBuilder = Request.Builder().url(url).get()
+            if (!userId.isNullOrBlank()) {
+                reqBuilder.header("x-user-id", userId)
+            }
+            client.newCall(reqBuilder.build()).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (response.isSuccessful) {
+                    val json = JSONObject(body)
+                    val compObj = json.optJSONObject("competition")
+                    if (compObj != null) {
+                        val comp = com.example.model.CompetitionInfo(
+                            id = compObj.optString("id", "COMP_1"),
+                            competitionNumber = compObj.optInt("competitionNumber", 1),
+                            title = compObj.optString("title", "مسابقه شماره ۱"),
+                            status = compObj.optString("status", "ACTIVE"),
+                            startedAtMs = compObj.optLong("startedAt", System.currentTimeMillis()),
+                            endedAtMs = if (compObj.has("endedAt") && !compObj.isNull("endedAt")) compObj.optLong("endedAt") else null,
+                            totalParticipants = compObj.optInt("totalParticipants", 0),
+                            totalScore = compObj.optInt("totalScore", 0)
+                        )
+                        val userScore = json.optInt("userScore", 0)
+                        Result.Success(Pair(comp, userScore))
+                    } else {
+                        Result.Error("اطلاعات مسابقه در پاسخ سرور یافت نشد.")
+                    }
+                } else {
+                    Result.Error("سرور در دریافت وضعیت مسابقه پاسخ ناموفق ارسال کرد (کد ${response.code}).")
+                }
+            }
+        } catch (e: Exception) {
+            Result.Error("عدم برقراری ارتباط با سرور جهت دریافت وضعیت مسابقه: ${e.message}")
+        }
+    }
+
     private fun sha256(input: String): String {
         val bytes = MessageDigest.getInstance("SHA-256").digest(input.toByteArray())
         return bytes.joinToString("") { "%02x".format(it) }

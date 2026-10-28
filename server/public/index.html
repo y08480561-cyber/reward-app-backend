@@ -17,6 +17,8 @@
     .btn-gold { background: linear-gradient(135deg, #FFB703, #FB8500); color: #0B192C; font-weight: bold; border: none; }
     .btn-gold:hover { background: linear-gradient(135deg, #FB8500, #FFB703); color: #0B192C; }
     .auth-bar { background-color: #152A44; border-bottom: 2px solid #2E5077; }
+    .comp-banner { background: linear-gradient(135deg, #152A44 0%, #1E3E62 100%); border: 2px solid #FFB703; border-radius: 18px; }
+    .modal-dark .modal-content { background-color: #152A44; color: #fff; border: 1px solid #2E5077; border-radius: 18px; }
   </style>
 </head>
 <body>
@@ -41,7 +43,7 @@
     <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-3 border-bottom border-secondary gap-3">
       <div>
         <h2 class="gold-text mb-1"><i class="bi bi-trophy-fill text-warning"></i> پنل مدیریت زنده «رقابت کن، جایزه ببر»</h2>
-        <p class="text-secondary mb-0">نمایش داده‌های واقعی از سرور، پایش کاربران ثبت‌نامی و لاگ‌های تاییدیه تبلیغ تپسل</p>
+        <p class="text-secondary mb-0">نمایش داده‌های واقعی از سرور، مدیریت مسابقات دوره‌ای و آرشیو دائمی نتایج</p>
       </div>
       <div class="d-flex gap-2 flex-wrap">
         <a href="/admin/users" class="btn btn-outline-warning fw-bold px-3 py-2" title="مشاهده جدول کاربران در صفحه مستقل">
@@ -57,45 +59,68 @@
     <!-- Alert Box -->
     <div id="alertBox" class="alert alert-danger d-none" role="alert"></div>
 
-    <!-- Stats Overview -->
+    <!-- 1. Active Competition Section -->
+    <div class="card comp-banner p-4 mb-4 shadow">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div>
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="badge bg-success px-3 py-2 fs-6"><i class="bi bi-broadcast"></i> مسابقه جاری (فعال)</span>
+            <span class="badge bg-dark border border-warning text-warning" id="activeCompNumber">دوره ۱</span>
+          </div>
+          <h3 class="gold-text mb-1" id="activeCompTitle">در حال بارگذاری اطلاعات مسابقه جاری...</h3>
+          <p class="text-secondary mb-0">
+            <i class="bi bi-calendar3"></i> زمان شروع: <span id="activeCompStartedAt" class="text-white">-</span>
+            <span class="mx-2">|</span>
+            <i class="bi bi-info-circle"></i> وضعیت امتیازها: <span class="text-info">کاربران با امتیاز صفر شروع و به رقابت ادامه می‌دهند.</span>
+          </p>
+        </div>
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+          <button class="btn btn-lg btn-danger fw-bold px-4 py-3 shadow" data-bs-toggle="modal" data-bs-target="#startCompModal">
+            <i class="bi bi-arrow-repeat me-1"></i> شروع مسابقه جدید
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Stats Overview -->
     <div class="row g-3 mb-4">
       <div class="col-md-3">
         <div class="card p-3">
-          <span class="text-secondary"><i class="bi bi-people-fill text-info"></i> کل کاربران واقعی</span>
+          <span class="text-secondary"><i class="bi bi-people-fill text-info"></i> شرکت‌کنندگان دوره جاری</span>
           <h3 class="gold-text mt-2 mb-0" id="totalUsers">۰ نفر</h3>
           <small class="text-secondary mt-1">بدون احتساب داده آزمایشی</small>
         </div>
       </div>
       <div class="col-md-3">
         <div class="card p-3">
-          <span class="text-secondary"><i class="bi bi-star-fill text-warning"></i> مجموع امتیازهای کسب‌شده</span>
+          <span class="text-secondary"><i class="bi bi-star-fill text-warning"></i> مجموع امتیاز دوره جاری</span>
           <h3 class="text-warning mt-2 mb-0" id="totalScores">۰ امتیاز</h3>
-          <small class="text-secondary mt-1">از تبلیغات تاییدشده</small>
+          <small class="text-secondary mt-1">از تبلیغات تاییدشده مسابقه فعلی</small>
         </div>
       </div>
       <div class="col-md-3">
         <div class="card p-3">
-          <span class="text-secondary"><i class="bi bi-play-circle-fill text-success"></i> تبلیغات تاییدشده تپسل</span>
+          <span class="text-secondary"><i class="bi bi-play-circle-fill text-success"></i> کل رویدادهای تپسل</span>
           <h3 class="text-success mt-2 mb-0" id="totalAds">۰ رویداد</h3>
           <small class="text-secondary mt-1">با توکن ضدتقلب</small>
         </div>
       </div>
       <div class="col-md-3">
         <div class="card p-3">
-          <span class="text-secondary"><i class="bi bi-clock-history text-primary"></i> ساختار چرخه و شبکه</span>
-          <h5 class="text-white mt-2 mb-0">۲۴ ساعت (۵۰ مربع)</h5>
-          <small class="text-info mt-1">شبکه: Tapsell Plus Rewarded</small>
+          <span class="text-secondary"><i class="bi bi-archive-fill text-primary"></i> دوره‌های آرشیو شده</span>
+          <h3 class="text-white mt-2 mb-0" id="archivedCompsCount">۰ دوره</h3>
+          <small class="text-info mt-1">دارای کارنامه نهایی دائمی</small>
         </div>
       </div>
     </div>
 
-    <!-- Tables -->
-    <div class="row g-4">
+    <!-- 3. Tables (Active Users & Ad Sessions) -->
+    <div class="row g-4 mb-4">
       <!-- Users Table -->
       <div class="col-lg-6">
         <div class="card p-3 h-100">
           <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="gold-text mb-0"><i class="bi bi-person-lines-fill"></i> فهرست کاربران واقعی</h5>
+            <h5 class="gold-text mb-0"><i class="bi bi-person-lines-fill"></i> جدول امتیازات مسابقه جاری</h5>
             <input type="text" id="userSearchInput" class="form-control form-control-sm form-control-dark" style="width: 180px;" placeholder="جستجوی نام یا شماره..." onkeyup="filterUsers()">
           </div>
           <div class="table-responsive">
@@ -106,7 +131,7 @@
                   <th>شناسه کاربر</th>
                   <th>نام و نام خانوادگی</th>
                   <th>شماره موبایل</th>
-                  <th>مجموع امتیاز</th>
+                  <th>امتیاز دوره جاری</th>
                   <th>عملیات</th>
                 </tr>
               </thead>
@@ -145,10 +170,147 @@
         </div>
       </div>
     </div>
+
+    <!-- 4. Historical Competitions Archive & Audit Logs -->
+    <div class="row g-4 mb-5">
+      <!-- Archived Competitions -->
+      <div class="col-lg-7">
+        <div class="card p-3 h-100">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="gold-text mb-0"><i class="bi bi-collection-play-fill text-warning"></i> آرشیو مسابقات پایان‌یافته</h5>
+            <span class="badge bg-dark border border-warning text-warning">ثبت دائمی و غیرقابل حذف</span>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-dark table-hover table-striped rounded align-middle">
+              <thead>
+                <tr class="text-secondary">
+                  <th>دوره</th>
+                  <th>عنوان مسابقه</th>
+                  <th>شرکت‌کنندگان</th>
+                  <th>مجموع امتیاز آرشیو</th>
+                  <th>تاریخ پایان</th>
+                  <th>کارنامه نهایی</th>
+                </tr>
+              </thead>
+              <tbody id="archivedCompsTbody">
+                <tr><td colspan="6" class="text-center py-4 text-secondary">در حال بررسی آرشیو دوره‌ها...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Audit Logs -->
+      <div class="col-lg-5">
+        <div class="card p-3 h-100">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="gold-text mb-0"><i class="bi bi-journal-text text-info"></i> لاگ‌های نظارتی مسابقات</h5>
+            <span class="badge bg-secondary">Audit Trail</span>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-dark table-hover table-striped rounded align-middle">
+              <thead>
+                <tr class="text-secondary">
+                  <th>تاریخ و زمان</th>
+                  <th>عملیات</th>
+                  <th>جزئیات</th>
+                </tr>
+              </thead>
+              <tbody id="logsTbody">
+                <tr><td colspan="3" class="text-center py-4 text-secondary">در حال دریافت لاگ‌ها...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
+  <!-- Modal: Start New Competition -->
+  <div class="modal fade modal-dark" id="startCompModal" tabindex="-1" aria-labelledby="startCompModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header border-secondary">
+          <h5 class="modal-title gold-text" id="startCompModalLabel"><i class="bi bi-exclamation-triangle-fill text-danger me-2"></i> شروع مسابقه جدید و آرشیو نتایج</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="بستن"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-warning border-0 small mb-3">
+            <strong>توجه بسیار مهم:</strong> با شروع مسابقه جدید، رتبه و امتیازهای تمام کاربران در مسابقه فعلی به‌صورت <strong>دائمی در جدول آرشیو PostgreSQL</strong> ذخیره می‌شوند. سپس امتیاز مسابقه جدید برای همه کاربران <strong>صفر</strong> خواهد شد.
+            <hr class="my-2">
+            <strong>نکته امنیتی:</strong> حساب‌های کاربری، شماره‌های موبایل و خریدهای پلن عضویت کاربران <strong>حفظ خواهند شد</strong> و نیازی به ورود مجدد ندارند.
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label text-secondary">عنوان مسابقه جدید (اختیاری):</label>
+            <input type="text" id="newCompTitleInput" class="form-control form-control-dark" placeholder="مثلاً: مسابقه شماره ۲ (جایزه پلی‌استیشن ۵ و سفر کیش)">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label text-warning fw-bold">جهت تایید قطعی، عبارت «شروع مسابقه جدید» را تایپ کنید:</label>
+            <input type="text" id="confirmationPhraseInput" class="form-control form-control-dark" placeholder="شروع مسابقه جدید" onkeyup="checkConfirmationPhrase()">
+          </div>
+        </div>
+        <div class="modal-footer border-secondary">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">انصراف</button>
+          <button type="button" id="confirmStartCompBtn" class="btn btn-danger fw-bold px-4" disabled onclick="submitStartNewCompetition()">
+            <span id="startCompSpinner" class="spinner-border spinner-border-sm d-none me-1" role="status"></span>
+            تایید و شروع مسابقه جدید
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: View Archived Leaderboard -->
+  <div class="modal fade modal-dark" id="viewArchiveModal" tabindex="-1" aria-labelledby="viewArchiveModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-header border-secondary">
+          <h5 class="modal-title gold-text" id="viewArchiveModalLabel"><i class="bi bi-award-fill text-warning me-2"></i> رتبه‌بندی نهایی مسابقه آرشیو شده</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="بستن"></button>
+        </div>
+        <div class="modal-body">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 id="archiveModalCompTitle" class="text-white mb-0">-</h6>
+            <span id="archiveModalCompStats" class="badge bg-secondary">-</span>
+          </div>
+          <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+            <table class="table table-dark table-hover table-striped rounded align-middle">
+              <thead>
+                <tr class="text-secondary">
+                  <th>رتبه نهایی</th>
+                  <th>نام و نام خانوادگی</th>
+                  <th>شماره موبایل</th>
+                  <th>امتیاز کسب‌شده</th>
+                </tr>
+              </thead>
+              <tbody id="archiveResultsTbody">
+                <tr><td colspan="4" class="text-center py-4 text-secondary">در حال دریافت نتایج...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer border-secondary">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">بستن</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     let cachedUsers = [];
+    let bootstrapStartModal = null;
+    let bootstrapArchiveModal = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const sModalEl = document.getElementById('startCompModal');
+      if (sModalEl) bootstrapStartModal = new bootstrap.Modal(sModalEl);
+
+      const aModalEl = document.getElementById('viewArchiveModal');
+      if (aModalEl) bootstrapArchiveModal = new bootstrap.Modal(aModalEl);
+    });
 
     function getAdminKey() {
       return localStorage.getItem('reqabat_admin_key') || "ReqabatAdmin2026";
@@ -173,6 +335,16 @@
 
     function hideAlert() {
       document.getElementById('alertBox').classList.add('d-none');
+    }
+
+    function checkConfirmationPhrase() {
+      const phrase = document.getElementById('confirmationPhraseInput').value.trim();
+      const btn = document.getElementById('confirmStartCompBtn');
+      if (phrase === 'شروع مسابقه جدید') {
+        btn.removeAttribute('disabled');
+      } else {
+        btn.setAttribute('disabled', 'true');
+      }
     }
 
     async function loadDashboard() {
@@ -207,10 +379,28 @@
         authBadge.className = 'badge bg-success';
         authBadge.innerText = 'متصل و معتبر';
 
+        // Stats
         document.getElementById('totalUsers').innerText = data.totalUsers + ' نفر';
         document.getElementById('totalScores').innerText = (data.totalScoresSum || 0) + ' امتیاز';
         document.getElementById('totalAds').innerText = data.totalAdSessions + ' رویداد';
 
+        // Active Competition
+        if (data.activeCompetition) {
+          document.getElementById('activeCompNumber').innerText = 'دوره ' + data.activeCompetition.competitionNumber;
+          document.getElementById('activeCompTitle').innerText = data.activeCompetition.title;
+          const startDate = new Date(data.activeCompetition.startedAt);
+          document.getElementById('activeCompStartedAt').innerText = startDate.toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        }
+
+        // Past Competitions
+        const pastComps = data.pastCompetitions || [];
+        document.getElementById('archivedCompsCount').innerText = pastComps.length + ' دوره';
+        renderArchivedCompetitions(pastComps);
+
+        // Logs
+        renderLogs(data.competitionLogs || []);
+
+        // Users & Sessions
         cachedUsers = data.users || [];
         renderUsers(cachedUsers);
         renderSessions(data.recentSessions || []);
@@ -224,17 +414,140 @@
       }
     }
 
+    function renderArchivedCompetitions(comps) {
+      const tbody = document.getElementById('archivedCompsTbody');
+      if (!comps || comps.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-secondary"><i class="bi bi-info-circle"></i> هنوز هیچ مسابقه‌ای به پایان نرسیده و آرشیو نشده است. مسابقه جاری نخستین دوره می‌باشد.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = comps.map(c => {
+        const endDate = c.endedAt ? new Date(c.endedAt).toLocaleDateString('fa-IR', { year: 'numeric', month: 'short', day: 'numeric' }) : '-';
+        return `
+          <tr>
+            <td><span class="badge bg-secondary">دوره ${c.competitionNumber}</span></td>
+            <td class="fw-bold">${c.title}</td>
+            <td>${c.totalParticipants} نفر</td>
+            <td><span class="badge badge-gold">${c.totalScore} امتیاز</span></td>
+            <td><small class="text-secondary">${endDate}</small></td>
+            <td>
+              <button class="btn btn-sm btn-outline-warning" onclick="viewArchivedLeaderboard('${c.id}')">
+                <i class="bi bi-eye-fill"></i> کارنامه نهایی
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function renderLogs(logs) {
+      const tbody = document.getElementById('logsTbody');
+      if (!logs || logs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-secondary"><i class="bi bi-info-circle"></i> لاگی ثبت نشده است.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = logs.map(l => {
+        const dt = new Date(l.createdAt).toLocaleDateString('fa-IR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        return `
+          <tr>
+            <td><small class="text-secondary">${dt}</small></td>
+            <td><span class="badge bg-info text-dark">${l.action}</span></td>
+            <td><small>${l.details || (l.prevTitle + ' -> ' + l.newTitle)}</small></td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    async function viewArchivedLeaderboard(compId) {
+      const resultsTbody = document.getElementById('archiveResultsTbody');
+      resultsTbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-secondary">در حال دریافت کارنامه نهایی از دیتابیس...</td></tr>';
+      if (bootstrapArchiveModal) bootstrapArchiveModal.show();
+
+      try {
+        const res = await fetch(`/api/competitions/${compId}/results`);
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('archiveModalCompTitle').innerText = data.competition.title;
+          document.getElementById('archiveModalCompStats').innerText = `شرکت‌کنندگان: ${data.competition.totalParticipants} نفر | مجموع امتیاز: ${data.competition.totalScore}`;
+          
+          if (!data.results || data.results.length === 0) {
+            resultsTbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-secondary">هیچ رتبه‌ای برای این مسابقه ذخیره نشده است.</td></tr>';
+          } else {
+            resultsTbody.innerHTML = data.results.map(r => `
+              <tr>
+                <td><span class="badge ${r.rank <= 3 ? 'bg-warning text-dark fw-bold' : 'bg-secondary'}">#${r.rank}</span></td>
+                <td class="fw-bold">${r.displayName}</td>
+                <td dir="ltr" class="text-secondary">${r.phoneNumber}</td>
+                <td><span class="badge badge-gold">${r.finalScore} امتیاز</span></td>
+              </tr>
+            `).join('');
+          }
+        } else {
+          resultsTbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger py-4">${data.error || 'خطا در دریافت'}</td></tr>`;
+        }
+      } catch (err) {
+        resultsTbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger py-4">خطای ارتباط: ${err.message}</td></tr>`;
+      }
+    }
+
+    async function submitStartNewCompetition() {
+      const phrase = document.getElementById('confirmationPhraseInput').value.trim();
+      if (phrase !== 'شروع مسابقه جدید') {
+        alert('لطفاً عبارت «شروع مسابقه جدید» را دقیقاً وارد کنید.');
+        return;
+      }
+
+      const newTitle = document.getElementById('newCompTitleInput').value.trim();
+      const key = getAdminKey();
+      const btn = document.getElementById('confirmStartCompBtn');
+      const spinner = document.getElementById('startCompSpinner');
+
+      btn.setAttribute('disabled', 'true');
+      spinner.classList.remove('d-none');
+
+      try {
+        const res = await fetch('/api/admin/competition/start-new', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-key': key
+          },
+          body: JSON.stringify({
+            confirmationPhrase: phrase,
+            newTitle: newTitle
+          })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          alert('عملیات با موفقیت انجام شد!\n' + data.message);
+          if (bootstrapStartModal) bootstrapStartModal.hide();
+          document.getElementById('confirmationPhraseInput').value = '';
+          document.getElementById('newCompTitleInput').value = '';
+          loadDashboard();
+        } else {
+          alert('خطا در شروع مسابقه جدید: ' + (data.error || 'عملیات ناموفق بود'));
+        }
+      } catch (err) {
+        alert('خطای ارتباط با سرور: ' + err.message);
+      } finally {
+        spinner.classList.add('d-none');
+        btn.removeAttribute('disabled');
+      }
+    }
+
     function renderUsers(users) {
       const tbody = document.getElementById('usersTbody');
       if (!users || users.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-secondary"><i class="bi bi-info-circle"></i> هیچ کاربر واقعی هنوز ثبت‌نام نکرده است. تمام داده‌های آزمایشی با موفقیت حذف شده‌اند.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-secondary"><i class="bi bi-info-circle"></i> هیچ کاربری در مسابقه فعلی ثبت نشده است.</td></tr>';
         return;
       }
 
       tbody.innerHTML = users.map((u, index) => `
         <tr>
           <td><span class="text-secondary">${index + 1}</span></td>
-          <td><code class="text-warning">${u.id}</code></td>
+          <td><code class="text-warning">${u.id.substring(0, 8)}...</code></td>
           <td class="fw-bold">${u.firstName || ''} ${u.lastName || ''}</td>
           <td dir="ltr" class="text-end">${u.phoneNumber || '-'}</td>
           <td><span class="badge badge-gold">${u.score || 0} امتیاز</span></td>
@@ -250,7 +563,7 @@
     function renderSessions(sessions) {
       const tbody = document.getElementById('sessionsTbody');
       if (!sessions || sessions.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-secondary"><i class="bi bi-info-circle"></i> هنوز هیچ تبلیغی تکمیل و ثبت نشده است.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-secondary"><i class="bi bi-info-circle"></i> هنوز هیچ تبلیغی در این دوره تکمیل و ثبت نشده است.</td></tr>';
         return;
       }
 
@@ -258,10 +571,10 @@
         <tr>
           <td><code class="text-info">${s.sessionId}</code></td>
           <td><span class="badge bg-warning text-dark">مربع ${s.squareNumber}</span></td>
-          <td><small class="text-secondary">${s.userId}</small></td>
+          <td><small class="text-secondary">${s.userId.substring(0, 8)}...</small></td>
           <td>${s.adDurationSeconds} ثانیه</td>
           <td><span class="badge bg-success"><i class="bi bi-check-circle"></i> تایید سرور</span></td>
-          <td><small class="text-secondary" title="${s.token || ''}">${(s.token || '').substring(0, 14)}...</small></td>
+          <td><small class="text-secondary" title="${s.token || ''}">${(s.token || '').substring(0, 10)}...</small></td>
         </tr>
       `).join('');
     }

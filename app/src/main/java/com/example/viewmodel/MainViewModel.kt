@@ -133,11 +133,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val squares = backendRepository.getSquares(user.id)
             val prizes = backendRepository.getPrizes()
 
+            // Fetch active competition info & sync user score
+            val compResult = backendRepository.getCurrentCompetition(user.id)
+            var activeComp: com.example.model.CompetitionInfo? = null
+            var updatedUser = user
+            if (compResult is Result.Success) {
+                val (comp, serverScore) = compResult.data
+                activeComp = comp
+                if (serverScore != user.totalScore) {
+                    updatedUser = user.copy(totalScore = serverScore)
+                    prefs.totalScore = serverScore
+                    database.userDao().updateScore(user.id, serverScore)
+                }
+            }
+
             _uiState.update {
                 it.copy(
                     dailyCycle = cycle,
                     squares = squares,
                     prizes = prizes,
+                    activeCompetition = activeComp ?: it.activeCompetition,
+                    currentUser = updatedUser,
                     isLoading = false
                 )
             }

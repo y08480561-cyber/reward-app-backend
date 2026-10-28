@@ -249,7 +249,58 @@ async function initDatabaseTables() {
       status TEXT NOT NULL DEFAULT 'SUCCESS',
       purchase_token TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );`
+    );`,
+
+    // 9. Competitions table (Management of sequential competition rounds)
+    `CREATE TABLE IF NOT EXISTS public.competitions (
+      id TEXT PRIMARY KEY,
+      competition_number INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'ACTIVE',
+      started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      ended_at TIMESTAMPTZ,
+      total_participants INTEGER NOT NULL DEFAULT 0,
+      total_score INTEGER NOT NULL DEFAULT 0,
+      created_by TEXT NOT NULL DEFAULT 'admin',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );`,
+    `CREATE INDEX IF NOT EXISTS idx_competitions_status ON public.competitions(status);`,
+    `CREATE INDEX IF NOT EXISTS idx_competitions_number ON public.competitions(competition_number);`,
+
+    // 10. Permanent Archive Table for Previous Competitions
+    `CREATE TABLE IF NOT EXISTS public.competition_archives (
+      id TEXT PRIMARY KEY,
+      competition_id TEXT NOT NULL REFERENCES public.competitions(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL,
+      final_score INTEGER NOT NULL DEFAULT 0,
+      final_rank INTEGER NOT NULL DEFAULT 0,
+      first_name TEXT DEFAULT '',
+      last_name TEXT DEFAULT '',
+      phone_number TEXT DEFAULT '',
+      archived_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );`,
+    `CREATE INDEX IF NOT EXISTS idx_comp_archives_lookup ON public.competition_archives(competition_id, final_rank);`,
+    `CREATE INDEX IF NOT EXISTS idx_comp_archives_user ON public.competition_archives(competition_id, user_id);`,
+
+    // 11. Competition Operation Audit Logs
+    `CREATE TABLE IF NOT EXISTS public.competition_logs (
+      log_id TEXT PRIMARY KEY,
+      action TEXT NOT NULL,
+      admin_key_used TEXT NOT NULL,
+      prev_competition_id TEXT,
+      new_competition_id TEXT,
+      prev_title TEXT,
+      new_title TEXT,
+      participants_count INTEGER DEFAULT 0,
+      total_score_archived INTEGER DEFAULT 0,
+      details TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );`,
+    `CREATE INDEX IF NOT EXISTS idx_comp_logs_created ON public.competition_logs(created_at DESC);`,
+
+    // 12. Ad Sessions competition reference
+    `ALTER TABLE public.ad_sessions ADD COLUMN IF NOT EXISTS competition_id TEXT;`,
+    `CREATE INDEX IF NOT EXISTS idx_ad_sessions_competition ON public.ad_sessions(competition_id);`
   ];
 
   for (const q of ddlQueries) {
@@ -259,6 +310,24 @@ async function initDatabaseTables() {
       console.warn('[PostgreSQL DDL Notice]', err.message);
     }
   }
+
+  // Ensure there is at least one ACTIVE competition seeded
+  try {
+    const compCheck = await pool.query(`SELECT id FROM public.competitions WHERE status = 'ACTIVE' LIMIT 1`);
+    if (compCheck.rows.length === 0) {
+      const defaultId = 'COMP_1';
+      await pool.query(
+        `INSERT INTO public.competitions (id, competition_number, title, status, started_at, created_by, created_at)
+         VALUES ($1, 1, 'مسابقه شماره ۱ (جایزه آیفون و پلی‌استیشن)', 'ACTIVE', NOW(), 'admin', NOW())
+         ON CONFLICT (id) DO NOTHING`,
+        [defaultId]
+      );
+      console.log('[PostgreSQL] Initial ACTIVE competition initialized (COMP_1).');
+    }
+  } catch (err) {
+    console.warn('[PostgreSQL Init Competition Warning]', err.message);
+  }
+
   console.log('[PostgreSQL] Database tables and schema verified/initialized.');
 }
 
@@ -996,12 +1065,16 @@ app.post('/api/ads/complete', ensureDatabaseReady, async (req, res) => {
       [squareKey, userId, cycle.cycleId, squareNumber, now]
     );
 
-    // Insert ad session record with unique token
+    // Get active competition id to tag ad session
+    const compRes = await client.query(`SELECT id FROM public.competitions WHERE status = 'ACTIVE' LIMIT 1`);
+    const activeCompId = compRes.rows.length > 0 ? compRes.rows[0].id : 'COMP_1';
+
+    // Insert ad session record with unique token and active competition id
     const sessionId = "ADS_" + crypto.randomBytes(6).toString('hex');
     await client.query(
-      `INSERT INTO public.ad_sessions (session_id, user_id, square_number, cycle_id, timestamp, ad_duration_seconds, status, token, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, 'COMPLETED', $7, NOW())`,
-      [sessionId, userId, squareNumber, cycle.cycleId, now, adDurationSeconds, rewardNonce || null]
+      `INSERT INTO public.ad_sessions (session_id, user_id, square_number, cycle_id, timestamp, ad_duration_seconds, status, token, competition_id, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, 'COMPLETED', $7, $8, NOW())`,
+      [sessionId, userId, squareNumber, cycle.cycleId, now, adDurationSeconds, rewardNonce || null, activeCompId]
     );
 
     // Atomic increment in public.user_scores by awardedMultiplier
@@ -1123,10 +1196,69 @@ app.get('/api/admin/overview', requireAdminAuth, ensureDatabaseReady, async (req
 
     const totalScoresSum = users.reduce((sum, u) => sum + (u.score || 0), 0);
 
+    // Active Competition & Historical Competitions Overview
+    const activeCompRes = await pool.query(`SELECT * FROM public.competitions WHERE status = 'ACTIVE' LIMIT 1`);
+    const activeComp = activeCompRes.rows.length > 0 ? activeCompRes.rows[0] : null;
+
+    const pastCompsRes = await pool.query(`
+      SELECT id, competition_number, title, status, started_at, ended_at, total_participants, total_score 
+      FROM public.competitions 
+      WHERE status = 'ARCHIVED' 
+      ORDER BY competition_number DESC 
+      LIMIT 10
+    `);
+
+    const compLogsRes = await pool.query(`
+      SELECT log_id, action, admin_key_used, prev_title, new_title, participants_count, total_score_archived, details, created_at
+      FROM public.competition_logs
+      ORDER BY created_at DESC
+      LIMIT 10
+    `);
+
     return res.json({
       totalUsers: users.length,
       totalAdSessions,
       totalScoresSum,
+      activeCompetition: activeComp ? {
+        id: activeComp.id,
+        competitionNumber: Number(activeComp.competition_number),
+        title: activeComp.title,
+        status: activeComp.status,
+        startedAt: new Date(activeComp.started_at).getTime(),
+        endedAt: activeComp.ended_at ? new Date(activeComp.ended_at).getTime() : null,
+        totalParticipants: Number(activeComp.total_participants || 0),
+        totalScore: Number(activeComp.total_score || 0)
+      } : {
+        id: 'COMP_1',
+        competitionNumber: 1,
+        title: 'مسابقه شماره ۱ (جایزه آیفون و پلی‌استیشن)',
+        status: 'ACTIVE',
+        startedAt: Date.now(),
+        endedAt: null,
+        totalParticipants: 0,
+        totalScore: 0
+      },
+      pastCompetitions: pastCompsRes.rows.map(c => ({
+        id: c.id,
+        competitionNumber: Number(c.competition_number),
+        title: c.title,
+        status: c.status,
+        startedAt: new Date(c.started_at).getTime(),
+        endedAt: c.ended_at ? new Date(c.ended_at).getTime() : null,
+        totalParticipants: Number(c.total_participants || 0),
+        totalScore: Number(c.total_score || 0)
+      })),
+      competitionLogs: compLogsRes.rows.map(l => ({
+        logId: l.log_id,
+        action: l.action,
+        adminKeyUsed: l.admin_key_used,
+        prevTitle: l.prev_title,
+        newTitle: l.new_title,
+        participantsCount: Number(l.participants_count || 0),
+        totalScoreArchived: Number(l.total_score_archived || 0),
+        details: l.details,
+        createdAt: new Date(l.created_at).getTime()
+      })),
       settings: {
         tapsellAppKey: process.env.TAPSELL_APP_KEY || "sgedhqdbofphgpajkrqtahjkedbkokdlqiesotcmfqcklbamjaaiddqsqnihdtmobfidcb",
         tapsellZoneId: process.env.TAPSELL_ZONE_ID || "6ad231b89140ba2215e772db",
@@ -1218,6 +1350,341 @@ app.post('/api/admin/cycle/reset', requireAdminAuth, ensureDatabaseReady, async 
     return res.status(500).json({ error: "خطای سرور در بازنشانی چرخه." });
   }
 });
+
+// ====================================================================
+// 8. Competition Lifecycle & Management APIs
+// ====================================================================
+let isCompetitionResetting = false;
+
+// Helper: Get active competition or create default
+async function getActiveCompetition(clientOrPool = pool) {
+  let compRes = await clientOrPool.query(`SELECT * FROM public.competitions WHERE status = 'ACTIVE' LIMIT 1`);
+  if (compRes.rows.length === 0) {
+    const defaultId = 'COMP_1';
+    await clientOrPool.query(
+      `INSERT INTO public.competitions (id, competition_number, title, status, started_at, created_by, created_at)
+       VALUES ($1, 1, 'مسابقه شماره ۱ (جایزه آیفون و پلی‌استیشن)', 'ACTIVE', NOW(), 'admin', NOW())
+       ON CONFLICT (id) DO NOTHING`,
+      [defaultId]
+    );
+    compRes = await clientOrPool.query(`SELECT * FROM public.competitions WHERE status = 'ACTIVE' LIMIT 1`);
+  }
+  return compRes.rows[0];
+}
+
+// 8.1 Current Active Competition & User Score
+app.get('/api/competition/current', ensureDatabaseReady, async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'] || req.query.userId;
+    const active = await getActiveCompetition();
+
+    let userScore = 0;
+    if (userId) {
+      const scoreRes = await pool.query(
+        `SELECT COALESCE(s.total_score, u.total_score, 0) AS score
+         FROM public.users u
+         LEFT JOIN public.user_scores s ON u.id = s.user_id
+         WHERE u.id = $1 LIMIT 1`,
+        [userId]
+      );
+      if (scoreRes.rows.length > 0) {
+        userScore = Number(scoreRes.rows[0].score);
+      }
+    }
+
+    return res.json({
+      success: true,
+      competition: {
+        id: active.id,
+        competitionNumber: Number(active.competition_number),
+        title: active.title,
+        status: active.status,
+        startedAt: new Date(active.started_at).getTime(),
+        endedAt: active.ended_at ? new Date(active.ended_at).getTime() : null,
+        totalParticipants: Number(active.total_participants || 0),
+        totalScore: Number(active.total_score || 0)
+      },
+      userScore
+    });
+  } catch (err) {
+    console.error('[API Current Competition Error]', err);
+    return res.status(500).json({ error: "خطا در دریافت وضعیت مسابقه جاری." });
+  }
+});
+
+// 8.2 Historical Competitions List
+app.get('/api/competitions/history', ensureDatabaseReady, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT id, competition_number, title, status, started_at, ended_at, total_participants, total_score, created_at
+      FROM public.competitions
+      ORDER BY competition_number DESC
+    `);
+    const competitions = result.rows.map(r => ({
+      id: r.id,
+      competitionNumber: Number(r.competition_number),
+      title: r.title,
+      status: r.status,
+      startedAt: new Date(r.started_at).getTime(),
+      endedAt: r.ended_at ? new Date(r.ended_at).getTime() : null,
+      totalParticipants: Number(r.total_participants || 0),
+      totalScore: Number(r.total_score || 0)
+    }));
+    return res.json({ success: true, competitions });
+  } catch (err) {
+    console.error('[API Competition History Error]', err);
+    return res.status(500).json({ error: "خطا در دریافت تاریخچه مسابقات." });
+  }
+});
+
+// 8.3 Historical Competition Leaderboard Results
+app.get('/api/competitions/:id/results', ensureDatabaseReady, async (req, res) => {
+  try {
+    const compId = req.params.id;
+    const compRes = await pool.query(`SELECT * FROM public.competitions WHERE id = $1 LIMIT 1`, [compId]);
+    if (compRes.rows.length === 0) {
+      return res.status(404).json({ error: "مسابقه مورد نظر یافت نشد." });
+    }
+    const comp = compRes.rows[0];
+
+    const archRes = await pool.query(`
+      SELECT id, user_id, final_score, final_rank, first_name, last_name, phone_number, archived_at
+      FROM public.competition_archives
+      WHERE competition_id = $1
+      ORDER BY final_rank ASC, final_score DESC
+      LIMIT 200
+    `, [compId]);
+
+    const results = archRes.rows.map(r => {
+      const fName = r.first_name || 'کاربر';
+      const lName = r.last_name || '';
+      const maskedName = lName.length > 2 ? `${fName} ${lName.substring(0, 2)}***` : `${fName} ***`;
+      const maskedPhone = r.phone_number && r.phone_number.length >= 11
+        ? `${r.phone_number.substring(0, 4)}***${r.phone_number.substring(7)}`
+        : '***';
+
+      return {
+        rank: Number(r.final_rank),
+        userId: r.user_id,
+        displayName: maskedName.trim(),
+        phoneNumber: maskedPhone,
+        finalScore: Number(r.final_score),
+        archivedAt: new Date(r.archived_at).getTime()
+      };
+    });
+
+    return res.json({
+      success: true,
+      competition: {
+        id: comp.id,
+        competitionNumber: Number(comp.competition_number),
+        title: comp.title,
+        status: comp.status,
+        startedAt: new Date(comp.started_at).getTime(),
+        endedAt: comp.ended_at ? new Date(comp.ended_at).getTime() : null,
+        totalParticipants: Number(comp.total_participants || 0),
+        totalScore: Number(comp.total_score || 0)
+      },
+      results
+    });
+  } catch (err) {
+    console.error('[API Competition Results Error]', err);
+    return res.status(500).json({ error: "خطا در دریافت نتایج آرشیو مسابقه." });
+  }
+});
+
+// 8.4 Competition Audit Logs (Admin Protected)
+app.get('/api/admin/competition/logs', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
+  try {
+    const logsRes = await pool.query(`
+      SELECT log_id, action, admin_key_used, prev_competition_id, new_competition_id, prev_title, new_title, participants_count, total_score_archived, details, created_at
+      FROM public.competition_logs
+      ORDER BY created_at DESC
+      LIMIT 50
+    `);
+    return res.json({
+      success: true,
+      logs: logsRes.rows.map(l => ({
+        logId: l.log_id,
+        action: l.action,
+        adminKeyUsed: l.admin_key_used,
+        prevCompetitionId: l.prev_competition_id,
+        newCompetitionId: l.new_competition_id,
+        prevTitle: l.prev_title,
+        newTitle: l.new_title,
+        participantsCount: Number(l.participants_count || 0),
+        totalScoreArchived: Number(l.total_score_archived || 0),
+        details: l.details,
+        createdAt: new Date(l.created_at).getTime()
+      }))
+    });
+  } catch (err) {
+    console.error('[API Competition Logs Error]', err);
+    return res.status(500).json({ error: "خطا در دریافت لاگ‌های عملیاتی مسابقات." });
+  }
+});
+
+// 8.5 Start New Competition (Atomic, Archiving, Zeroing with Confirmation Phrase)
+app.post('/api/admin/competition/start-new', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
+  const { confirmationPhrase, newTitle } = req.body || {};
+
+  // Exact confirmation phrase validation
+  if (!confirmationPhrase || confirmationPhrase.trim() !== 'شروع مسابقه جدید') {
+    return res.status(400).json({
+      success: false,
+      error: "عبارت تایید نادرست است. جهت آغاز مسابقه جدید و آرشیو نتایج قبلی، لطفاً عبارت «شروع مسابقه جدید» را دقیقاً وارد نمایید."
+    });
+  }
+
+  // Mutex lock to debounce/prevent race conditions
+  if (isCompetitionResetting) {
+    return res.status(429).json({
+      success: false,
+      error: "عملیات شروع مسابقه جدید توسط مدیر در حال انجام است. لطفاً چند لحظه شکیبا باشید."
+    });
+  }
+
+  isCompetitionResetting = true;
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // 1. Get currently active competition with row lock
+    const activeCompRes = await client.query(`SELECT * FROM public.competitions WHERE status = 'ACTIVE' FOR UPDATE`);
+    const activeComp = activeCompRes.rows[0];
+    let prevNumber = 1;
+    let prevId = 'COMP_1';
+    let prevTitle = 'مسابقه شماره ۱ (جایزه آیفون و پلی‌استیشن)';
+
+    if (activeComp) {
+      prevNumber = Number(activeComp.competition_number);
+      prevId = activeComp.id;
+      prevTitle = activeComp.title;
+    }
+
+    // 2. Query all users and their scores for snapshot
+    const usersRes = await client.query(`
+      SELECT 
+        u.id AS user_id,
+        u.first_name,
+        u.last_name,
+        u.phone_number,
+        COALESCE(s.total_score, u.total_score, 0) AS total_score,
+        u.created_at
+      FROM public.users u
+      LEFT JOIN public.user_scores s ON u.id = s.user_id
+      ORDER BY total_score DESC, u.created_at ASC, u.id ASC
+    `);
+
+    let totalScoreArchived = 0;
+    let participantsCount = 0;
+
+    for (let i = 0; i < usersRes.rows.length; i++) {
+      const u = usersRes.rows[i];
+      const finalScore = Number(u.total_score);
+      const rank = i + 1;
+      if (finalScore > 0) participantsCount++;
+      totalScoreArchived += finalScore;
+
+      const archId = `ARCH_${prevId}_${u.user_id}`;
+      await client.query(`
+        INSERT INTO public.competition_archives 
+          (id, competition_id, user_id, final_score, final_rank, first_name, last_name, phone_number, archived_at)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+        ON CONFLICT (id) DO UPDATE SET 
+          final_score = $4, final_rank = $5, first_name = $6, last_name = $7, phone_number = $8, archived_at = NOW()
+      `, [archId, prevId, u.user_id, finalScore, rank, u.first_name || '', u.last_name || '', u.phone_number || '']);
+    }
+
+    // 3. Mark previous active competition as ARCHIVED
+    if (activeComp) {
+      await client.query(`
+        UPDATE public.competitions 
+        SET status = 'ARCHIVED', ended_at = NOW(), total_participants = $1, total_score = $2
+        WHERE id = $3
+      `, [participantsCount, totalScoreArchived, prevId]);
+    } else {
+      await client.query(`
+        INSERT INTO public.competitions (id, competition_number, title, status, started_at, ended_at, total_participants, total_score, created_by, created_at)
+        VALUES ($1, $2, $3, 'ARCHIVED', NOW(), NOW(), $4, $5, 'admin', NOW())
+        ON CONFLICT (id) DO NOTHING
+      `, [prevId, prevNumber, prevTitle, participantsCount, totalScoreArchived]);
+    }
+
+    // 4. Create new ACTIVE competition
+    const nextNumber = prevNumber + 1;
+    const newCompId = `COMP_${nextNumber}_${Date.now()}`;
+    const competitionTitle = (newTitle && newTitle.trim()) ? newTitle.trim() : `مسابقه شماره ${nextNumber}`;
+
+    await client.query(`
+      INSERT INTO public.competitions (id, competition_number, title, status, started_at, created_by, created_at)
+      VALUES ($1, $2, $3, 'ACTIVE', NOW(), 'admin', NOW())
+    `, [newCompId, nextNumber, competitionTitle]);
+
+    // 5. Reset all user scores to 0
+    await client.query(`UPDATE public.user_scores SET total_score = 0, updated_at = NOW()`);
+    if (schemaInfo.userHasTotalScore) {
+      await client.query(`UPDATE public.users SET total_score = 0, updated_at = NOW()`);
+    }
+
+    // 6. Delete all square states so all 50 squares reset to READY
+    await client.query(`DELETE FROM public.square_states`);
+
+    // 7. Insert audit log
+    const logId = `CLOG_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+    const rawAdminKey = req.headers['x-admin-key'] || req.query.adminKey || 'ADMIN';
+    const maskedKey = rawAdminKey.length > 4 ? rawAdminKey.substring(0, 4) + '***' : '***';
+
+    await client.query(`
+      INSERT INTO public.competition_logs 
+        (log_id, action, admin_key_used, prev_competition_id, new_competition_id, prev_title, new_title, participants_count, total_score_archived, details, created_at)
+      VALUES ($1, 'START_NEW_COMPETITION', $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+    `, [
+      logId,
+      maskedKey,
+      prevId,
+      newCompId,
+      prevTitle,
+      competitionTitle,
+      participantsCount,
+      totalScoreArchived,
+      `پایان مسابقه شماره ${prevNumber} با ${participantsCount} شرکت‌کننده و آرشیو ${totalScoreArchived} امتیاز. شروع مسابقه جدید «${competitionTitle}».`
+    ]);
+
+    await client.query('COMMIT');
+
+    console.log(`[Admin Competition] Successfully started competition ${nextNumber} ("${competitionTitle}"). Previous competition (${prevTitle}) archived with ${participantsCount} participants and ${totalScoreArchived} points.`);
+
+    return res.json({
+      success: true,
+      message: `مسابقه قبلی (${prevTitle}) با موفقیت به پایان رسید و نتایج آن در آرشیو دائمی ثبت شد. مسابقه جدید «${competitionTitle}» با امتیاز صفر برای تمام کاربران آغاز گردید.`,
+      archivedCompetition: {
+        id: prevId,
+        competitionNumber: prevNumber,
+        title: prevTitle,
+        totalParticipants: participantsCount,
+        totalScoreArchived
+      },
+      newCompetition: {
+        id: newCompId,
+        competitionNumber: nextNumber,
+        title: competitionTitle,
+        status: 'ACTIVE',
+        startedAt: Date.now()
+      }
+    });
+
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[Start New Competition Transaction Error]', err);
+    return res.status(500).json({ success: false, error: "خطا در پردازش اتمیک پایان مسابقه و آغاز مسابقه جدید در پایگاه داده." });
+  } finally {
+    isCompetitionResetting = false;
+    client.release();
+  }
+});
+
 
 // Global Error Handler
 app.use((err, req, res, next) => {

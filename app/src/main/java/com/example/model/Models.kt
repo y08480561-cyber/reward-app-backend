@@ -111,3 +111,18 @@ data class AdSession(
     val status: String,
     val rewardNonce: String
 )
+
+/**
+ * Information regarding the active or past competition round
+ */
+data class CompetitionInfo(
+    val id: String,
+    val competitionNumber: Int,
+    val title: String,
+    val status: String,
+    val startedAtMs: Long,
+    val endedAtMs: Long? = null,
+    val totalParticipants: Int = 0,
+    val totalScore: Int = 0
+)
+

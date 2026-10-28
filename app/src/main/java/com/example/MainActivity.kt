@@ -101,6 +101,7 @@ class MainActivity : ComponentActivity() {
                                 uiState.currentUser?.let { user ->
                                     ProfileScreen(
                                         user = user,
+                                        activeCompetition = uiState.activeCompetition,
                                         onLogout = { viewModel.logout() },
                                         onNavigateToMembership = { viewModel.navigateTo(AppScreen.MEMBERSHIP) }
                                     )

@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -269,22 +270,35 @@ fun PanelCard(
     accentColor: Color,
     onAction: () -> Unit
 ) {
+    // Professional Gradient for high-end look
+    val cardGradient = Brush.verticalGradient(
+        colors = listOf(
+            Color.White,
+            if (isCurrent) accentColor.copy(alpha = 0.05f) else Color(0xFFF8FAFC)
+        )
+    )
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(4.dp, RoundedCornerShape(18.dp))
+            .shadow(
+                elevation = if (isCurrent) 12.dp else 6.dp,
+                shape = RoundedCornerShape(28.dp),
+                spotColor = accentColor
+            )
             .border(
-                width = if (isCurrent) 2.5.dp else 1.dp,
+                width = if (isCurrent) 3.5.dp else 1.5.dp,
                 color = if (isCurrent) accentColor else Color(0xFFE2E8F0),
-                shape = RoundedCornerShape(18.dp)
+                shape = RoundedCornerShape(28.dp)
             ),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(28.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(18.dp)
+                .background(cardGradient)
+                .padding(28.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -293,65 +307,79 @@ fun PanelCard(
             ) {
                 Text(
                     text = title,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.ExtraBold,
                     color = NavyPrimary
                 )
                 Surface(
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(14.dp),
                     color = accentColor.copy(alpha = 0.15f)
                 ) {
                     Text(
                         text = priceStr,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
                         color = accentColor,
                         fontWeight = FontWeight.ExtraBold,
-                        fontSize = 12.sp
+                        fontSize = 14.sp
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(imageVector = Icons.Default.Star, contentDescription = null, tint = accentColor, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(4.dp))
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(accentColor.copy(alpha = 0.25f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = null,
+                        tint = accentColor,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(10.dp))
                 Text(
                     text = multiplierStr,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = accentColor
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = NavyPrimary
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             Text(
                 text = description,
-                fontSize = 12.sp,
+                fontSize = 14.sp,
                 color = TextSecondary,
-                lineHeight = 18.sp
+                lineHeight = 22.sp
             )
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             Button(
                 onClick = onAction,
                 enabled = buttonEnabled,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(44.dp),
-                shape = RoundedCornerShape(12.dp),
+                    .height(56.dp)
+                    .shadow(if (buttonEnabled) 4.dp else 0.dp, RoundedCornerShape(18.dp)),
+                shape = RoundedCornerShape(18.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (isCurrent) NavySecondary else accentColor,
-                    disabledContainerColor = Color(0xFFE2E8F0),
+                    disabledContainerColor = Color(0xFFF1F5F9),
                     disabledContentColor = Color(0xFF94A3B8)
                 )
             ) {
                 Text(
                     text = buttonText,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 15.sp,
                     color = if (buttonEnabled) Color.White else Color(0xFF64748B)
                 )
             }

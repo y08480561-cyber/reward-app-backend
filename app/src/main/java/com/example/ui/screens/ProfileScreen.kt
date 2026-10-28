@@ -66,6 +66,7 @@ import com.example.viewmodel.AppScreen
 @Composable
 fun ProfileScreen(
     user: User,
+    activeCompetition: com.example.model.CompetitionInfo? = null,
     onLogout: () -> Unit,
     onNavigateToMembership: () -> Unit
 ) {
@@ -125,15 +126,20 @@ fun ProfileScreen(
                     if (user.panelType != "free") {
                         Spacer(modifier = Modifier.width(8.dp))
                         Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = if (user.panelType == "gold") GoldAccent else Color(0xFFE2E8F0)
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (user.panelType == "gold") GoldAccent else Color(0xFFE2E8F0),
+                            modifier = Modifier.border(
+                                width = 1.dp,
+                                color = if (user.panelType == "gold") Color.White else Color(0xFFCBD5E1),
+                                shape = RoundedCornerShape(12.dp)
+                            )
                         ) {
                             Text(
                                 text = if (user.panelType == "gold") "👑 طلایی" else "🥈 نقره‌ای",
                                 color = if (user.panelType == "gold") NavyPrimary else Color(0xFF475569),
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                             )
                         }
                     }
@@ -221,17 +227,19 @@ fun ProfileScreen(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
 
+                activeCompetition?.let { comp ->
+                    ProfileStatRow(
+                        label = "مسابقه فعال",
+                        value = "دوره ${comp.competitionNumber} (${comp.title})"
+                    )
+                }
                 ProfileStatRow(
-                    label = "مجموع امتیازهای کسب‌شده",
+                    label = "مجموع امتیازهای دوره جاری",
                     value = "${user.totalScore.toPersianDigits()} امتیاز"
                 )
                 ProfileStatRow(
                     label = "وضعیت حساب",
                     value = "فعال و تایید شده"
-                )
-                ProfileStatRow(
-                    label = "شبکه تبلیغاتی متصل",
-                    value = "تپسل پلاس (رسمی)"
                 )
             }
         }

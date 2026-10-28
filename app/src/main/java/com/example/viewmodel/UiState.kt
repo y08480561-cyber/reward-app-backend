@@ -54,5 +54,7 @@ data class MainUiState(
     // Membership panels
     val panels: List<org.json.JSONObject> = emptyList(),
     val userMembership: org.json.JSONObject? = null,
-    val isMembershipLoading: Boolean = false
+    val isMembershipLoading: Boolean = false,
+    // Active Competition
+    val activeCompetition: com.example.model.CompetitionInfo? = null
 )
