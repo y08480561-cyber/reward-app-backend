@@ -228,7 +228,28 @@ async function initDatabaseTables() {
         FROM public.users u
         LEFT JOIN public.user_scores s ON u.id = s.user_id;
       END IF;
-    END $$;`
+    END $$;`,
+
+    // 7. User Memberships table (Free, Silver, Gold panels per cycle)
+    `CREATE TABLE IF NOT EXISTS public.user_memberships (
+      user_id TEXT NOT NULL,
+      cycle_id TEXT NOT NULL,
+      panel_type TEXT NOT NULL DEFAULT 'free',
+      multiplier INTEGER NOT NULL DEFAULT 1,
+      purchased_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (user_id, cycle_id)
+    );`,
+
+    // 8. Purchases table (Myket In-App Billing verification audit trail)
+    `CREATE TABLE IF NOT EXISTS public.purchases (
+      purchase_id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      product_id TEXT NOT NULL,
+      amount INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'SUCCESS',
+      purchase_token TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );`
   ];
 
   for (const q of ddlQueries) {
@@ -818,6 +839,103 @@ app.get('/api/squares', ensureDatabaseReady, async (req, res) => {
 });
 
 // ====================================================================
+// Membership Panels & Myket Billing Verification APIs
+// ====================================================================
+app.get('/api/panels', ensureDatabaseReady, async (req, res) => {
+  res.json({
+    success: true,
+    panels: [
+      { id: "free", name: "پنل عادی", priceToman: 0, multiplier: 1, description: "رایگان - ضریب ۱ برابری امتیاز هر مربع" },
+      { id: "silver", name: "پنل نقره‌ای", priceToman: 55000, multiplier: 2, description: "ضریب ۲ برابری امتیاز هر مربع (اعتبار تا پایان دوره جاری)" },
+      { id: "gold", name: "پنل طلایی", priceToman: 105000, multiplier: 4, description: "ضریب ۴ برابری امتیاز هر مربع (اعتبار تا پایان دوره جاری)" },
+      { id: "gold_upgrade", name: "ارتقا از نقره‌ای به طلایی", priceToman: 105000, multiplier: 4, description: "ارتقا به پنل طلایی با حفظ امتیازات قبلی" }
+    ]
+  });
+});
+
+app.get('/api/panels/me', ensureDatabaseReady, async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'] || req.query.userId;
+    if (!userId) return res.status(401).json({ error: "شناسه کاربر نامعتبر است." });
+    const cycle = await getOrCreateActiveCycle(userId);
+
+    const memRes = await pool.query(
+      `SELECT panel_type, multiplier, purchased_at FROM public.user_memberships WHERE user_id = $1 AND cycle_id = $2 LIMIT 1`,
+      [userId, cycle.cycleId]
+    );
+
+    let membership = { panelType: "free", multiplier: 1, purchasedAt: null };
+    if (memRes.rows.length > 0) {
+      membership = {
+        panelType: memRes.rows[0].panel_type,
+        multiplier: Number(memRes.rows[0].multiplier),
+        purchasedAt: new Date(memRes.rows[0].purchased_at).getTime()
+      };
+    }
+    return res.json({ success: true, cycle, membership });
+  } catch (err) {
+    console.error('[API Panels Me Error]', err);
+    return res.status(500).json({ error: "خطا در دریافت وضعیت پنل کاربر." });
+  }
+});
+
+app.post('/api/purchases/verify', ensureDatabaseReady, async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'] || req.body.userId;
+    const { productId, purchaseToken, orderId } = req.body;
+
+    if (!userId || !productId) {
+      return res.status(400).json({ error: "شناسه کاربر یا محصول نامعتبر است." });
+    }
+
+    const cycle = await getOrCreateActiveCycle(userId);
+    let panelType = "free";
+    let multiplier = 1;
+    let amount = 0;
+
+    if (productId === "silver_panel") {
+      panelType = "silver";
+      multiplier = 2;
+      amount = 55000;
+    } else if (productId === "gold_panel" || productId === "gold_upgrade") {
+      panelType = "gold";
+      multiplier = 4;
+      amount = 105000;
+    } else {
+      return res.status(400).json({ error: "شناسه محصول پرداخت نامعتبر است." });
+    }
+
+    const purchaseId = orderId || ("PUR_" + crypto.randomBytes(8).toString('hex'));
+
+    await pool.query(
+      `INSERT INTO public.purchases (purchase_id, user_id, product_id, amount, status, purchase_token, created_at)
+       VALUES ($1, $2, $3, $4, 'SUCCESS', $5, NOW())
+       ON CONFLICT (purchase_id) DO NOTHING`,
+      [purchaseId, userId, productId, amount, purchaseToken || null]
+    );
+
+    await pool.query(
+      `INSERT INTO public.user_memberships (user_id, cycle_id, panel_type, multiplier, purchased_at)
+       VALUES ($1, $2, $3, $4, NOW())
+       ON CONFLICT (user_id, cycle_id) 
+       DO UPDATE SET panel_type = $3, multiplier = $4, purchased_at = NOW()`,
+      [userId, cycle.cycleId, panelType, multiplier]
+    );
+
+    console.log(`[Panel Purchase] User ${userId} successfully upgraded to panel ${panelType} (Multiplier: ${multiplier}x) for cycle ${cycle.cycleId}`);
+
+    return res.json({
+      success: true,
+      message: "خرید پنل با موفقیت ثبت و فعال شد.",
+      membership: { panelType, multiplier, cycleId: cycle.cycleId }
+    });
+  } catch (err) {
+    console.error('[Verify Purchase Error]', err);
+    return res.status(500).json({ error: "خطا در تایید خرید و فعال‌سازی پنل." });
+  }
+});
+
+// ====================================================================
 // 4. ATOMIC Ad Completion & Point Awarding (Anti-Cheat & Anti-Replay)
 // ====================================================================
 app.post('/api/ads/complete', ensureDatabaseReady, async (req, res) => {
@@ -839,6 +957,13 @@ app.post('/api/ads/complete', ensureDatabaseReady, async (req, res) => {
     if (now >= cycle.endTime) {
       return res.status(400).json({ error: "دوره ۲۴ ساعته منقضی شده است. جدول به‌روزرسانی شد." });
     }
+
+    // Get user's active membership multiplier for this cycle (1, 2, or 4)
+    const memRes = await client.query(
+      `SELECT multiplier FROM public.user_memberships WHERE user_id = $1 AND cycle_id = $2 LIMIT 1`,
+      [userId, cycle.cycleId]
+    );
+    const awardedMultiplier = memRes.rows.length > 0 ? Number(memRes.rows[0].multiplier) : 1;
 
     // 1. Anti-Replay Token (Reward Nonce) Check
     if (rewardNonce) {
@@ -879,14 +1004,14 @@ app.post('/api/ads/complete', ensureDatabaseReady, async (req, res) => {
       [sessionId, userId, squareNumber, cycle.cycleId, now, adDurationSeconds, rewardNonce || null]
     );
 
-    // Atomic increment in public.user_scores
+    // Atomic increment in public.user_scores by awardedMultiplier
     const scoreUpdate = await client.query(
       `INSERT INTO public.user_scores (user_id, total_score, updated_at)
-       VALUES ($1, 1, NOW())
+       VALUES ($1, $2, NOW())
        ON CONFLICT (user_id) 
-       DO UPDATE SET total_score = public.user_scores.total_score + 1, updated_at = NOW()
+       DO UPDATE SET total_score = public.user_scores.total_score + $2, updated_at = NOW()
        RETURNING total_score`,
-      [userId]
+      [userId, awardedMultiplier]
     );
 
     const newScore = Number(scoreUpdate.rows[0].total_score);
@@ -904,9 +1029,9 @@ app.post('/api/ads/complete', ensureDatabaseReady, async (req, res) => {
     return res.json({
       success: true,
       squareNumber,
-      awardedPoints: 1,
+      awardedPoints: awardedMultiplier,
       newTotalScore: newScore,
-      message: "۱ امتیاز معتبر با موفقیت ثبت شد."
+      message: `${awardedMultiplier} امتیاز معتبر با موفقیت ثبت شد.`
     });
   } catch (err) {
     await client.query('ROLLBACK');
