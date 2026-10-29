@@ -1127,6 +1127,33 @@ class BackendRepository(
         }
     }
 
+    suspend fun updateNotificationPreference(userId: String, enabled: Boolean): Result<Boolean> = withContext(Dispatchers.IO) {
+        val url = "${prefs.serverUrl.trimEnd('/')}/api/user/settings/notifications"
+        val payload = JSONObject().apply {
+            put("enabled", enabled)
+        }
+        try {
+            val request = Request.Builder()
+                .url(url)
+                .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer ${prefs.authToken}")
+                .header("x-auth-token", prefs.authToken)
+                .header("x-user-id", userId)
+                .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    Result.Success(enabled)
+                } else {
+                    Result.Error("خطا در به‌روزرسانی تنظیمات اعلان از سرور")
+                }
+            }
+        } catch (e: Exception) {
+            Result.Error("خطای شبکه: ${e.message}")
+        }
+    }
+
     private fun sha256(input: String): String {
         val bytes = MessageDigest.getInstance("SHA-256").digest(input.toByteArray())
         return bytes.joinToString("") { "%02x".format(it) }
