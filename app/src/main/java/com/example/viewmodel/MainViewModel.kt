@@ -723,25 +723,5 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             it.copy(supportErrorMessage = null, supportSuccessMessage = null)
         }
     }
-
-    fun toggleNotificationPreference(enabled: Boolean) {
-        val user = _uiState.value.currentUser ?: return
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true) }
-            when (val result = backendRepository.updateNotificationPreference(user.id, enabled)) {
-                is Result.Success -> {
-                    _uiState.update {
-                        it.copy(
-                            currentUser = user.copy(notificationsEnabled = enabled),
-                            isLoading = false
-                        )
-                    }
-                }
-                is Result.Error -> {
-                    _uiState.update { it.copy(isLoading = false, errorMessage = result.message) }
-                }
-            }
-        }
-    }
 }
 

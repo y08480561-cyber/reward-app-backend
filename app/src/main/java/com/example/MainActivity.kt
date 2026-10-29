@@ -116,8 +116,7 @@ class MainActivity : ComponentActivity() {
                                         activeCompetition = uiState.activeCompetition,
                                         onLogout = { viewModel.logout() },
                                         onNavigateToMembership = { viewModel.navigateTo(AppScreen.MEMBERSHIP) },
-                                        onNavigateToSupport = { viewModel.navigateTo(AppScreen.SUPPORT) },
-                                        onToggleNotifications = { enabled -> viewModel.toggleNotificationPreference(enabled) }
+                                        onNavigateToSupport = { viewModel.navigateTo(AppScreen.SUPPORT) }
                                     )
                                 }
                             }
