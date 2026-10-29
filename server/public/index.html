@@ -161,6 +161,22 @@
       </div>
     </div>
 
+    <!-- 3. Push Notifications Section (NEW) -->
+    <div class="card p-4 mb-4 shadow" style="background-color: #1E293B; border: 1px solid #6366F1;">
+      <h4 class="text-white fw-bold"><i class="bi bi-send-fill text-indigo-400"></i> ارسال اعلان پوش (Push Notification)</h4>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <input type="text" id="pushTitle" class="form-control form-control-dark" placeholder="عنوان اعلان">
+        </div>
+        <div class="col-md-6">
+          <input type="text" id="pushMessage" class="form-control form-control-dark" placeholder="متن اعلان">
+        </div>
+        <div class="col-12">
+          <button class="btn btn-primary" onclick="sendPushNotification()">ارسال اعلان</button>
+        </div>
+      </div>
+    </div>
+
     <!-- 3. Stats Overview -->
     <div class="row g-3 mb-4">
       <div class="col-md-3">
@@ -1578,6 +1594,35 @@
           loadAdminSupportTickets();
         } else {
           alert('خطا: ' + (data.error || 'تغییر وضعیت ناموفق بود'));
+        }
+      } catch (err) {
+        alert('خطای ارتباط: ' + err.message);
+      }
+    }
+
+    async function sendPushNotification() {
+      const title = document.getElementById('pushTitle').value.trim();
+      const message = document.getElementById('pushMessage').value.trim();
+      if (!title || !message) {
+        alert('لطفاً عنوان و متن اعلان را وارد کنید.');
+        return;
+      }
+      
+      const key = getAdminKey();
+      try {
+        const res = await fetch('/api/admin/push-notification', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-key': key
+          },
+          body: JSON.stringify({ title, message, audience: 'ALL' })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('اعلان با موفقیت ارسال شد.');
+        } else {
+          alert('خطا در ارسال: ' + (data.error || 'خطای ناشناخته'));
         }
       } catch (err) {
         alert('خطای ارتباط: ' + err.message);

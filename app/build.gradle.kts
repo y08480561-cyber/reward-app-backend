@@ -127,6 +127,7 @@ dependencies {
   implementation("ir.tapsell.plus:tapsell-plus-sdk-android:2.3.3")
   implementation("com.google.android.gms:play-services-ads-identifier:18.2.0")
   implementation(libs.retrofit)
+  implementation(libs.onesignal)
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
   testImplementation(libs.androidx.junit)

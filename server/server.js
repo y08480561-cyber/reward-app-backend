@@ -2622,3 +2622,40 @@ app.listen(PORT, '0.0.0.0', async () => {
   console.log(`[Reqabat Va Jayezah Server] Running on http://0.0.0.0:${PORT}`);
   await testAndInitDatabase();
 });
+
+// Admin: Send Push Notification (OneSignal)
+app.post('/api/admin/push-notification', requireAdminAuth, async (req, res) => {
+  try {
+    const { title, message, audience } = req.body;
+    const appId = process.env.ONESIGNAL_APP_ID;
+    const apiKey = process.env.ONESIGNAL_REST_API_KEY;
+
+    if (!appId || !apiKey) {
+      return res.status(503).json({ error: "سرویس اعلان پوش روی سرور تنظیم نشده است." });
+    }
+
+    const response = await fetch('https://onesignal.com/api/v1/notifications', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${apiKey}`
+      },
+      body: JSON.stringify({
+        app_id: appId,
+        headings: { en: title },
+        contents: { en: message },
+        included_segments: audience === 'ALL' ? ['All'] : []
+      })
+    });
+
+    const data = await response.json();
+    if (response.ok) {
+      return res.json({ success: true, data });
+    } else {
+      return res.status(500).json({ success: false, error: data.errors });
+    }
+  } catch (err) {
+    console.error('[Push Notification Error]', err);
+    return res.status(500).json({ success: false, error: "خطا در ارسال اعلان." });
+  }
+});
