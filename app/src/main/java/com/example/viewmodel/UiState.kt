@@ -42,7 +42,7 @@ data class MainUiState(
     val currentScreen: AppScreen = AppScreen.AUTH,
     val currentUser: User? = null,
     val dailyCycle: DailyCycle? = null,
-    val squares: List<AdSquare> = (1..50).map { AdSquare(squareNumber = it, status = SquareStatus.READY) },
+    val squares: List<AdSquare> = (1..100).map { AdSquare(squareNumber = it, status = SquareStatus.READY) },
     val leaderboard: List<LeaderboardEntry> = emptyList(),
     val prizes: List<Prize> = emptyList(),
     val isLoading: Boolean = false,

@@ -5,7 +5,7 @@
     
     <!-- Navigation -->
     <string name="nav_home">خانه</string>
-    <string name="nav_squares">۵۰ مربع</string>
+    <string name="nav_squares">۱۰۰ مربع</string>
     <string name="nav_leaderboard">رتبه‌بندی</string>
     <string name="nav_prizes">جوایز</string>
     <string name="nav_profile">پروفایل</string>
@@ -55,7 +55,7 @@
     <string name="square_status_completed">تکمیل شده (۱ امتیاز)</string>
     <string name="square_status_failed">ناموفق (تلاش مجدد)</string>
     <string name="reward_awarded">۱ امتیاز با موفقیت ثبت شد!</string>
-    <string name="all_squares_completed">تبریک! تمام ۵۰ مربع این دوره تکمیل شد.</string>
+    <string name="all_squares_completed">تبریک! تمام ۱۰۰ مربع این دوره تکمیل شد.</string>
     <string name="cycle_countdown_prefix">زمان تا باز شدن مجدد مربع‌ها:</string>
-    <string name="daily_limit_info">حداکثر ۵۰ امتیاز در هر دوره ۲۴ ساعته</string>
+    <string name="daily_limit_info">حداکثر ۱۰۰ امتیاز در هر دوره ۲۴ ساعته</string>
 </resources>

@@ -177,7 +177,7 @@ fun AppBottomNavigation(
         modifier = Modifier.border(1.dp, Color(0xFFE2E8F0))
     ) {
         val items = listOf(
-            Triple(AppScreen.SQUARES, "۵۰ مربع", Icons.Default.GridView),
+            Triple(AppScreen.SQUARES, "۱۰۰ مربع", Icons.Default.GridView),
             Triple(AppScreen.LEADERBOARD, "رتبه‌بندی", Icons.Default.EmojiEvents),
             Triple(AppScreen.PRIZES, "جوایز", Icons.Default.CardGiftcard),
             Triple(AppScreen.PROFILE, "پروفایل", Icons.Default.Person)

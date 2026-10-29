@@ -139,7 +139,7 @@ fun AuthScreen(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "سامانه مسابقه ۵۰ مربع جایزه‌دار و ثبت زنده در سرور",
+                        text = "سامانه مسابقه ۱۰۰ مربع جایزه‌دار و ثبت زنده در سرور",
                         fontFamily = VazirmatnFontFamily,
                         color = GoldAccent,
                         fontSize = 12.5.sp,

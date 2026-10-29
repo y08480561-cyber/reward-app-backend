@@ -70,10 +70,10 @@ fun SquaresScreen(
     val context = LocalContext.current
     val activity = context as? Activity
 
-    val displaySquares = if (squares.size >= 50) {
+    val displaySquares = if (squares.size >= 100) {
         squares
     } else {
-        (1..50).map { num ->
+        (1..100).map { num ->
             squares.find { it.squareNumber == num } ?: AdSquare(
                 squareNumber = num,
                 status = SquareStatus.READY
@@ -82,14 +82,14 @@ fun SquaresScreen(
     }
 
     val completedCount = displaySquares.count { it.status == SquareStatus.COMPLETED }
-    val remainingCount = 50 - completedCount
+    val remainingCount = 100 - completedCount
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFFF8FAFC))
     ) {
-        // Top Sticky Banner: 50 Squares Progress & Midnight Iran Countdown
+        // Top Sticky Banner: 100 Squares Progress & Midnight Iran Countdown
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
@@ -108,7 +108,7 @@ fun SquaresScreen(
                 ) {
                     Column {
                         Text(
-                            text = "۵۰ مربع جایزه‌دار",
+                            text = "۱۰۰ مربع جایزه‌دار",
                             fontSize = 17.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = NavyPrimary
@@ -160,7 +160,7 @@ fun SquaresScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                val progressFraction = (completedCount.toFloat() / 50f).coerceIn(0f, 1f)
+                val progressFraction = (completedCount.toFloat() / 100f).coerceIn(0f, 1f)
                 LinearProgressIndicator(
                     progress = { progressFraction },
                     modifier = Modifier
@@ -194,7 +194,7 @@ fun SquaresScreen(
             )
         }
 
-        // 50 Squares Professional Grid
+        // 100 Squares Professional Grid
         LazyVerticalGrid(
             columns = GridCells.Fixed(5),
             contentPadding = PaddingValues(12.dp),
@@ -203,7 +203,7 @@ fun SquaresScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .weight(1f)
-                .testTag("grid_50_squares")
+                .testTag("grid_100_squares")
         ) {
             items(displaySquares, key = { it.squareNumber }) { square ->
                 SquareCard(

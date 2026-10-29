@@ -182,12 +182,12 @@ async function initDatabaseTables() {
     );`,
     `CREATE INDEX IF NOT EXISTS idx_daily_cycles_user ON public.daily_cycles(user_id, start_time, end_time);`,
 
-    // 4. Square States table (50 squares per cycle per user)
+    // 4. Square States table (100 squares per cycle per user)
     `CREATE TABLE IF NOT EXISTS public.square_states (
       state_key TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
       cycle_id TEXT NOT NULL,
-      square_number INTEGER NOT NULL CHECK (square_number BETWEEN 1 AND 50),
+      square_number INTEGER NOT NULL CHECK (square_number BETWEEN 1 AND 100),
       status TEXT NOT NULL DEFAULT 'COMPLETED',
       completed_at BIGINT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -198,7 +198,7 @@ async function initDatabaseTables() {
     `CREATE TABLE IF NOT EXISTS public.ad_sessions (
       session_id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
-      square_number INTEGER NOT NULL CHECK (square_number BETWEEN 1 AND 50),
+      square_number INTEGER NOT NULL CHECK (square_number BETWEEN 1 AND 100),
       cycle_id TEXT NOT NULL,
       timestamp BIGINT NOT NULL,
       ad_duration_seconds INTEGER NOT NULL,
@@ -208,6 +208,19 @@ async function initDatabaseTables() {
     );`,
     `CREATE INDEX IF NOT EXISTS idx_ad_sessions_user ON public.ad_sessions(user_id);`,
     `CREATE INDEX IF NOT EXISTS idx_ad_sessions_token ON public.ad_sessions(token);`,
+
+    // Update existing table constraints safely to support 100 squares without data loss
+    `DO $$
+    BEGIN
+      ALTER TABLE public.square_states DROP CONSTRAINT IF EXISTS square_states_square_number_check;
+      ALTER TABLE public.square_states ADD CONSTRAINT square_states_square_number_check CHECK (square_number BETWEEN 1 AND 100);
+
+      ALTER TABLE public.ad_sessions DROP CONSTRAINT IF EXISTS ad_sessions_square_number_check;
+      ALTER TABLE public.ad_sessions ADD CONSTRAINT ad_sessions_square_number_check CHECK (square_number BETWEEN 1 AND 100);
+    EXCEPTION
+      WHEN OTHERS THEN
+        NULL;
+    END $$;`,
 
     // 6. Leaderboard View (if not already existing as a table or view)
     `DO $$
@@ -386,7 +399,7 @@ async function initDatabaseTables() {
       await pool.query(
         `INSERT INTO public.home_announcements 
           (id, title, content, type, is_active, competition_id, starts_at, created_by, created_at, updated_at)
-         VALUES ($1, 'آغاز مسابقه بزرگ دوره‌ای!', 'به مسابقه «رقابت کن، جایزه ببر» خوش آمدید! با تکمیل روزانه ۵۰ مربع تبلیغاتی تپسل امتیاز کسب کنید و شانس برنده شدن آیفون ۱۶ و کنسول پلی‌استیشن را افزایش دهید.', 'COMPETITION_START', true, 'COMP_1', NOW(), 'admin', NOW(), NOW())
+         VALUES ($1, 'آغاز مسابقه بزرگ دوره‌ای!', 'به مسابقه «رقابت کن، جایزه ببر» خوش آمدید! با تکمیل روزانه ۱۰۰ مربع تبلیغاتی تپسل امتیاز کسب کنید و شانس برنده شدن آیفون ۱۶ و کنسول پلی‌استیشن را افزایش دهید.', 'COMPETITION_START', true, 'COMP_1', NOW(), 'admin', NOW(), NOW())
          ON CONFLICT (id) DO NOTHING`,
         [defaultAnnId]
       );
@@ -1041,7 +1054,7 @@ app.get('/api/squares', ensureDatabaseReady, async (req, res) => {
     }
 
     const squares = [];
-    for (let i = 1; i <= 50; i++) {
+    for (let i = 1; i <= 100; i++) {
       const state = completedMap.get(i);
       squares.push({
         squareNumber: i,
@@ -1165,7 +1178,7 @@ app.post('/api/ads/complete', ensureDatabaseReady, async (req, res) => {
     const userId = req.headers['x-user-id'] || req.body.userId;
     const { squareNumber, rewardNonce, adDurationSeconds } = req.body;
 
-    if (!userId || !squareNumber || squareNumber < 1 || squareNumber > 50) {
+    if (!userId || !squareNumber || squareNumber < 1 || squareNumber > 100) {
       return res.status(400).json({ error: "شماره مربع یا کاربر نامعتبر است." });
     }
 
@@ -1811,7 +1824,7 @@ app.post('/api/admin/competition/start-new', requireAdminAuth, ensureDatabaseRea
       await client.query(`UPDATE public.users SET total_score = 0, updated_at = NOW()`);
     }
 
-    // 6. Delete all square states so all 50 squares reset to READY
+    // 6. Delete all square states so all 100 squares reset to READY
     await client.query(`DELETE FROM public.square_states`);
 
     // 7. Automatically publish linked Home Announcement for the new competition
@@ -1820,7 +1833,7 @@ app.post('/api/admin/competition/start-new', requireAdminAuth, ensureDatabaseRea
     const annTitle = (announcementTitle && announcementTitle.trim()) ? announcementTitle.trim() : `شروع ${competitionTitle}`;
     const annBody = (announcementContent && announcementContent.trim()) 
       ? announcementContent.trim() 
-      : `دوره جدید مسابقه («${competitionTitle}») آغاز شد! با مشاهده تبلیغات و تکمیل ۵۰ مربع روزانه امتیاز کسب کرده و برنده جوایز ارزنده شوید.`;
+      : `دوره جدید مسابقه («${competitionTitle}») آغاز شد! با مشاهده تبلیغات و تکمیل ۱۰۰ مربع روزانه امتیاز کسب کرده و برنده جوایز ارزنده شوید.`;
 
     await client.query(`
       INSERT INTO public.home_announcements 

@@ -64,7 +64,7 @@ data class DailyCycle(
     val startTimeMs: Long,
     val endTimeMs: Long,
     val completedSquaresCount: Int = 0,
-    val totalSquares: Int = 50
+    val totalSquares: Int = 100
 ) {
     val remainingMs: Long
         get() = (endTimeMs - System.currentTimeMillis()).coerceAtLeast(0L)

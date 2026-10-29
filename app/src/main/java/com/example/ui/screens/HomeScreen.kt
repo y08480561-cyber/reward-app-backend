@@ -199,7 +199,7 @@ fun HomeScreen(
                 )
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
-                    text = "ورود به جدول ۵۰ مربع جایزه‌دار",
+                    text = "ورود به جدول ۱۰۰ مربع جایزه‌دار",
                     color = NavyPrimary,
                     fontWeight = FontWeight.ExtraBold,
                     fontSize = 14.sp

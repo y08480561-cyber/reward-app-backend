@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS public.score_transactions (
     user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
     points INTEGER NOT NULL DEFAULT 1 CHECK (points > 0),
     reason TEXT NOT NULL DEFAULT 'ad_reward',
-    square_number INTEGER NOT NULL CHECK (square_number BETWEEN 1 AND 50),
+    square_number INTEGER NOT NULL CHECK (square_number BETWEEN 1 AND 100),
     nonce TEXT NOT NULL UNIQUE,
     status TEXT NOT NULL DEFAULT 'verified' CHECK (status IN ('verified', 'rejected')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -52,14 +52,14 @@ CREATE INDEX IF NOT EXISTS idx_score_tx_user ON public.score_transactions(user_i
 CREATE INDEX IF NOT EXISTS idx_score_tx_nonce ON public.score_transactions(nonce);
 
 -- --------------------------------------------------------------------
--- ۴. جدول قفل روزانه ۵۰ مربع (user_daily_squares)
+-- ۴. جدول قفل روزانه ۱۰۰ مربع (user_daily_squares)
 -- تضمین قطعی: هر مربع در هر روز تقویمی فقط یک بار قابل تکمیل است
 -- --------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS public.user_daily_squares (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
     cycle_date DATE NOT NULL DEFAULT CURRENT_DATE,
-    square_number INTEGER NOT NULL CHECK (square_number BETWEEN 1 AND 50),
+    square_number INTEGER NOT NULL CHECK (square_number BETWEEN 1 AND 100),
     completed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT uq_user_cycle_square UNIQUE (user_id, cycle_date, square_number)
 );
@@ -201,9 +201,9 @@ BEGIN
         RETURN jsonb_build_object('success', FALSE, 'message', 'خطای احراز هویت: ابتدا باید وارد حساب کاربری خود شوید.');
     END IF;
 
-    -- ۲. اعتبارسنجی شماره مربع (۱ تا ۵۰)
-    IF p_square_number < 1 OR p_square_number > 50 THEN
-        RETURN jsonb_build_object('success', FALSE, 'message', 'شماره مربع نامعتبر است (۱ تا ۵۰).');
+    -- ۲. اعتبارسنجی شماره مربع (۱ تا ۱۰۰)
+    IF p_square_number < 1 OR p_square_number > 100 THEN
+        RETURN jsonb_build_object('success', FALSE, 'message', 'شماره مربع نامعتبر است (۱ تا ۱۰۰).');
     END IF;
 
     -- ۳. اعتبارسنجی وضعیت کاربر

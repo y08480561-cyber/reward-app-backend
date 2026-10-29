@@ -398,8 +398,8 @@ class BackendRepository(
             )
             cycleDao.saveCycle(newCycle)
 
-            // Reset all 50 squares to READY state with new cycle ID
-            val freshSquares = (1..50).map { num ->
+            // Reset all 100 squares to READY state with new cycle ID
+            val freshSquares = (1..100).map { num ->
                 SquareEntity(
                     squareNumber = num,
                     status = SquareStatus.READY.name,
@@ -414,13 +414,13 @@ class BackendRepository(
                 startTimeMs = startTime,
                 endTimeMs = endTime,
                 completedSquaresCount = 0,
-                totalSquares = 50
+                totalSquares = 100
             )
         } else {
-            // Cycle is active: ensure all 50 squares are populated
+            // Cycle is active: ensure all 100 squares are populated
             val existingSquares = squareDao.getAllSquares()
-            if (existingSquares.size < 50) {
-                val filledSquares = (1..50).map { num ->
+            if (existingSquares.size < 100) {
+                val filledSquares = (1..100).map { num ->
                     existingSquares.find { it.squareNumber == num } ?: SquareEntity(
                         squareNumber = num,
                         status = SquareStatus.READY.name,
@@ -437,13 +437,13 @@ class BackendRepository(
                 startTimeMs = currentCycleEntity.startTimeMs,
                 endTimeMs = currentCycleEntity.endTimeMs,
                 completedSquaresCount = completedCount,
-                totalSquares = 50
+                totalSquares = 100
             )
         }
     }
 
     /**
-     * Get all 50 squares for current active cycle
+     * Get all 100 squares for current active cycle
      */
     suspend fun getSquares(userId: String): List<AdSquare> = withContext(Dispatchers.IO) {
         ensureActiveCycle(userId)
@@ -453,7 +453,7 @@ class BackendRepository(
 
     /**
      * ATOMIC POINT AWARD & ANTI-CHEAT VERIFICATION:
-     * - Validates square number (1..50)
+     * - Validates square number (1..100)
      * - Checks if 24h cycle is still active
      * - Verifies idempotency: square not already completed in this cycle
      * - Verifies reward nonce from Tapsell SDK
@@ -467,7 +467,7 @@ class BackendRepository(
         rewardNonce: String,
         adDurationSeconds: Int
     ): Result<Int> = withContext(Dispatchers.IO) {
-        if (squareNumber !in 1..50) {
+        if (squareNumber !in 1..100) {
             return@withContext Result.Error("شماره مربع نامعتبر است.")
         }
 
@@ -704,10 +704,10 @@ class BackendRepository(
                 id = "PRZ_4",
                 rankRequired = "قرعه‌کشی همگانی",
                 title = "۵۰ کارت هدیه ۵۰۰ هزار تومانی",
-                description = "قرعه‌کشی عادلانه بین تمام کاربرانی که حداقل یک دوره ۵۰ مربعی را کامل کرده باشند",
+                description = "قرعه‌کشی عادلانه بین تمام کاربرانی که حداقل یک دوره ۱۰۰ مربعی را کامل کرده باشند",
                 prizeValue = "۲۵,۰۰۰,۰۰۰ تومان مجموعاً",
                 drawDatePersian = "پانزدهم هر ماه",
-                minPointsToQualify = 50,
+                minPointsToQualify = 100,
                 iconName = "gift"
             )
         )
@@ -737,7 +737,7 @@ class BackendRepository(
             startTimeMs = startTime,
             endTimeMs = endTime,
             completedSquaresCount = 0,
-            totalSquares = 50
+            totalSquares = 100
         )
     }
 

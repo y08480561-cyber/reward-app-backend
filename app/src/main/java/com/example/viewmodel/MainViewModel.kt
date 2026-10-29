@@ -204,7 +204,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 it.copy(
                                     dailyCycle = newCycle,
                                     squares = newSquares,
-                                    infoMessage = "دوره ۲۴ ساعته جدید آغاز شد! تمام ۵۰ مربع باز شدند."
+                                    infoMessage = "دوره ۲۴ ساعته جدید آغاز شد! تمام ۱۰۰ مربع باز شدند."
                                 )
                             }
                         }

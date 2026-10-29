@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS public.user_scores (
 );
 CREATE INDEX IF NOT EXISTS idx_user_scores_total ON public.user_scores(total_score DESC);
 
--- ۳. جدول چرخه‌های ۲۴ ساعته ۵۰ مربع
+-- ۳. جدول چرخه‌های ۲۴ ساعته ۱۰۰ مربع
 CREATE TABLE IF NOT EXISTS public.daily_cycles (
     cycle_id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
@@ -33,12 +33,12 @@ CREATE TABLE IF NOT EXISTS public.daily_cycles (
 );
 CREATE INDEX IF NOT EXISTS idx_daily_cycles_user ON public.daily_cycles(user_id, start_time, end_time);
 
--- ۴. جدول قفل وضعیت ۵۰ مربع روزانه به ازای هر کاربر
+-- ۴. جدول قفل وضعیت ۱۰۰ مربع روزانه به ازای هر کاربر
 CREATE TABLE IF NOT EXISTS public.square_states (
     state_key TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
     cycle_id TEXT NOT NULL,
-    square_number INTEGER NOT NULL CHECK (square_number BETWEEN 1 AND 50),
+    square_number INTEGER NOT NULL CHECK (square_number BETWEEN 1 AND 100),
     status TEXT NOT NULL DEFAULT 'COMPLETED',
     completed_at BIGINT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -49,7 +49,7 @@ CREATE INDEX IF NOT EXISTS idx_square_states_lookup ON public.square_states(user
 CREATE TABLE IF NOT EXISTS public.ad_sessions (
     session_id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
-    square_number INTEGER NOT NULL CHECK (square_number BETWEEN 1 AND 50),
+    square_number INTEGER NOT NULL CHECK (square_number BETWEEN 1 AND 100),
     cycle_id TEXT NOT NULL,
     timestamp BIGINT NOT NULL,
     ad_duration_seconds INTEGER NOT NULL,
