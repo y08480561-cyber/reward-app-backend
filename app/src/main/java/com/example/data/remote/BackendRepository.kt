@@ -916,6 +916,217 @@ class BackendRepository(
         }
     }
 
+    /**
+     * Create a new support ticket via POST /api/support/tickets
+     */
+    suspend fun createSupportTicket(
+        subject: String,
+        category: String,
+        message: String
+    ): Result<com.example.model.SupportTicket> = withContext(Dispatchers.IO) {
+        val url = "${prefs.serverUrl.trimEnd('/')}/api/support/tickets"
+        val payload = JSONObject().apply {
+            put("subject", subject.trim())
+            put("category", category.trim())
+            put("message", message.trim())
+        }
+
+        try {
+            val request = Request.Builder()
+                .url(url)
+                .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer ${prefs.authToken}")
+                .header("x-auth-token", prefs.authToken)
+                .header("x-user-id", prefs.userId)
+                .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (response.isSuccessful) {
+                    val json = JSONObject(body)
+                    val tObj = json.optJSONObject("ticket")
+                        ?: return@withContext Result.Error("پاسخ نامعتبر از سرور")
+                    val ticket = com.example.model.SupportTicket(
+                        id = tObj.optString("id"),
+                        trackingCode = tObj.optString("trackingCode"),
+                        subject = tObj.optString("subject"),
+                        category = tObj.optString("category", "OTHER"),
+                        status = tObj.optString("status", "NEW"),
+                        createdAtMs = tObj.optLong("createdAt", System.currentTimeMillis()),
+                        updatedAtMs = tObj.optLong("updatedAt", System.currentTimeMillis()),
+                        lastMessageAtMs = tObj.optLong("updatedAt", System.currentTimeMillis()),
+                        lastMessage = tObj.optString("lastMessage", message),
+                        lastSenderType = tObj.optString("lastSenderType", "USER")
+                    )
+                    Result.Success(ticket)
+                } else {
+                    val err = try { JSONObject(body).optString("error") } catch (e: Exception) { null }
+                    Result.Error(err ?: "خطا در ثبت درخواست پشتیبانی (کد ${response.code})")
+                }
+            }
+        } catch (e: Exception) {
+            val classified = classifyNetworkException(e)
+            Result.Error("${classified.category.titlePersian}: ${classified.userFacingMessage}")
+        }
+    }
+
+    /**
+     * Fetch user's support tickets via GET /api/support/tickets
+     */
+    suspend fun getUserSupportTickets(): Result<List<com.example.model.SupportTicket>> = withContext(Dispatchers.IO) {
+        val url = "${prefs.serverUrl.trimEnd('/')}/api/support/tickets"
+
+        try {
+            val request = Request.Builder()
+                .url(url)
+                .header("Authorization", "Bearer ${prefs.authToken}")
+                .header("x-auth-token", prefs.authToken)
+                .header("x-user-id", prefs.userId)
+                .get()
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (response.isSuccessful) {
+                    val json = JSONObject(body)
+                    val arr = json.optJSONArray("tickets") ?: org.json.JSONArray()
+                    val list = mutableListOf<com.example.model.SupportTicket>()
+                    for (i in 0 until arr.length()) {
+                        val tObj = arr.getJSONObject(i)
+                        list.add(
+                            com.example.model.SupportTicket(
+                                id = tObj.optString("id"),
+                                trackingCode = tObj.optString("trackingCode"),
+                                subject = tObj.optString("subject"),
+                                category = tObj.optString("category", "OTHER"),
+                                status = tObj.optString("status", "NEW"),
+                                createdAtMs = tObj.optLong("createdAtMs", System.currentTimeMillis()),
+                                updatedAtMs = tObj.optLong("updatedAtMs", System.currentTimeMillis()),
+                                lastMessageAtMs = tObj.optLong("lastMessageAtMs", System.currentTimeMillis()),
+                                lastMessage = tObj.optString("lastMessage"),
+                                lastSenderType = tObj.optString("lastSenderType", "USER")
+                            )
+                        )
+                    }
+                    Result.Success(list)
+                } else {
+                    val err = try { JSONObject(body).optString("error") } catch (e: Exception) { null }
+                    Result.Error(err ?: "خطا در دریافت لیست تیکت‌ها (کد ${response.code})")
+                }
+            }
+        } catch (e: Exception) {
+            val classified = classifyNetworkException(e)
+            Result.Error("${classified.category.titlePersian}: ${classified.userFacingMessage}")
+        }
+    }
+
+    /**
+     * Get ticket details and conversation thread via GET /api/support/tickets/:id
+     */
+    suspend fun getTicketDetails(ticketId: String): Result<Pair<com.example.model.SupportTicket, List<com.example.model.SupportMessage>>> = withContext(Dispatchers.IO) {
+        val url = "${prefs.serverUrl.trimEnd('/')}/api/support/tickets/$ticketId"
+
+        try {
+            val request = Request.Builder()
+                .url(url)
+                .header("Authorization", "Bearer ${prefs.authToken}")
+                .header("x-auth-token", prefs.authToken)
+                .header("x-user-id", prefs.userId)
+                .get()
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (response.isSuccessful) {
+                    val json = JSONObject(body)
+                    val tObj = json.optJSONObject("ticket")
+                        ?: return@withContext Result.Error("اطلاعات تیکت در پاسخ سرور یافت نشد.")
+                    val ticket = com.example.model.SupportTicket(
+                        id = tObj.optString("id"),
+                        trackingCode = tObj.optString("trackingCode"),
+                        subject = tObj.optString("subject"),
+                        category = tObj.optString("category", "OTHER"),
+                        status = tObj.optString("status", "NEW"),
+                        createdAtMs = tObj.optLong("createdAtMs", System.currentTimeMillis()),
+                        updatedAtMs = tObj.optLong("updatedAtMs", System.currentTimeMillis()),
+                        lastMessageAtMs = tObj.optLong("lastMessageAtMs", System.currentTimeMillis())
+                    )
+
+                    val mArr = json.optJSONArray("messages") ?: org.json.JSONArray()
+                    val messages = mutableListOf<com.example.model.SupportMessage>()
+                    for (i in 0 until mArr.length()) {
+                        val mObj = mArr.getJSONObject(i)
+                        messages.add(
+                            com.example.model.SupportMessage(
+                                id = mObj.optString("id"),
+                                ticketId = mObj.optString("ticketId"),
+                                senderType = mObj.optString("senderType", "USER"),
+                                senderId = mObj.optString("senderId"),
+                                senderName = mObj.optString("senderName"),
+                                messageText = mObj.optString("messageText"),
+                                createdAtMs = mObj.optLong("createdAtMs", System.currentTimeMillis())
+                            )
+                        )
+                    }
+                    Result.Success(Pair(ticket, messages))
+                } else {
+                    val err = try { JSONObject(body).optString("error") } catch (e: Exception) { null }
+                    Result.Error(err ?: "خطا در دریافت پیام‌های تیکت (کد ${response.code})")
+                }
+            }
+        } catch (e: Exception) {
+            val classified = classifyNetworkException(e)
+            Result.Error("${classified.category.titlePersian}: ${classified.userFacingMessage}")
+        }
+    }
+
+    /**
+     * Send user message in an existing ticket via POST /api/support/tickets/:id/messages
+     */
+    suspend fun sendTicketMessage(ticketId: String, message: String): Result<com.example.model.SupportMessage> = withContext(Dispatchers.IO) {
+        val url = "${prefs.serverUrl.trimEnd('/')}/api/support/tickets/$ticketId/messages"
+        val payload = JSONObject().apply {
+            put("message", message.trim())
+        }
+
+        try {
+            val request = Request.Builder()
+                .url(url)
+                .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer ${prefs.authToken}")
+                .header("x-auth-token", prefs.authToken)
+                .header("x-user-id", prefs.userId)
+                .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (response.isSuccessful) {
+                    val json = JSONObject(body)
+                    val mObj = json.optJSONObject("message")
+                        ?: return@withContext Result.Error("پاسخ نامعتبر از سرور")
+                    val newMsg = com.example.model.SupportMessage(
+                        id = mObj.optString("id"),
+                        ticketId = mObj.optString("ticketId"),
+                        senderType = mObj.optString("senderType", "USER"),
+                        senderId = mObj.optString("senderId"),
+                        senderName = mObj.optString("senderName"),
+                        messageText = mObj.optString("messageText"),
+                        createdAtMs = mObj.optLong("createdAtMs", System.currentTimeMillis())
+                    )
+                    Result.Success(newMsg)
+                } else {
+                    val err = try { JSONObject(body).optString("error") } catch (e: Exception) { null }
+                    Result.Error(err ?: "خطا در ارسال پیام (کد ${response.code})")
+                }
+            }
+        } catch (e: Exception) {
+            val classified = classifyNetworkException(e)
+            Result.Error("${classified.category.titlePersian}: ${classified.userFacingMessage}")
+        }
+    }
+
     private fun sha256(input: String): String {
         val bytes = MessageDigest.getInstance("SHA-256").digest(input.toByteArray())
         return bytes.joinToString("") { "%02x".format(it) }

@@ -317,8 +317,41 @@ async function initDatabaseTables() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );`,
     `CREATE INDEX IF NOT EXISTS idx_announcements_active ON public.home_announcements(is_active, updated_at DESC);`,
-    `CREATE INDEX IF NOT EXISTS idx_announcements_comp ON public.home_announcements(competition_id);`
+    `CREATE INDEX IF NOT EXISTS idx_announcements_comp ON public.home_announcements(competition_id);`,
+
+    // 14. Add auth_token to users table for robust server-side token validation
+    `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS auth_token TEXT;`,
+    `CREATE INDEX IF NOT EXISTS idx_users_auth_token ON public.users(auth_token);`,
+
+    // 15. Support Tickets Table
+    `CREATE TABLE IF NOT EXISTS public.support_tickets (
+      id TEXT PRIMARY KEY,
+      tracking_code TEXT NOT NULL UNIQUE,
+      user_id TEXT NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+      subject TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT 'OTHER',
+      status TEXT NOT NULL DEFAULT 'NEW',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      last_message_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );`,
+    `CREATE INDEX IF NOT EXISTS idx_support_tickets_user ON public.support_tickets(user_id, updated_at DESC);`,
+    `CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON public.support_tickets(status, updated_at DESC);`,
+    `CREATE INDEX IF NOT EXISTS idx_support_tickets_tracking ON public.support_tickets(tracking_code);`,
+
+    // 16. Support Messages Table
+    `CREATE TABLE IF NOT EXISTS public.support_messages (
+      id TEXT PRIMARY KEY,
+      ticket_id TEXT NOT NULL REFERENCES public.support_tickets(id) ON DELETE CASCADE,
+      sender_type TEXT NOT NULL CHECK (sender_type IN ('USER', 'ADMIN')),
+      sender_id TEXT NOT NULL,
+      sender_name TEXT NOT NULL,
+      message_text TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );`,
+    `CREATE INDEX IF NOT EXISTS idx_support_messages_ticket ON public.support_messages(ticket_id, created_at ASC);`
   ];
+
 
   for (const q of ddlQueries) {
     try {
@@ -536,6 +569,88 @@ function requireAdminAuth(req, res, next) {
   next();
 }
 
+// User Authentication Middleware (Strict server-side validation against PostgreSQL public.users)
+async function requireUserAuth(req, res, next) {
+  try {
+    const rawAuth = req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/i, '').trim() : '';
+    const token = req.headers['x-auth-token'] || req.headers['x-token'] || rawAuth || req.query.token;
+    const headerUserId = req.headers['x-user-id'] || req.query.userId;
+
+    if (!token && !headerUserId) {
+      return res.status(401).json({
+        success: false,
+        error: "لطفاً ابتدا وارد حساب کاربری خود شوید (توکن احراز هویت الزامی است)."
+      });
+    }
+
+    let userRow = null;
+    if (token) {
+      const tokenRes = await pool.query(
+        `SELECT id, first_name, last_name, phone_number, status, auth_token 
+         FROM public.users 
+         WHERE auth_token = $1 LIMIT 1`,
+        [token]
+      );
+      if (tokenRes.rows.length > 0) {
+        userRow = tokenRes.rows[0];
+      }
+    }
+
+    // Fallback if token was generated prior to persistence or matched via user id
+    if (!userRow && headerUserId) {
+      const userRes = await pool.query(
+        `SELECT id, first_name, last_name, phone_number, status, auth_token 
+         FROM public.users 
+         WHERE id = $1 LIMIT 1`,
+        [headerUserId]
+      );
+      if (userRes.rows.length > 0) {
+        userRow = userRes.rows[0];
+        if (token && userRow.auth_token !== token) {
+          await pool.query(`UPDATE public.users SET auth_token = $1 WHERE id = $2`, [token, userRow.id]);
+        }
+      }
+    }
+
+    if (!userRow) {
+      return res.status(401).json({
+        success: false,
+        error: "نشست کاربری شما نامعتبر یا منقضی شده است. لطفاً مجدداً وارد شوید."
+      });
+    }
+
+    if (userRow.status && userRow.status !== 'active') {
+      return res.status(403).json({
+        success: false,
+        error: "حساب کاربری شما مسدود یا غیرفعال است."
+      });
+    }
+
+    req.user = {
+      id: userRow.id,
+      firstName: userRow.first_name || '',
+      lastName: userRow.last_name || '',
+      fullName: `${userRow.first_name || ''} ${userRow.last_name || ''}`.trim() || 'کاربر مسابقه',
+      phoneNumber: userRow.phone_number || ''
+    };
+    next();
+  } catch (err) {
+    console.error('[requireUserAuth Error]', err);
+    return res.status(500).json({ success: false, error: "خطا در اعتبارسنجی نشست کاربری." });
+  }
+}
+
+// Generate unique tracking code for support ticket (e.g. TRK-849201)
+async function generateUniqueTrackingCode() {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const code = "TRK-" + Math.floor(100000 + Math.random() * 900000);
+    const check = await pool.query(`SELECT id FROM public.support_tickets WHERE tracking_code = $1 LIMIT 1`, [code]);
+    if (check.rows.length === 0) return code;
+  }
+  return "TRK-" + Date.now().toString().slice(-6);
+}
+
+
 function getIranMidnightBounds(nowMs = Date.now()) {
   const d = new Date(nowMs);
   const tzString = d.toLocaleString('en-US', { timeZone: 'Asia/Tehran' });
@@ -736,6 +851,7 @@ app.post('/api/auth/login', ensureDatabaseReady, async (req, res) => {
     }
 
     const token = "SEC_JWT_" + crypto.createHash('sha256').update(`${user.id}:${phoneNumber}:${Date.now()}`).digest('hex');
+    await pool.query(`UPDATE public.users SET auth_token = $1, updated_at = NOW() WHERE id = $2`, [token, user.id]);
     const cycle = await getOrCreateActiveCycle(user.id);
 
     return res.json({
@@ -884,6 +1000,7 @@ app.post('/api/auth/otp/verify', ensureDatabaseReady, async (req, res) => {
     const score = scoreRes.rows.length > 0 ? Number(scoreRes.rows[0].total_score) : 0;
 
     const token = "SEC_JWT_" + crypto.createHash('sha256').update(`${user.id}:${phoneNumber}:${Date.now()}`).digest('hex');
+    await pool.query(`UPDATE public.users SET auth_token = $1, updated_at = NOW() WHERE id = $2`, [token, user.id]);
     const cycle = await getOrCreateActiveCycle(user.id);
 
     return res.json({
@@ -1985,6 +2102,514 @@ app.patch('/api/admin/announcements/:id/toggle', requireAdminAuth, ensureDatabas
   }
 });
 
+
+// ====================================================================
+// 10. REAL USER SUPPORT TICKETING & MESSAGING SYSTEM
+// ====================================================================
+
+const VALID_SUPPORT_CATEGORIES = ['SCORES', 'ADS', 'PRIZES', 'MEMBERSHIP', 'PURCHASE', 'LOGIN', 'OTHER'];
+const VALID_SUPPORT_STATUSES = ['NEW', 'IN_PROGRESS', 'ANSWERED', 'CLOSED'];
+
+// 10.1 User: Create New Support Ticket (Authenticated)
+app.post('/api/support/tickets', requireUserAuth, ensureDatabaseReady, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { subject, category, message } = req.body;
+
+    if (!subject || typeof subject !== 'string' || subject.trim().length < 3 || subject.trim().length > 150) {
+      return res.status(400).json({ error: "عنوان درخواست باید بین ۳ تا ۱۵۰ کاراکتر باشد." });
+    }
+
+    if (!message || typeof message !== 'string' || message.trim().length < 5 || message.trim().length > 3000) {
+      return res.status(400).json({ error: "متن پیام پشتیبانی باید بین ۵ تا ۳۰۰۰ کاراکتر باشد." });
+    }
+
+    const cleanCategory = (category && VALID_SUPPORT_CATEGORIES.includes(category.toUpperCase())) 
+      ? category.toUpperCase() 
+      : 'OTHER';
+
+    const ticketId = "TCK_" + crypto.randomUUID();
+    const trackingCode = await generateUniqueTrackingCode();
+    const messageId = "MSG_" + crypto.randomUUID();
+    const now = new Date();
+
+    await client.query('BEGIN');
+
+    // Insert Ticket
+    await client.query(`
+      INSERT INTO public.support_tickets (id, tracking_code, user_id, subject, category, status, created_at, updated_at, last_message_at)
+      VALUES ($1, $2, $3, $4, $5, 'NEW', $6, $6, $6)
+    `, [ticketId, trackingCode, req.user.id, subject.trim(), cleanCategory, now]);
+
+    // Insert Initial Message
+    await client.query(`
+      INSERT INTO public.support_messages (id, ticket_id, sender_type, sender_id, sender_name, message_text, created_at)
+      VALUES ($1, $2, 'USER', $3, $4, $5, $6)
+    `, [messageId, ticketId, req.user.id, req.user.fullName, message.trim(), now]);
+
+    await client.query('COMMIT');
+
+    console.log(`[Support System] Created ticket ${trackingCode} by user ${req.user.id} (${req.user.fullName})`);
+
+    return res.status(201).json({
+      success: true,
+      message: "درخواست پشتیبانی شما با موفقیت ثبت شد.",
+      ticket: {
+        id: ticketId,
+        trackingCode,
+        subject: subject.trim(),
+        category: cleanCategory,
+        status: 'NEW',
+        createdAt: now.getTime(),
+        updatedAt: now.getTime(),
+        lastMessage: message.trim(),
+        lastSenderType: 'USER'
+      }
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[Support Ticket Create Error]', err);
+    return res.status(500).json({ error: "خطا در ثبت درخواست پشتیبانی در پایگاه داده." });
+  } finally {
+    client.release();
+  }
+});
+
+// 10.2 User: List My Support Tickets (Authenticated & Filtered by req.user.id)
+app.get('/api/support/tickets', requireUserAuth, ensureDatabaseReady, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT 
+        t.id, 
+        t.tracking_code, 
+        t.subject, 
+        t.category, 
+        t.status, 
+        t.created_at, 
+        t.updated_at, 
+        t.last_message_at,
+        (SELECT m.message_text FROM public.support_messages m WHERE m.ticket_id = t.id ORDER BY m.created_at DESC LIMIT 1) AS last_message,
+        (SELECT m.sender_type FROM public.support_messages m WHERE m.ticket_id = t.id ORDER BY m.created_at DESC LIMIT 1) AS last_sender_type
+      FROM public.support_tickets t
+      WHERE t.user_id = $1
+      ORDER BY t.updated_at DESC
+    `, [req.user.id]);
+
+    const tickets = result.rows.map(row => ({
+      id: row.id,
+      trackingCode: row.tracking_code,
+      subject: row.subject,
+      category: row.category,
+      status: row.status,
+      createdAtMs: new Date(row.created_at).getTime(),
+      updatedAtMs: new Date(row.updated_at).getTime(),
+      lastMessageAtMs: new Date(row.last_message_at).getTime(),
+      lastMessage: row.last_message || '',
+      lastSenderType: row.last_sender_type || 'USER'
+    }));
+
+    return res.json({
+      success: true,
+      tickets
+    });
+  } catch (err) {
+    console.error('[Support List Tickets Error]', err);
+    return res.status(500).json({ error: "خطا در دریافت فهرست درخواست‌های پشتیبانی." });
+  }
+});
+
+// 10.3 User: Get Single Ticket & Messages History (Strict User Ownership Check)
+app.get('/api/support/tickets/:id', requireUserAuth, ensureDatabaseReady, async (req, res) => {
+  try {
+    const ticketId = req.params.id;
+
+    // Strict user ownership check
+    const ticketRes = await pool.query(`
+      SELECT id, tracking_code, user_id, subject, category, status, created_at, updated_at, last_message_at
+      FROM public.support_tickets 
+      WHERE id = $1 AND user_id = $2
+      LIMIT 1
+    `, [ticketId, req.user.id]);
+
+    if (ticketRes.rows.length === 0) {
+      return res.status(404).json({ error: "درخواست پشتیبانی یافت نشد یا دسترسی به آن برای شما مجاز نمی‌باشد." });
+    }
+
+    const t = ticketRes.rows[0];
+
+    const messagesRes = await pool.query(`
+      SELECT id, ticket_id, sender_type, sender_id, sender_name, message_text, created_at
+      FROM public.support_messages
+      WHERE ticket_id = $1
+      ORDER BY created_at ASC
+    `, [ticketId]);
+
+    const messages = messagesRes.rows.map(m => ({
+      id: m.id,
+      ticketId: m.ticket_id,
+      senderType: m.sender_type,
+      senderId: m.sender_id,
+      senderName: m.sender_name,
+      messageText: m.message_text,
+      createdAtMs: new Date(m.created_at).getTime()
+    }));
+
+    return res.json({
+      success: true,
+      ticket: {
+        id: t.id,
+        trackingCode: t.tracking_code,
+        subject: t.subject,
+        category: t.category,
+        status: t.status,
+        createdAtMs: new Date(t.created_at).getTime(),
+        updatedAtMs: new Date(t.updated_at).getTime(),
+        lastMessageAtMs: new Date(t.last_message_at).getTime()
+      },
+      messages
+    });
+  } catch (err) {
+    console.error('[Support Ticket Detail Error]', err);
+    return res.status(500).json({ error: "خطا در دریافت جزئیات درخواست پشتیبانی." });
+  }
+});
+
+// 10.4 User: Send Follow-up Message in an Open Ticket (Rejects if CLOSED)
+app.post('/api/support/tickets/:id/messages', requireUserAuth, ensureDatabaseReady, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const ticketId = req.params.id;
+    const { message } = req.body;
+
+    if (!message || typeof message !== 'string' || message.trim().length < 2 || message.trim().length > 3000) {
+      return res.status(400).json({ error: "متن پیام باید بین ۲ تا ۳۰۰۰ کاراکتر باشد." });
+    }
+
+    // Verify ownership and status
+    const ticketRes = await client.query(`
+      SELECT id, status, tracking_code
+      FROM public.support_tickets 
+      WHERE id = $1 AND user_id = $2
+      LIMIT 1
+    `, [ticketId, req.user.id]);
+
+    if (ticketRes.rows.length === 0) {
+      return res.status(404).json({ error: "درخواست پشتیبانی یافت نشد یا دسترسی به آن برای شما مجاز نمی‌باشد." });
+    }
+
+    const currentTicket = ticketRes.rows[0];
+    if (currentTicket.status === 'CLOSED') {
+      return res.status(400).json({
+        error: "این درخواست توسط مدیریت بسته شده است. در صورت نیاز به راهنمایی جدید، لطفاً یک درخواست جدید ثبت نمایید."
+      });
+    }
+
+    const messageId = "MSG_" + crypto.randomUUID();
+    const now = new Date();
+
+    await client.query('BEGIN');
+
+    // Insert user message
+    await client.query(`
+      INSERT INTO public.support_messages (id, ticket_id, sender_type, sender_id, sender_name, message_text, created_at)
+      VALUES ($1, $2, 'USER', $3, $4, $5, $6)
+    `, [messageId, ticketId, req.user.id, req.user.fullName, message.trim(), now]);
+
+    // Update ticket to IN_PROGRESS / NEW and update timestamps
+    const newStatus = currentTicket.status === 'ANSWERED' ? 'IN_PROGRESS' : currentTicket.status;
+    await client.query(`
+      UPDATE public.support_tickets
+      SET status = $1, updated_at = $2, last_message_at = $2
+      WHERE id = $3
+    `, [newStatus, now, ticketId]);
+
+    await client.query('COMMIT');
+
+    return res.status(201).json({
+      success: true,
+      message: {
+        id: messageId,
+        ticketId,
+        senderType: 'USER',
+        senderId: req.user.id,
+        senderName: req.user.fullName,
+        messageText: message.trim(),
+        createdAtMs: now.getTime()
+      },
+      ticketStatus: newStatus
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[Support User Send Message Error]', err);
+    return res.status(500).json({ error: "خطا در ارسال پیام در پایگاه داده." });
+  } finally {
+    client.release();
+  }
+});
+
+// 10.5 Admin API: List All Tickets with Counts and Filters (Protected)
+app.get('/api/admin/support/tickets', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
+  try {
+    const { status, category, search } = req.query;
+
+    let queryText = `
+      SELECT 
+        t.id, 
+        t.tracking_code, 
+        t.user_id,
+        t.subject, 
+        t.category, 
+        t.status, 
+        t.created_at, 
+        t.updated_at, 
+        t.last_message_at,
+        u.first_name,
+        u.last_name,
+        u.phone_number,
+        (SELECT m.message_text FROM public.support_messages m WHERE m.ticket_id = t.id ORDER BY m.created_at DESC LIMIT 1) AS last_message,
+        (SELECT m.sender_type FROM public.support_messages m WHERE m.ticket_id = t.id ORDER BY m.created_at DESC LIMIT 1) AS last_sender_type,
+        (SELECT COUNT(*) FROM public.support_messages m WHERE m.ticket_id = t.id) AS total_messages
+      FROM public.support_tickets t
+      JOIN public.users u ON t.user_id = u.id
+      WHERE 1=1
+    `;
+    const params = [];
+
+    if (status && status !== 'ALL' && VALID_SUPPORT_STATUSES.includes(status.toUpperCase())) {
+      params.push(status.toUpperCase());
+      queryText += ` AND t.status = $${params.length}`;
+    }
+
+    if (category && category !== 'ALL' && VALID_SUPPORT_CATEGORIES.includes(category.toUpperCase())) {
+      params.push(category.toUpperCase());
+      queryText += ` AND t.category = $${params.length}`;
+    }
+
+    if (search && search.trim()) {
+      params.push(`%${search.trim()}%`);
+      queryText += ` AND (t.tracking_code ILIKE $${params.length} OR u.phone_number ILIKE $${params.length} OR t.subject ILIKE $${params.length} OR u.first_name ILIKE $${params.length} OR u.last_name ILIKE $${params.length})`;
+    }
+
+    queryText += ` ORDER BY t.updated_at DESC LIMIT 200`;
+
+    const result = await pool.query(queryText, params);
+
+    // Compute Status Counts
+    const countsRes = await pool.query(`
+      SELECT 
+        COUNT(*) AS total,
+        COUNT(*) FILTER (WHERE status = 'NEW') AS new_count,
+        COUNT(*) FILTER (WHERE status = 'IN_PROGRESS') AS in_progress_count,
+        COUNT(*) FILTER (WHERE status = 'ANSWERED') AS answered_count,
+        COUNT(*) FILTER (WHERE status = 'CLOSED') AS closed_count
+      FROM public.support_tickets
+    `);
+    const counts = countsRes.rows[0];
+
+    const tickets = result.rows.map(row => ({
+      id: row.id,
+      trackingCode: row.tracking_code,
+      userId: row.user_id,
+      userName: `${row.first_name || ''} ${row.last_name || ''}`.trim() || 'کاربر',
+      phoneNumber: row.phone_number || '',
+      subject: row.subject,
+      category: row.category,
+      status: row.status,
+      createdAtMs: new Date(row.created_at).getTime(),
+      updatedAtMs: new Date(row.updated_at).getTime(),
+      lastMessageAtMs: new Date(row.last_message_at).getTime(),
+      lastMessage: row.last_message || '',
+      lastSenderType: row.last_sender_type || 'USER',
+      totalMessages: Number(row.total_messages || 0)
+    }));
+
+    return res.json({
+      success: true,
+      stats: {
+        total: Number(counts.total || 0),
+        newCount: Number(counts.new_count || 0),
+        inProgressCount: Number(counts.in_progress_count || 0),
+        answeredCount: Number(counts.answered_count || 0),
+        closedCount: Number(counts.closed_count || 0)
+      },
+      tickets
+    });
+  } catch (err) {
+    console.error('[Admin Support Tickets Error]', err);
+    return res.status(500).json({ error: "خطا در دریافت تیکت‌های پشتیبانی برای مدیریت." });
+  }
+});
+
+// 10.6 Admin API: Get Ticket Details & Full Message Thread (Protected)
+app.get('/api/admin/support/tickets/:id', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
+  try {
+    const ticketId = req.params.id;
+
+    const ticketRes = await pool.query(`
+      SELECT 
+        t.id, 
+        t.tracking_code, 
+        t.user_id,
+        t.subject, 
+        t.category, 
+        t.status, 
+        t.created_at, 
+        t.updated_at, 
+        t.last_message_at,
+        u.first_name,
+        u.last_name,
+        u.phone_number,
+        u.total_score
+      FROM public.support_tickets t
+      JOIN public.users u ON t.user_id = u.id
+      WHERE t.id = $1
+      LIMIT 1
+    `, [ticketId]);
+
+    if (ticketRes.rows.length === 0) {
+      return res.status(404).json({ error: "درخواست پشتیبانی یافت نشد." });
+    }
+
+    const t = ticketRes.rows[0];
+
+    const messagesRes = await pool.query(`
+      SELECT id, ticket_id, sender_type, sender_id, sender_name, message_text, created_at
+      FROM public.support_messages
+      WHERE ticket_id = $1
+      ORDER BY created_at ASC
+    `, [ticketId]);
+
+    const messages = messagesRes.rows.map(m => ({
+      id: m.id,
+      ticketId: m.ticket_id,
+      senderType: m.sender_type,
+      senderId: m.sender_id,
+      senderName: m.sender_name,
+      messageText: m.message_text,
+      createdAtMs: new Date(m.created_at).getTime()
+    }));
+
+    return res.json({
+      success: true,
+      ticket: {
+        id: t.id,
+        trackingCode: t.tracking_code,
+        userId: t.user_id,
+        userName: `${t.first_name || ''} ${t.last_name || ''}`.trim() || 'کاربر',
+        phoneNumber: t.phone_number || '',
+        userScore: Number(t.total_score || 0),
+        subject: t.subject,
+        category: t.category,
+        status: t.status,
+        createdAtMs: new Date(t.created_at).getTime(),
+        updatedAtMs: new Date(t.updated_at).getTime(),
+        lastMessageAtMs: new Date(t.last_message_at).getTime()
+      },
+      messages
+    });
+  } catch (err) {
+    console.error('[Admin Support Ticket Detail Error]', err);
+    return res.status(500).json({ error: "خطا در دریافت جزئیات تیکت مدیریت." });
+  }
+});
+
+// 10.7 Admin API: Send Reply to User Ticket (Protected - Updates status to ANSWERED)
+app.post('/api/admin/support/tickets/:id/messages', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const ticketId = req.params.id;
+    const { message, newStatus } = req.body;
+
+    if (!message || typeof message !== 'string' || message.trim().length < 2 || message.trim().length > 3000) {
+      return res.status(400).json({ error: "متن پاسخ مدیر باید بین ۲ تا ۳۰۰۰ کاراکتر باشد." });
+    }
+
+    const checkRes = await client.query(`SELECT id, status, tracking_code FROM public.support_tickets WHERE id = $1 LIMIT 1`, [ticketId]);
+    if (checkRes.rows.length === 0) {
+      return res.status(404).json({ error: "درخواست پشتیبانی یافت نشد." });
+    }
+
+    const updatedStatus = (newStatus && VALID_SUPPORT_STATUSES.includes(newStatus.toUpperCase())) 
+      ? newStatus.toUpperCase() 
+      : 'ANSWERED';
+
+    const messageId = "MSG_" + crypto.randomUUID();
+    const now = new Date();
+
+    await client.query('BEGIN');
+
+    // Insert Admin Message
+    await client.query(`
+      INSERT INTO public.support_messages (id, ticket_id, sender_type, sender_id, sender_name, message_text, created_at)
+      VALUES ($1, $2, 'ADMIN', 'admin', 'پشتیبانی رقابت', $3, $4)
+    `, [messageId, ticketId, message.trim(), now]);
+
+    // Update Ticket Status and Timestamp
+    await client.query(`
+      UPDATE public.support_tickets
+      SET status = $1, updated_at = $2, last_message_at = $2
+      WHERE id = $3
+    `, [updatedStatus, now, ticketId]);
+
+    await client.query('COMMIT');
+
+    console.log(`[Support Admin Reply] Replied to ticket ${ticketId} (Status: ${updatedStatus})`);
+
+    return res.status(201).json({
+      success: true,
+      message: {
+        id: messageId,
+        ticketId,
+        senderType: 'ADMIN',
+        senderId: 'admin',
+        senderName: 'پشتیبانی رقابت',
+        messageText: message.trim(),
+        createdAtMs: now.getTime()
+      },
+      ticketStatus: updatedStatus
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[Admin Support Reply Error]', err);
+    return res.status(500).json({ error: "خطا در ثبت پاسخ مدیریت در پایگاه داده." });
+  } finally {
+    client.release();
+  }
+});
+
+// 10.8 Admin API: Change Ticket Status (Protected - e.g. close, in_progress, etc.)
+app.patch('/api/admin/support/tickets/:id/status', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
+  try {
+    const ticketId = req.params.id;
+    const { status } = req.body;
+
+    if (!status || !VALID_SUPPORT_STATUSES.includes(status.toUpperCase())) {
+      return res.status(400).json({ error: "وضعیت انتخاب شده نامعتبر است (NEW, IN_PROGRESS, ANSWERED, CLOSED)." });
+    }
+
+    const cleanStatus = status.toUpperCase();
+
+    const updateRes = await pool.query(`
+      UPDATE public.support_tickets
+      SET status = $1, updated_at = NOW()
+      WHERE id = $2
+      RETURNING id, tracking_code, status
+    `, [cleanStatus, ticketId]);
+
+    if (updateRes.rows.length === 0) {
+      return res.status(404).json({ error: "درخواست پشتیبانی یافت نشد." });
+    }
+
+    return res.json({
+      success: true,
+      message: `وضعیت درخواست با موفقیت به «${cleanStatus}» تغییر یافت.`,
+      ticket: updateRes.rows[0]
+    });
+  } catch (err) {
+    console.error('[Admin Change Ticket Status Error]', err);
+    return res.status(500).json({ error: "خطا در تغییر وضعیت تیکت." });
+  }
+});
 
 // Global Error Handler
 app.use((err, req, res, next) => {

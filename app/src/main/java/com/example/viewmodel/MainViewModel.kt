@@ -572,4 +572,156 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+
+    // ====================================================================
+    // Support System Methods
+    // ====================================================================
+
+    fun loadUserTickets() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSupportLoading = true, supportErrorMessage = null) }
+            when (val result = backendRepository.getUserSupportTickets()) {
+                is Result.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            supportTickets = result.data,
+                            isSupportLoading = false
+                        )
+                    }
+                }
+                is Result.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isSupportLoading = false,
+                            supportErrorMessage = result.message
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun openTicketDetail(ticketId: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSupportLoading = true, supportErrorMessage = null) }
+            when (val result = backendRepository.getTicketDetails(ticketId)) {
+                is Result.Success -> {
+                    val (ticket, messages) = result.data
+                    _uiState.update {
+                        it.copy(
+                            activeSupportTicket = ticket,
+                            activeTicketMessages = messages,
+                            isSupportLoading = false
+                        )
+                    }
+                }
+                is Result.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isSupportLoading = false,
+                            supportErrorMessage = result.message
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun closeTicketDetail() {
+        _uiState.update {
+            it.copy(
+                activeSupportTicket = null,
+                activeTicketMessages = emptyList(),
+                supportErrorMessage = null,
+                supportSuccessMessage = null
+            )
+        }
+    }
+
+    fun createSupportTicket(
+        subject: String,
+        category: String,
+        message: String,
+        onSuccess: () -> Unit
+    ) {
+        if (subject.trim().length < 3) {
+            _uiState.update { it.copy(supportErrorMessage = "عنوان درخواست باید حداقل ۳ کاراکتر باشد.") }
+            return
+        }
+        if (message.trim().length < 5) {
+            _uiState.update { it.copy(supportErrorMessage = "متن پیام باید حداقل ۵ کاراکتر باشد.") }
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSendingTicketMessage = true, supportErrorMessage = null) }
+            when (val result = backendRepository.createSupportTicket(subject, category, message)) {
+                is Result.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            isSendingTicketMessage = false,
+                            supportSuccessMessage = "درخواست پشتیبانی شما با شماره پیگیری ${result.data.trackingCode} ثبت شد."
+                        )
+                    }
+                    loadUserTickets()
+                    onSuccess()
+                }
+                is Result.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isSendingTicketMessage = false,
+                            supportErrorMessage = result.message
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun sendTicketMessage(ticketId: String, messageText: String) {
+        if (messageText.trim().isEmpty()) return
+        val currentTicket = _uiState.value.activeSupportTicket ?: return
+        if (currentTicket.isClosed) {
+            _uiState.update { it.copy(supportErrorMessage = "این درخواست بسته شده است و امکان ارسال پیام وجود ندارد.") }
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSendingTicketMessage = true, supportErrorMessage = null) }
+            when (val result = backendRepository.sendTicketMessage(ticketId, messageText)) {
+                is Result.Success -> {
+                    val updatedMessages = _uiState.value.activeTicketMessages + result.data
+                    val updatedTicket = currentTicket.copy(
+                        status = if (currentTicket.status == "ANSWERED") "IN_PROGRESS" else currentTicket.status,
+                        lastMessage = result.data.messageText,
+                        lastSenderType = "USER",
+                        updatedAtMs = System.currentTimeMillis()
+                    )
+                    _uiState.update {
+                        it.copy(
+                            activeSupportTicket = updatedTicket,
+                            activeTicketMessages = updatedMessages,
+                            isSendingTicketMessage = false
+                        )
+                    }
+                    loadUserTickets()
+                }
+                is Result.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isSendingTicketMessage = false,
+                            supportErrorMessage = result.message
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun clearSupportMessages() {
+        _uiState.update {
+            it.copy(supportErrorMessage = null, supportSuccessMessage = null)
+        }
+    }
 }
+

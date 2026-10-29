@@ -106,7 +106,8 @@ class MainActivity : ComponentActivity() {
                                         user = user,
                                         activeCompetition = uiState.activeCompetition,
                                         onLogout = { viewModel.logout() },
-                                        onNavigateToMembership = { viewModel.navigateTo(AppScreen.MEMBERSHIP) }
+                                        onNavigateToMembership = { viewModel.navigateTo(AppScreen.MEMBERSHIP) },
+                                        onNavigateToSupport = { viewModel.navigateTo(AppScreen.SUPPORT) }
                                     )
                                 }
                             }
@@ -121,6 +122,28 @@ class MainActivity : ComponentActivity() {
                                     onRefresh = { viewModel.loadMembershipData() },
                                     onPurchase = { productId -> viewModel.purchasePanel(productId) },
                                     onDismissMessage = { viewModel.clearMessages() }
+                                )
+                            }
+                            AppScreen.SUPPORT -> {
+                                SupportScreen(
+                                    tickets = uiState.supportTickets,
+                                    activeTicket = uiState.activeSupportTicket,
+                                    messages = uiState.activeTicketMessages,
+                                    isLoading = uiState.isSupportLoading,
+                                    isSending = uiState.isSendingTicketMessage,
+                                    errorMessage = uiState.supportErrorMessage,
+                                    successMessage = uiState.supportSuccessMessage,
+                                    onRefresh = { viewModel.loadUserTickets() },
+                                    onOpenTicket = { ticketId -> viewModel.openTicketDetail(ticketId) },
+                                    onCloseTicketDetail = { viewModel.closeTicketDetail() },
+                                    onCreateTicket = { subject, category, message ->
+                                        viewModel.createSupportTicket(subject, category, message) {}
+                                    },
+                                    onSendMessage = { ticketId, text ->
+                                        viewModel.sendTicketMessage(ticketId, text)
+                                    },
+                                    onClearMessages = { viewModel.clearSupportMessages() },
+                                    onBackToHome = { viewModel.navigateTo(AppScreen.PROFILE) }
                                 )
                             }
                         }

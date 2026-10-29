@@ -14,7 +14,8 @@ enum class AppScreen {
     LEADERBOARD,
     PRIZES,
     PROFILE,
-    MEMBERSHIP
+    MEMBERSHIP,
+    SUPPORT
 }
 
 enum class AuthMode {
@@ -58,5 +59,14 @@ data class MainUiState(
     // Active Competition
     val activeCompetition: com.example.model.CompetitionInfo? = null,
     // Active Home Announcement
-    val activeAnnouncement: com.example.model.HomeAnnouncement? = null
+    val activeAnnouncement: com.example.model.HomeAnnouncement? = null,
+    // Support System State
+    val supportTickets: List<com.example.model.SupportTicket> = emptyList(),
+    val activeSupportTicket: com.example.model.SupportTicket? = null,
+    val activeTicketMessages: List<com.example.model.SupportMessage> = emptyList(),
+    val isSupportLoading: Boolean = false,
+    val isSendingTicketMessage: Boolean = false,
+    val supportErrorMessage: String? = null,
+    val supportSuccessMessage: String? = null
 )
+

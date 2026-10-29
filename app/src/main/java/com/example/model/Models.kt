@@ -149,4 +149,81 @@ data class HomeAnnouncement(
         get() = endsAtMs?.let { System.currentTimeMillis() >= it } ?: false
 }
 
+/**
+ * Support Ticket Category representation
+ */
+enum class SupportCategory(val key: String, val titlePersian: String) {
+    SCORES("SCORES", "امتیازها"),
+    ADS("ADS", "تبلیغات"),
+    PRIZES("PRIZES", "جوایز"),
+    MEMBERSHIP("MEMBERSHIP", "عضویت و پلن‌ها"),
+    PURCHASE("PURCHASE", "خرید و پرداخت"),
+    LOGIN("LOGIN", "ورود و حساب کاربری"),
+    OTHER("OTHER", "سایر موارد");
+
+    companion object {
+        fun fromKey(key: String): SupportCategory {
+            return entries.find { it.key.equals(key, ignoreCase = true) } ?: OTHER
+        }
+    }
+}
+
+/**
+ * Support Ticket Status
+ */
+enum class SupportStatus(val key: String, val titlePersian: String) {
+    NEW("NEW", "جدید / در انتظار پاسخ"),
+    IN_PROGRESS("IN_PROGRESS", "در حال بررسی"),
+    ANSWERED("ANSWERED", "پاسخ داده شد"),
+    CLOSED("CLOSED", "بسته شده");
+
+    companion object {
+        fun fromKey(key: String): SupportStatus {
+            return entries.find { it.key.equals(key, ignoreCase = true) } ?: NEW
+        }
+    }
+}
+
+/**
+ * Support ticket created by user
+ */
+data class SupportTicket(
+    val id: String,
+    val trackingCode: String,
+    val subject: String,
+    val category: String = "OTHER",
+    val status: String = "NEW",
+    val createdAtMs: Long = System.currentTimeMillis(),
+    val updatedAtMs: Long = System.currentTimeMillis(),
+    val lastMessageAtMs: Long = System.currentTimeMillis(),
+    val lastMessage: String = "",
+    val lastSenderType: String = "USER"
+) {
+    val categoryEnum: SupportCategory
+        get() = SupportCategory.fromKey(category)
+
+    val statusEnum: SupportStatus
+        get() = SupportStatus.fromKey(status)
+
+    val isClosed: Boolean
+        get() = status.equals("CLOSED", ignoreCase = true)
+}
+
+/**
+ * Individual message in a support ticket thread
+ */
+data class SupportMessage(
+    val id: String,
+    val ticketId: String,
+    val senderType: String, // "USER" or "ADMIN"
+    val senderId: String,
+    val senderName: String,
+    val messageText: String,
+    val createdAtMs: Long = System.currentTimeMillis()
+) {
+    val isAdmin: Boolean
+        get() = senderType.equals("ADMIN", ignoreCase = true)
+}
+
+
 

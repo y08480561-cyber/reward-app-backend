@@ -148,4 +148,37 @@ CREATE TABLE IF NOT EXISTS public.home_announcements (
 CREATE INDEX IF NOT EXISTS idx_announcements_active ON public.home_announcements(is_active, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_announcements_comp ON public.home_announcements(competition_id);
 
+-- ۱۲. توکن احراز هویت نشست کاربری امن در جدول کاربران
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS auth_token TEXT;
+CREATE INDEX IF NOT EXISTS idx_users_auth_token ON public.users(auth_token);
+
+-- ۱۳. جدول تیکت‌های پشتیبانی کاربران (Support Tickets)
+CREATE TABLE IF NOT EXISTS public.support_tickets (
+    id TEXT PRIMARY KEY,
+    tracking_code TEXT NOT NULL UNIQUE,
+    user_id TEXT NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    subject TEXT NOT NULL,
+    category TEXT NOT NULL DEFAULT 'OTHER',
+    status TEXT NOT NULL DEFAULT 'NEW',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_message_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_support_tickets_user ON public.support_tickets(user_id, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON public.support_tickets(status, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_support_tickets_tracking ON public.support_tickets(tracking_code);
+
+-- ۱۴. جدول پیام‌ها و مکالمات درون هر تیکت (Support Messages)
+CREATE TABLE IF NOT EXISTS public.support_messages (
+    id TEXT PRIMARY KEY,
+    ticket_id TEXT NOT NULL REFERENCES public.support_tickets(id) ON DELETE CASCADE,
+    sender_type TEXT NOT NULL CHECK (sender_type IN ('USER', 'ADMIN')),
+    sender_id TEXT NOT NULL,
+    sender_name TEXT NOT NULL,
+    message_text TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_support_messages_ticket ON public.support_messages(ticket_id, created_at ASC);
+
+
 

@@ -89,5 +89,65 @@ class ExampleUnitTest {
     assertTrue("Should be marked as ended", announcement.isEnded)
     assertEquals(0L, announcement.remainingMs)
   }
+
+  @Test
+  fun supportTicket_categoryAndStatusMapping() {
+    val ticket = com.example.model.SupportTicket(
+      id = "TCK_123",
+      trackingCode = "TRK-987654",
+      subject = "مشکل در ثبت امتیاز تماشای ویدیو",
+      category = "ADS",
+      status = "ANSWERED",
+      lastMessage = "پاسخ داده شد",
+      lastSenderType = "ADMIN"
+    )
+
+    assertEquals("TCK_123", ticket.id)
+    assertEquals("TRK-987654", ticket.trackingCode)
+    assertEquals(com.example.model.SupportCategory.ADS, ticket.categoryEnum)
+    assertEquals("تبلیغات", ticket.categoryEnum.titlePersian)
+    assertEquals(com.example.model.SupportStatus.ANSWERED, ticket.statusEnum)
+    assertEquals("پاسخ داده شد", ticket.statusEnum.titlePersian)
+    assertFalse(ticket.isClosed)
+  }
+
+  @Test
+  fun supportTicket_closedStateDetection() {
+    val closedTicket = com.example.model.SupportTicket(
+      id = "TCK_456",
+      trackingCode = "TRK-112233",
+      subject = "سوال عمومی",
+      category = "OTHER",
+      status = "CLOSED"
+    )
+
+    assertTrue("Ticket with CLOSED status must be marked as closed", closedTicket.isClosed)
+    assertEquals(com.example.model.SupportStatus.CLOSED, closedTicket.statusEnum)
+  }
+
+  @Test
+  fun supportMessage_adminDetection() {
+    val userMsg = com.example.model.SupportMessage(
+      id = "MSG_1",
+      ticketId = "TCK_123",
+      senderType = "USER",
+      senderId = "usr_1",
+      senderName = "مجتبی",
+      messageText = "سلام پشتیبانی"
+    )
+
+    val adminMsg = com.example.model.SupportMessage(
+      id = "MSG_2",
+      ticketId = "TCK_123",
+      senderType = "ADMIN",
+      senderId = "admin",
+      senderName = "پشتیبانی رقابت",
+      messageText = "سلام کاربر عزیز، پیام شما بررسی شد."
+    )
+
+    assertFalse("User message must not be marked as admin", userMsg.isAdmin)
+    assertTrue("Admin message must be marked as admin", adminMsg.isAdmin)
+  }
 }
+
 

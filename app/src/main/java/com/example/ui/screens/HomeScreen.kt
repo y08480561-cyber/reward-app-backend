@@ -269,5 +269,54 @@ fun HomeScreen(
                 }
             }
         }
+
+        // 5. Quick Support Banner Card
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .shadow(2.dp, RoundedCornerShape(16.dp))
+                .clickable { onNavigate(AppScreen.SUPPORT) }
+                .testTag("home_card_support"),
+            shape = RoundedCornerShape(16.dp),
+            color = Color.White,
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF0284C7).copy(alpha = 0.35f))
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.HeadsetMic,
+                        contentDescription = null,
+                        tint = Color(0xFF0284C7),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = "مرکز پشتیبانی و پیام‌ها",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = NavyPrimary
+                        )
+                        Text(
+                            text = "پاسخ مستقیم مدیر به سوالات و مشکلات شما",
+                            fontSize = 11.sp,
+                            color = Color(0xFF64748B)
+                        )
+                    }
+                }
+                Text(
+                    text = "ارسال تیکت ←",
+                    color = Color(0xFF0284C7),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp
+                )
+            }
+        }
     }
 }

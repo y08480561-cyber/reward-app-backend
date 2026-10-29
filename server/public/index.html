@@ -303,6 +303,168 @@
         </div>
       </div>
     </div>
+
+    <!-- 4. Support Center Management Section -->
+    <div class="card p-4 mb-4 shadow" style="border: 1px solid #0284C7; background-color: #162C46;">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3 pb-2 border-bottom border-secondary">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-headset text-info fs-3"></i>
+          <div>
+            <h4 class="mb-0 text-white fw-bold">مرکز پشتیبانی و پیام‌های کاربران</h4>
+            <small class="text-secondary">مشاهده و پاسخ‌گویی به تیکت‌های پشتیبانی کاربران اپلیکیشن و تغییر وضعیت</small>
+          </div>
+        </div>
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+          <button class="btn btn-sm btn-outline-info" onclick="loadAdminSupportTickets()">
+            <i class="bi bi-arrow-clockwise me-1"></i> به‌روزرسانی تیکت‌ها
+          </button>
+        </div>
+      </div>
+
+      <!-- Support Counters -->
+      <div class="row g-2 mb-3">
+        <div class="col-md-3 col-6">
+          <div class="p-2 rounded text-center" style="background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.3);">
+            <div class="small text-info fw-bold">کل تیکت‌ها</div>
+            <div class="fs-5 fw-bold text-white" id="supportCountTotal">۰</div>
+          </div>
+        </div>
+        <div class="col-md-3 col-6">
+          <div class="p-2 rounded text-center" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3);">
+            <div class="small text-danger fw-bold">جدید / بی‌پاسخ</div>
+            <div class="fs-5 fw-bold text-danger" id="supportCountNew">۰</div>
+          </div>
+        </div>
+        <div class="col-md-3 col-6">
+          <div class="p-2 rounded text-center" style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3);">
+            <div class="small text-warning fw-bold">در حال بررسی</div>
+            <div class="fs-5 fw-bold text-warning" id="supportCountInProgress">۰</div>
+          </div>
+        </div>
+        <div class="col-md-3 col-6">
+          <div class="p-2 rounded text-center" style="background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.3);">
+            <div class="small text-success fw-bold">پاسخ داده شده</div>
+            <div class="fs-5 fw-bold text-success" id="supportCountAnswered">۰</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filters Bar -->
+      <div class="row g-2 align-items-center mb-3">
+        <div class="col-md-4">
+          <div class="input-group input-group-sm">
+            <span class="input-group-text bg-dark border-secondary text-secondary"><i class="bi bi-search"></i></span>
+            <input type="text" id="supportSearchInput" class="form-control form-control-dark" placeholder="جستجو بر اساس کد پیگیری، شماره یا نام..." oninput="filterSupportTickets()">
+          </div>
+        </div>
+        <div class="col-md-3">
+          <select id="supportStatusFilter" class="form-select form-select-sm form-select-dark" onchange="filterSupportTickets()">
+            <option value="ALL">تمام وضعیت‌ها</option>
+            <option value="NEW">جدید / منتظر پاسخ</option>
+            <option value="IN_PROGRESS">در حال بررسی</option>
+            <option value="ANSWERED">پاسخ داده شده</option>
+            <option value="CLOSED">بسته شده</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <select id="supportCategoryFilter" class="form-select form-select-sm form-select-dark" onchange="filterSupportTickets()">
+            <option value="ALL">تمام موضوعات</option>
+            <option value="SCORES">امتیازها</option>
+            <option value="ADS">تبلیغات</option>
+            <option value="PRIZES">جوایز</option>
+            <option value="MEMBERSHIP">عضویت</option>
+            <option value="PURCHASE">خرید</option>
+            <option value="LOGIN">مشکل ورود</option>
+            <option value="OTHER">سایر موارد</option>
+          </select>
+        </div>
+        <div class="col-md-2 text-end">
+          <span class="text-secondary small" id="supportFilterSummary">نمایش تیکت‌ها</span>
+        </div>
+      </div>
+
+      <!-- Tickets Table -->
+      <div class="table-responsive">
+        <table class="table table-dark table-hover table-striped rounded align-middle mb-0">
+          <thead>
+            <tr class="text-secondary small">
+              <th>کد پیگیری</th>
+              <th>کاربر</th>
+              <th>موضوع</th>
+              <th>عنوان درخواست</th>
+              <th>وضعیت</th>
+              <th>آخرین پیام</th>
+              <th>به‌روزرسانی</th>
+              <th>عملیات</th>
+            </tr>
+          </thead>
+          <tbody id="supportTicketsTbody">
+            <tr><td colspan="8" class="text-center py-4 text-secondary">در حال دریافت تیکت‌های پشتیبانی...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Support Ticket Conversation & Reply -->
+  <div class="modal fade modal-dark" id="ticketConversationModal" tabindex="-1" aria-labelledby="ticketConvModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-header border-secondary">
+          <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-chat-left-text-fill text-info fs-5"></i>
+            <div>
+              <h5 class="modal-title text-white fw-bold" id="ticketConvTitle">گفت‌وگوی تیکت</h5>
+              <div class="small text-secondary">
+                کد پیگیری: <span id="ticketConvCode" class="text-warning fw-bold">-</span> |
+                کاربر: <span id="ticketConvUser" class="text-white">-</span> (<span id="ticketConvPhone" class="text-info">-</span>)
+              </div>
+            </div>
+          </div>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="بستن"></button>
+        </div>
+        <div class="modal-body p-3">
+          <!-- Ticket Details bar -->
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 p-2 rounded mb-3" style="background: #112233; border: 1px solid #1E3E62;">
+            <div>
+              <span class="badge bg-secondary me-1" id="ticketConvCategory">-</span>
+              <span class="badge bg-primary" id="ticketConvStatusBadge">-</span>
+              <span class="text-secondary small ms-2">ثبت: <span id="ticketConvCreated">-</span></span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <label class="text-secondary small">تغییر وضعیت:</label>
+              <select id="ticketConvStatusSelect" class="form-select form-select-sm form-select-dark" style="width: auto;" onchange="updateTicketStatusFromSelect()">
+                <option value="NEW">جدید</option>
+                <option value="IN_PROGRESS">در حال بررسی</option>
+                <option value="ANSWERED">پاسخ داده شد</option>
+                <option value="CLOSED">بسته شد</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Message Thread Box -->
+          <div id="ticketMessagesContainer" class="p-3 rounded mb-3" style="max-height: 380px; overflow-y: auto; background-color: #0B192C; border: 1px solid #1E3E62; display: flex; flex-direction: column; gap: 12px;">
+            <div class="text-center text-secondary py-3">در حال بارگذاری پیام‌ها...</div>
+          </div>
+
+          <!-- Reply Box -->
+          <div id="ticketReplyBox">
+            <label class="form-label text-warning small fw-bold"><i class="bi bi-reply-fill"></i> ارسال پاسخ مدیریت به کاربر:</label>
+            <textarea id="adminReplyTextarea" rows="3" class="form-control form-control-dark mb-2" placeholder="متن پاسخ مدیریت به این کاربر را بنویسید..."></textarea>
+            <div class="d-flex justify-content-between align-items-center">
+              <div class="form-check form-check-inline small">
+                <input class="form-check-input" type="checkbox" id="replySetAnswered" checked>
+                <label class="form-check-label text-secondary" for="replySetAnswered">تغییر خودکار وضعیت به «پاسخ داده شد»</label>
+              </div>
+              <button type="button" class="btn btn-gold btn-sm px-4 fw-bold" id="sendReplyBtn" onclick="sendAdminReply()">
+                <span id="sendReplySpinner" class="spinner-border spinner-border-sm d-none me-1" role="status"></span>
+                <i class="bi bi-send-fill me-1"></i> ثبت و ارسال پاسخ
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Modal: Create / Edit Home Announcement -->
@@ -482,11 +644,14 @@
   <script>
     let cachedUsers = [];
     let cachedAnnouncements = [];
+    let cachedTickets = [];
+    let currentOpenTicket = null;
     let currentActiveAnn = null;
     let currentActiveComp = null;
     let bootstrapStartModal = null;
     let bootstrapArchiveModal = null;
     let bootstrapAnnModal = null;
+    let bootstrapTicketModal = null;
 
     document.addEventListener('DOMContentLoaded', () => {
       const sModalEl = document.getElementById('startCompModal');
@@ -497,6 +662,9 @@
 
       const annModalEl = document.getElementById('announcementModal');
       if (annModalEl) bootstrapAnnModal = new bootstrap.Modal(annModalEl);
+
+      const tModalEl = document.getElementById('ticketConversationModal');
+      if (tModalEl) bootstrapTicketModal = new bootstrap.Modal(tModalEl);
     });
 
     function getAdminKey() {
@@ -798,6 +966,9 @@
         renderUsers(cachedUsers);
         renderSessions(data.recentSessions || []);
 
+        // Load Support Tickets
+        loadAdminSupportTickets();
+
       } catch (err) {
         authBadge.className = 'badge bg-warning text-dark';
         authBadge.innerText = 'خطای ارتباط';
@@ -1097,6 +1268,316 @@
           loadDashboard();
         } else {
           alert('خطا: ' + (data.error || 'عملیات ناموفق بود'));
+        }
+      } catch (err) {
+        alert('خطای ارتباط: ' + err.message);
+      }
+    }
+
+    // ====================================================================
+    // Support Tickets Management JavaScript (Admin Panel)
+    // ====================================================================
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    const SUPPORT_CATEGORY_MAP = {
+      'SCORES': { label: 'امتیازها', icon: 'bi-star-fill text-warning' },
+      'ADS': { label: 'تبلیغات', icon: 'bi-play-circle-fill text-info' },
+      'PRIZES': { label: 'جوایز', icon: 'bi-gift-fill text-primary' },
+      'MEMBERSHIP': { label: 'عضویت', icon: 'bi-award-fill text-warning' },
+      'PURCHASE': { label: 'خرید', icon: 'bi-cart-check-fill text-success' },
+      'LOGIN': { label: 'مشکل ورود', icon: 'bi-key-fill text-danger' },
+      'OTHER': { label: 'سایر موارد', icon: 'bi-question-circle text-secondary' }
+    };
+
+    const SUPPORT_STATUS_MAP = {
+      'NEW': { label: 'جدید / بی‌پاسخ', cls: 'badge bg-danger' },
+      'IN_PROGRESS': { label: 'در حال بررسی', cls: 'badge bg-warning text-dark' },
+      'ANSWERED': { label: 'پاسخ داده شد', cls: 'badge bg-success' },
+      'CLOSED': { label: 'بسته شده', cls: 'badge bg-secondary' }
+    };
+
+    async function loadAdminSupportTickets() {
+      const key = getAdminKey();
+      try {
+        const res = await fetch('/api/admin/support/tickets', {
+          headers: { 'x-admin-key': key }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.success) {
+          cachedTickets = data.tickets || [];
+
+          // Update Counters
+          if (data.stats) {
+            document.getElementById('supportCountTotal').innerText = data.stats.total;
+            document.getElementById('supportCountNew').innerText = data.stats.newCount;
+            document.getElementById('supportCountInProgress').innerText = data.stats.inProgressCount;
+            document.getElementById('supportCountAnswered').innerText = data.stats.answeredCount;
+          }
+
+          filterSupportTickets();
+        }
+      } catch (err) {
+        console.warn('[Support Tickets Fetch Error]', err.message);
+      }
+    }
+
+    function filterSupportTickets() {
+      const search = (document.getElementById('supportSearchInput')?.value || '').trim().toLowerCase();
+      const statusFilter = document.getElementById('supportStatusFilter')?.value || 'ALL';
+      const categoryFilter = document.getElementById('supportCategoryFilter')?.value || 'ALL';
+
+      let filtered = cachedTickets.slice();
+
+      if (statusFilter !== 'ALL') {
+        filtered = filtered.filter(t => t.status === statusFilter);
+      }
+
+      if (categoryFilter !== 'ALL') {
+        filtered = filtered.filter(t => t.category === categoryFilter);
+      }
+
+      if (search) {
+        filtered = filtered.filter(t => 
+          (t.trackingCode && t.trackingCode.toLowerCase().includes(search)) ||
+          (t.phoneNumber && t.phoneNumber.includes(search)) ||
+          (t.userName && t.userName.toLowerCase().includes(search)) ||
+          (t.subject && t.subject.toLowerCase().includes(search)) ||
+          (t.lastMessage && t.lastMessage.toLowerCase().includes(search))
+        );
+      }
+
+      const summaryEl = document.getElementById('supportFilterSummary');
+      if (summaryEl) {
+        summaryEl.innerText = `${filtered.length} تیکت از ${cachedTickets.length}`;
+      }
+
+      renderSupportTickets(filtered);
+    }
+
+    function renderSupportTickets(tickets) {
+      const tbody = document.getElementById('supportTicketsTbody');
+      if (!tbody) return;
+
+      if (!tickets || tickets.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-secondary">هیچ تیکت پشتیبانی متناسب با فیلتر یافت نشد.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = tickets.map(t => {
+        const cat = SUPPORT_CATEGORY_MAP[t.category] || SUPPORT_CATEGORY_MAP['OTHER'];
+        const stat = SUPPORT_STATUS_MAP[t.status] || SUPPORT_STATUS_MAP['NEW'];
+        const updateDate = new Date(t.updatedAtMs).toLocaleDateString('fa-IR', {
+          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
+
+        const snippet = t.lastMessage ? (t.lastMessage.length > 40 ? t.lastMessage.substring(0, 40) + '...' : t.lastMessage) : '-';
+        const senderBadge = t.lastSenderType === 'ADMIN' 
+          ? '<span class="badge bg-info text-dark" style="font-size:0.65rem;">مدیر</span> ' 
+          : '<span class="badge bg-secondary" style="font-size:0.65rem;">کاربر</span> ';
+
+        return `
+          <tr>
+            <td><strong class="text-warning">${escapeHtml(t.trackingCode)}</strong></td>
+            <td>
+              <div class="fw-bold text-white">${escapeHtml(t.userName)}</div>
+              <small class="text-secondary" style="direction:ltr; display:inline-block;">${escapeHtml(t.phoneNumber)}</small>
+            </td>
+            <td>
+              <span class="small text-nowrap"><i class="bi ${cat.icon} me-1"></i> ${cat.label}</span>
+            </td>
+            <td>
+              <div class="text-white text-truncate" style="max-width: 180px;">${escapeHtml(t.subject)}</div>
+            </td>
+            <td><span class="${stat.cls}">${stat.label}</span></td>
+            <td>
+              <small class="text-light" style="max-width: 220px; display:inline-block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                ${senderBadge}${escapeHtml(snippet)}
+              </small>
+            </td>
+            <td><small class="text-secondary">${updateDate}</small></td>
+            <td>
+              <button class="btn btn-sm btn-outline-info" onclick="openSupportTicketModal('${t.id}')">
+                <i class="bi bi-chat-dots me-1"></i> مشاهده و پاسخ
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    async function openSupportTicketModal(ticketId) {
+      currentOpenTicket = null;
+      const key = getAdminKey();
+
+      document.getElementById('ticketConvTitle').innerText = 'در حال بارگذاری...';
+      document.getElementById('ticketConvCode').innerText = '...';
+      document.getElementById('ticketConvUser').innerText = '...';
+      document.getElementById('ticketConvPhone').innerText = '...';
+      document.getElementById('ticketMessagesContainer').innerHTML = '<div class="text-center text-secondary py-4"><span class="spinner-border spinner-border-sm me-2"></span>در حال دریافت پیام‌ها...</div>';
+      document.getElementById('adminReplyTextarea').value = '';
+
+      if (bootstrapTicketModal) bootstrapTicketModal.show();
+
+      try {
+        const res = await fetch(`/api/admin/support/tickets/${ticketId}`, {
+          headers: { 'x-admin-key': key }
+        });
+        if (!res.ok) throw new Error('خطا در دریافت تیکت');
+        const data = await res.json();
+        if (data.success && data.ticket) {
+          currentOpenTicket = data.ticket;
+          renderTicketConversation(data.ticket, data.messages || []);
+        }
+      } catch (err) {
+        document.getElementById('ticketMessagesContainer').innerHTML = `<div class="alert alert-danger mb-0">${escapeHtml(err.message)}</div>`;
+      }
+    }
+
+    function renderTicketConversation(ticket, messages) {
+      document.getElementById('ticketConvTitle').innerText = ticket.subject;
+      document.getElementById('ticketConvCode').innerText = ticket.trackingCode;
+      document.getElementById('ticketConvUser').innerText = ticket.userName;
+      document.getElementById('ticketConvPhone').innerText = ticket.phoneNumber;
+
+      const cat = SUPPORT_CATEGORY_MAP[ticket.category] || SUPPORT_CATEGORY_MAP['OTHER'];
+      const stat = SUPPORT_STATUS_MAP[ticket.status] || SUPPORT_STATUS_MAP['NEW'];
+      document.getElementById('ticketConvCategory').innerText = cat.label;
+      document.getElementById('ticketConvStatusBadge').className = stat.cls;
+      document.getElementById('ticketConvStatusBadge').innerText = stat.label;
+
+      const createdDate = new Date(ticket.createdAtMs).toLocaleDateString('fa-IR', {
+        year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+      });
+      document.getElementById('ticketConvCreated').innerText = createdDate;
+
+      const select = document.getElementById('ticketConvStatusSelect');
+      if (select) select.value = ticket.status;
+
+      const container = document.getElementById('ticketMessagesContainer');
+      if (!messages || messages.length === 0) {
+        container.innerHTML = '<div class="text-center text-secondary py-3">هیچ پیامی ثبت نشده است.</div>';
+        return;
+      }
+
+      container.innerHTML = messages.map(m => {
+        const isUser = m.senderType === 'USER';
+        const timeStr = new Date(m.createdAtMs).toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' });
+        const dateStr = new Date(m.createdAtMs).toLocaleDateString('fa-IR', { month: 'short', day: 'numeric' });
+
+        if (isUser) {
+          return `
+            <div class="d-flex flex-column align-items-start" style="max-width: 85%; align-self: flex-start;">
+              <div class="d-flex align-items-center gap-1 mb-1">
+                <span class="badge bg-secondary" style="font-size: 0.7rem;"><i class="bi bi-person-fill"></i> ${escapeHtml(m.senderName || 'کاربر')}</span>
+                <span class="text-secondary small" style="font-size: 0.72rem;">${dateStr} ${timeStr}</span>
+              </div>
+              <div class="p-3 rounded-3 text-white" style="background-color: #1E3E62; border: 1px solid #2E5077; white-space: pre-line; word-break: break-word;">
+                ${escapeHtml(m.messageText)}
+              </div>
+            </div>
+          `;
+        } else {
+          return `
+            <div class="d-flex flex-column align-items-end" style="max-width: 85%; align-self: flex-end;">
+              <div class="d-flex align-items-center gap-1 mb-1">
+                <span class="text-secondary small" style="font-size: 0.72rem;">${dateStr} ${timeStr}</span>
+                <span class="badge bg-warning text-dark fw-bold" style="font-size: 0.7rem;"><i class="bi bi-shield-check"></i> پاسخ پشتیبانی مدیریت</span>
+              </div>
+              <div class="p-3 rounded-3 text-dark fw-medium" style="background-color: #FFB703; border: 1px solid #FB8500; white-space: pre-line; word-break: break-word;">
+                ${escapeHtml(m.messageText)}
+              </div>
+            </div>
+          `;
+        }
+      }).join('');
+
+      // Auto scroll to latest message
+      container.scrollTop = container.scrollHeight;
+    }
+
+    async function sendAdminReply() {
+      if (!currentOpenTicket) return;
+      const textarea = document.getElementById('adminReplyTextarea');
+      const text = textarea.value.trim();
+      if (!text) {
+        alert('لطفاً متن پاسخ را وارد نمایید.');
+        return;
+      }
+
+      const shouldSetAnswered = document.getElementById('replySetAnswered')?.checked;
+      const newStatus = shouldSetAnswered ? 'ANSWERED' : currentOpenTicket.status;
+
+      const btn = document.getElementById('sendReplyBtn');
+      const spinner = document.getElementById('sendReplySpinner');
+      btn.setAttribute('disabled', 'true');
+      spinner.classList.remove('d-none');
+
+      const key = getAdminKey();
+      try {
+        const res = await fetch(`/api/admin/support/tickets/${currentOpenTicket.id}/messages`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-key': key
+          },
+          body: JSON.stringify({
+            message: text,
+            newStatus
+          })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          textarea.value = '';
+          // Reload ticket messages
+          await openSupportTicketModal(currentOpenTicket.id);
+          // Reload dashboard tickets list
+          loadAdminSupportTickets();
+        } else {
+          alert('خطا: ' + (data.error || 'ارسال پاسخ ناموفق بود'));
+        }
+      } catch (err) {
+        alert('خطای ارتباط: ' + err.message);
+      } finally {
+        btn.removeAttribute('disabled');
+        spinner.classList.add('d-none');
+      }
+    }
+
+    async function updateTicketStatusFromSelect() {
+      if (!currentOpenTicket) return;
+      const select = document.getElementById('ticketConvStatusSelect');
+      const status = select.value;
+      const key = getAdminKey();
+
+      try {
+        const res = await fetch(`/api/admin/support/tickets/${currentOpenTicket.id}/status`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-key': key
+          },
+          body: JSON.stringify({ status })
+        });
+        const data = await res.json();
+        if (data.success) {
+          currentOpenTicket.status = status;
+          const stat = SUPPORT_STATUS_MAP[status] || SUPPORT_STATUS_MAP['NEW'];
+          document.getElementById('ticketConvStatusBadge').className = stat.cls;
+          document.getElementById('ticketConvStatusBadge').innerText = stat.label;
+          loadAdminSupportTickets();
+        } else {
+          alert('خطا: ' + (data.error || 'تغییر وضعیت ناموفق بود'));
         }
       } catch (err) {
         alert('خطای ارتباط: ' + err.message);

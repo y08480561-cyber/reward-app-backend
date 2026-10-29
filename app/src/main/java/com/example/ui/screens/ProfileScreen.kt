@@ -68,7 +68,8 @@ fun ProfileScreen(
     user: User,
     activeCompetition: com.example.model.CompetitionInfo? = null,
     onLogout: () -> Unit,
-    onNavigateToMembership: () -> Unit
+    onNavigateToMembership: () -> Unit,
+    onNavigateToSupport: () -> Unit = {}
 ) {
     var showLogoutDialog by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
@@ -206,6 +207,62 @@ fun ProfileScreen(
                 Text(
                     text = "مشاهده",
                     color = NavyPrimary,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp
+                )
+            }
+        }
+
+        // Support & Help Desk Card
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .shadow(2.dp, RoundedCornerShape(16.dp))
+                .clickable { onNavigateToSupport() }
+                .testTag("btn_profile_support"),
+            shape = RoundedCornerShape(16.dp),
+            color = Color.White,
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF0284C7).copy(alpha = 0.35f))
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .background(Color(0xFFE0F2FE), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = null,
+                            tint = Color(0xFF0284C7),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = "مرکز پشتیبانی و پیام‌ها",
+                            color = NavyPrimary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                        Text(
+                            text = "ثبت تیکت، پیگیری و گفت‌وگوی مستقیم با مدیریت",
+                            color = Color(0xFF64748B),
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+                Text(
+                    text = "ورود ←",
+                    color = Color(0xFF0284C7),
                     fontWeight = FontWeight.Bold,
                     fontSize = 12.sp
                 )
