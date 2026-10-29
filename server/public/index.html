@@ -860,10 +860,25 @@
       }
     }
 
+    function setElText(id, text) {
+      const el = document.getElementById(id);
+      if (el) el.innerText = text;
+    }
+
+    function setElHtml(id, html) {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = html;
+    }
+
+    function setElClass(id, className) {
+      const el = document.getElementById(id);
+      if (el) el.className = className;
+    }
+
     async function loadDashboard() {
       const spinner = document.getElementById('refreshSpinner');
       const authBadge = document.getElementById('authStatusBadge');
-      spinner.classList.remove('d-none');
+      if (spinner) spinner.classList.remove('d-none');
       hideAlert();
 
       const key = getAdminKey();
@@ -876,11 +891,13 @@
         });
 
         if (res.status === 401) {
-          authBadge.className = 'badge bg-danger';
-          authBadge.innerText = 'کلید نامعتبر';
+          if (authBadge) {
+            authBadge.className = 'badge bg-danger';
+            authBadge.innerText = 'کلید نامعتبر';
+          }
           showAlert('خطای دسترسی: کلید امنیتی مدیریت نامعتبر است. لطفاً کلید صحیح ADMIN_KEY را در کادر بالا وارد و تایید کنید.');
-          document.getElementById('usersTbody').innerHTML = '<tr><td colspan="6" class="text-center text-danger py-4">دسترسی به اطلاعات سرور نیازمند کلید مدیریت است.</td></tr>';
-          document.getElementById('sessionsTbody').innerHTML = '<tr><td colspan="6" class="text-center text-danger py-4">دسترسی مسدود است.</td></tr>';
+          setElHtml('usersTbody', '<tr><td colspan="6" class="text-center text-danger py-4">دسترسی به اطلاعات سرور نیازمند کلید مدیریت است.</td></tr>');
+          setElHtml('sessionsTbody', '<tr><td colspan="6" class="text-center text-danger py-4">دسترسی مسدود است.</td></tr>');
           return;
         }
 
@@ -889,26 +906,28 @@
         }
 
         const data = await res.json();
-        authBadge.className = 'badge bg-success';
-        authBadge.innerText = 'متصل و معتبر';
+        if (authBadge) {
+          authBadge.className = 'badge bg-success';
+          authBadge.innerText = 'متصل و معتبر';
+        }
 
         // Stats
-        document.getElementById('totalUsers').innerText = data.totalUsers + ' نفر';
-        document.getElementById('totalScores').innerText = (data.totalScoresSum || 0) + ' امتیاز';
-        document.getElementById('totalAds').innerText = data.totalAdSessions + ' رویداد';
+        setElText('totalUsers', (data.totalUsers || 0) + ' نفر');
+        setElText('totalScores', (data.totalScoresSum || 0) + ' امتیاز');
+        setElText('totalAds', (data.totalAdSessions || 0) + ' رویداد');
 
         // Active Competition
         if (data.activeCompetition) {
           currentActiveComp = data.activeCompetition;
-          document.getElementById('activeCompNumber').innerText = 'دوره ' + data.activeCompetition.competitionNumber;
-          document.getElementById('activeCompTitle').innerText = data.activeCompetition.title;
+          setElText('activeCompNumber', 'دوره ' + data.activeCompetition.competitionNumber);
+          setElText('activeCompTitle', data.activeCompetition.title);
           const startDate = new Date(data.activeCompetition.startedAt);
-          document.getElementById('activeCompStartedAt').innerText = startDate.toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+          setElText('activeCompStartedAt', startDate.toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }));
           if (data.activeCompetition.endedAt) {
             const endDate = new Date(data.activeCompetition.endedAt);
-            document.getElementById('activeCompEndedAt').innerText = endDate.toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            setElText('activeCompEndedAt', endDate.toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }));
           } else {
-            document.getElementById('activeCompEndedAt').innerText = 'نامحدود / تعیین نشده';
+            setElText('activeCompEndedAt', 'نامحدود / تعیین نشده');
           }
         }
 
@@ -922,7 +941,7 @@
 
         // Past Competitions
         const pastComps = data.pastCompetitions || [];
-        document.getElementById('archivedCompsCount').innerText = pastComps.length + ' دوره';
+        setElText('archivedCompsCount', pastComps.length + ' دوره');
         renderArchivedCompetitions(pastComps);
 
         // Logs
@@ -937,32 +956,35 @@
         loadAdminSupportTickets();
 
       } catch (err) {
-        authBadge.className = 'badge bg-warning text-dark';
-        authBadge.innerText = 'خطای ارتباط';
+        if (authBadge) {
+          authBadge.className = 'badge bg-warning text-dark';
+          authBadge.innerText = 'خطای ارتباط';
+        }
         showAlert(err.message || 'خطا در برقراری ارتباط با سرور');
       } finally {
-        spinner.classList.add('d-none');
+        if (spinner) spinner.classList.add('d-none');
       }
     }
 
     function renderActiveAnnouncement(ann) {
-      const card = document.getElementById('activeAnnCard');
       const toggleBtn = document.getElementById('toggleActiveAnnBtn');
+      const typeBadge = document.getElementById('activeAnnTypeBadge');
+
       if (!ann) {
-        document.getElementById('activeAnnStatusBadge').className = 'badge bg-secondary';
-        document.getElementById('activeAnnStatusBadge').innerHTML = '<i class="bi bi-dash-circle"></i> بدون پیام فعال';
-        document.getElementById('activeAnnTypeBadge').className = 'badge bg-dark d-none';
-        document.getElementById('activeAnnTitle').innerText = 'در حال حاضر هیچ پیامی در بالای صفحه اصلی فعال نیست.';
-        document.getElementById('activeAnnContent').innerText = 'برای نمایش اطلاعیه یا پیام جدید به کاربران اپلیکیشن، روی دکمه «ایجاد پیام جدید» کلیک کنید.';
-        document.getElementById('activeAnnStartsAt').innerText = '-';
-        document.getElementById('activeAnnEndsAt').innerText = '-';
-        toggleBtn.classList.add('d-none');
+        setElClass('activeAnnStatusBadge', 'badge bg-secondary');
+        setElHtml('activeAnnStatusBadge', '<i class="bi bi-dash-circle"></i> بدون پیام فعال');
+        if (typeBadge) typeBadge.className = 'badge bg-dark d-none';
+        setElText('activeAnnTitle', 'در حال حاضر هیچ پیامی در بالای صفحه اصلی فعال نیست.');
+        setElText('activeAnnContent', 'برای نمایش اطلاعیه یا پیام جدید به کاربران اپلیکیشن، روی دکمه «ایجاد پیام جدید» کلیک کنید.');
+        setElText('activeAnnStartsAt', '-');
+        setElText('activeAnnEndsAt', '-');
+        if (toggleBtn) toggleBtn.classList.add('d-none');
         return;
       }
 
-      toggleBtn.classList.remove('d-none');
-      document.getElementById('activeAnnStatusBadge').className = ann.isActive ? 'badge bg-success' : 'badge bg-danger';
-      document.getElementById('activeAnnStatusBadge').innerHTML = ann.isActive ? '<i class="bi bi-check-circle-fill"></i> در حال نمایش در صفحه اصلی' : '<i class="bi bi-eye-slash-fill"></i> غیرفعال شده';
+      if (toggleBtn) toggleBtn.classList.remove('d-none');
+      setElClass('activeAnnStatusBadge', ann.isActive ? 'badge bg-success' : 'badge bg-danger');
+      setElHtml('activeAnnStatusBadge', ann.isActive ? '<i class="bi bi-check-circle-fill"></i> در حال نمایش در صفحه اصلی' : '<i class="bi bi-eye-slash-fill"></i> غیرفعال شده');
 
       const typeLabels = {
         'ANNOUNCEMENT': 'اطلاعیه',
@@ -971,22 +993,26 @@
         'WINNERS': 'اعلام برندگان',
         'CUSTOM': 'پیام ویژه'
       };
-      document.getElementById('activeAnnTypeBadge').classList.remove('d-none');
-      document.getElementById('activeAnnTypeBadge').innerText = typeLabels[ann.type] || 'اطلاعیه';
+      if (typeBadge) {
+        typeBadge.classList.remove('d-none');
+        typeBadge.innerText = typeLabels[ann.type] || 'اطلاعیه';
+      }
 
-      document.getElementById('activeAnnTitle').innerText = ann.title;
-      document.getElementById('activeAnnContent').innerText = ann.content;
-      document.getElementById('activeAnnStartsAt').innerText = new Date(ann.updatedAt || ann.startsAt).toLocaleDateString('fa-IR', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+      setElText('activeAnnTitle', ann.title);
+      setElText('activeAnnContent', ann.content);
+      setElText('activeAnnStartsAt', new Date(ann.updatedAt || ann.startsAt).toLocaleDateString('fa-IR', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }));
       
       if (ann.endsAt) {
         const endDate = new Date(ann.endsAt);
-        document.getElementById('activeAnnEndsAt').innerText = endDate.toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        setElText('activeAnnEndsAt', endDate.toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }));
       } else {
-        document.getElementById('activeAnnEndsAt').innerText = 'تعیین نشده';
+        setElText('activeAnnEndsAt', 'تعیین نشده');
       }
 
-      toggleBtn.innerHTML = ann.isActive ? '<i class="bi bi-eye-slash"></i> غیرفعال‌سازی' : '<i class="bi bi-eye"></i> فعال‌سازی';
-      toggleBtn.className = ann.isActive ? 'btn btn-sm btn-outline-danger' : 'btn btn-sm btn-outline-success';
+      if (toggleBtn) {
+        toggleBtn.innerHTML = ann.isActive ? '<i class="bi bi-eye-slash"></i> غیرفعال‌سازی' : '<i class="bi bi-eye"></i> فعال‌سازی';
+        toggleBtn.className = ann.isActive ? 'btn btn-sm btn-outline-danger' : 'btn btn-sm btn-outline-success';
+      }
     }
 
     function renderAnnouncements(list) {
@@ -1285,10 +1311,10 @@
 
           // Update Counters
           if (data.stats) {
-            document.getElementById('supportCountTotal').innerText = data.stats.total;
-            document.getElementById('supportCountNew').innerText = data.stats.newCount;
-            document.getElementById('supportCountInProgress').innerText = data.stats.inProgressCount;
-            document.getElementById('supportCountAnswered').innerText = data.stats.answeredCount;
+            setElText('supportCountTotal', data.stats.total || 0);
+            setElText('supportCountNew', data.stats.newCount || 0);
+            setElText('supportCountInProgress', data.stats.inProgressCount || 0);
+            setElText('supportCountAnswered', data.stats.answeredCount || 0);
           }
 
           filterSupportTickets();
