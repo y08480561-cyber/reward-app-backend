@@ -26,6 +26,16 @@
     <string name="logout">خروج از حساب</string>
     <string name="logout_confirm">آیا مطمئن هستید که می‌خواهید از حساب کاربری خارج شوید؟</string>
 
+    <!-- Irancell Exclusive Notice -->
+    <string name="irancell_badge_title">سرویس اختصاصی مشترکین ایرانسل</string>
+    <string name="irancell_literary_title">سامانه منحصراً ویژه مشترکان ارجمند ایرانسل</string>
+    <string name="irancell_literary_desc">با کمال احترام و افتخار، این سامانه منحصراً جهت حضور، رقابت و بهره‌مندی مشترکین گرامی و همراهان وفادار اپراتور ایرانسل طراحی گردیده است.</string>
+    <string name="irancell_data_requirement_title">شرط اتصال: اینترنت سیم‌کارت ایرانسل</string>
+    <string name="irancell_data_requirement_desc">جهت اعتبارسنجی شبکه و ثبت بدون خطای امتیازات، خاموش بودن فیلترشکن (VPN) و اتصال مستقیم به اینترنت دیتای ایرانسل الزامی می‌باشد.</string>
+    <string name="irancell_wifi_warning">توجه: لطفاً وای‌فای (Wi-Fi) را خاموش کرده و داده همراه سیم‌کارت ایرانسل خود را روشن نمایید.</string>
+    <string name="irancell_phone_hint">شماره همراه ایرانسل (093x - 090x - 099x)</string>
+    <string name="irancell_support_note">اعتبارسنجی ورود و اهدای جوایز صرفاً با اینترنت و سیم‌کارت فعال ایرانسل مقدور می‌باشد.</string>
+
     <!-- Errors and Validations -->
     <string name="err_empty_name">لطفاً نام خود را وارد کنید.</string>
     <string name="err_empty_family">لطفاً نام خانوادگی خود را وارد کنید.</string>
