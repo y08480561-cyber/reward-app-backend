@@ -70,7 +70,8 @@ fun ProfileScreen(
     activeCompetition: com.example.model.CompetitionInfo? = null,
     onLogout: () -> Unit,
     onNavigateToMembership: () -> Unit,
-    onNavigateToSupport: () -> Unit = {}
+    onNavigateToSupport: () -> Unit = {},
+    onToggleNotifications: (Boolean) -> Unit
 ) {
     var showLogoutDialog by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
@@ -299,6 +300,23 @@ fun ProfileScreen(
                     label = "وضعیت حساب",
                     value = "فعال و تایید شده"
                 )
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "دریافت اعلان‌ها",
+                        fontSize = 12.sp,
+                        color = NavyPrimary,
+                        fontWeight = FontWeight.Bold
+                    )
+                    androidx.compose.material3.Switch(
+                        checked = user.notificationsEnabled,
+                        onCheckedChange = onToggleNotifications
+                    )
+                }
             }
         }
 

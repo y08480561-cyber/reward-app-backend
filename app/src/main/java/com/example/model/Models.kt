@@ -12,7 +12,8 @@ data class User(
     val token: String = "",
     val registeredAt: Long = System.currentTimeMillis(),
     val panelType: String = "free",
-    val multiplier: Int = 1
+    val multiplier: Int = 1,
+    val notificationsEnabled: Boolean = true
 ) {
     val fullName: String
         get() = "$firstName $lastName".trim()

@@ -24,6 +24,15 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MyApplicationTheme {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                    val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
+                        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+                    ) { isGranted -> }
+                    androidx.compose.runtime.LaunchedEffect(Unit) {
+                        launcher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                    }
+                }
+
                 val viewModel: MainViewModel = viewModel()
                 val uiState by viewModel.uiState.collectAsState()
                 val authState by viewModel.authUiState.collectAsState()
@@ -107,7 +116,8 @@ class MainActivity : ComponentActivity() {
                                         activeCompetition = uiState.activeCompetition,
                                         onLogout = { viewModel.logout() },
                                         onNavigateToMembership = { viewModel.navigateTo(AppScreen.MEMBERSHIP) },
-                                        onNavigateToSupport = { viewModel.navigateTo(AppScreen.SUPPORT) }
+                                        onNavigateToSupport = { viewModel.navigateTo(AppScreen.SUPPORT) },
+                                        onToggleNotifications = { enabled -> viewModel.toggleNotificationPreference(enabled) }
                                     )
                                 }
                             }

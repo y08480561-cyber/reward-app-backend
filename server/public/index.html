@@ -70,356 +70,47 @@
     <!-- Alert Box -->
     <div id="alertBox" class="alert alert-danger d-none" role="alert"></div>
 
-    <!-- 1. Active Competition Section -->
-    <div class="card comp-banner p-4 mb-4 shadow">
-      <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
-        <div>
-          <div class="d-flex align-items-center gap-2 mb-1">
-            <span class="badge bg-success px-3 py-2 fs-6"><i class="bi bi-broadcast"></i> مسابقه جاری (فعال)</span>
-            <span class="badge bg-dark border border-warning text-warning" id="activeCompNumber">دوره ۱</span>
-          </div>
-          <h3 class="gold-text mb-1" id="activeCompTitle">در حال بارگذاری اطلاعات مسابقه جاری...</h3>
-          <p class="text-secondary mb-0">
-            <i class="bi bi-calendar3"></i> زمان شروع: <span id="activeCompStartedAt" class="text-white">-</span>
-            <span class="mx-2">|</span>
-            <i class="bi bi-hourglass-split"></i> مهلت پایان: <span id="activeCompEndedAt" class="text-warning">نامحدود / تعیین نشده</span>
-            <span class="mx-2">|</span>
-            <i class="bi bi-info-circle"></i> وضعیت امتیازها: <span class="text-info">کاربران با امتیاز صفر شروع کرده و رقابت می‌کنند.</span>
-          </p>
-        </div>
-        <div class="d-flex gap-2 align-items-center flex-wrap">
-          <button class="btn btn-lg btn-danger fw-bold px-4 py-3 shadow" onclick="openStartCompModal()">
-            <i class="bi bi-arrow-repeat me-1"></i> شروع مسابقه جدید
-          </button>
-        </div>
+    <!-- Nav Tabs -->
+    <ul class="nav nav-tabs mb-4" id="adminTabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-stats" type="button" role="tab"><i class="bi bi-graph-up"></i> آمار و مسابقات</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-announcements" type="button" role="tab"><i class="bi bi-megaphone"></i> پیام‌ها و اعلان‌ها</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-support" type="button" role="tab"><i class="bi bi-headset"></i> پشتیبانی</button>
+      </li>
+    </ul>
+
+    <div class="tab-content">
+      <!-- Tab 1: Stats & Competitions -->
+      <div class="tab-pane fade show active" id="tab-stats" role="tabpanel">
+        <!-- Competitions Section -->
+        <div class="card comp-banner p-4 mb-4 shadow">...</div>
+        <!-- Stats Overview -->
+        <div class="row g-3 mb-4">...</div>
+        <!-- Tables -->
+        <div class="row g-4 mb-4">...</div>
+        <!-- Historical Competitions Archive -->
+        <div class="row g-4 mb-5">...</div>
+      </div>
+
+      <!-- Tab 2: Announcements & Push Notifications -->
+      <div class="tab-pane fade" id="tab-announcements" role="tabpanel">
+        <!-- Announcements Management -->
+        <div class="card ann-banner p-4 mb-4 shadow">...</div>
+        <!-- Push Notifications -->
+        <div class="card p-4 mb-4 shadow" style="background-color: #1E293B; border: 1px solid #6366F1;">...</div>
+      </div>
+
+      <!-- Tab 3: Support -->
+      <div class="tab-pane fade" id="tab-support" role="tabpanel">
+        <!-- Support Center Management -->
+        <div class="card p-4 mb-4 shadow" style="border: 1px solid #0284C7; background-color: #162C46;">...</div>
       </div>
     </div>
 
-    <!-- 2. Home Announcements Management Section (NEW) -->
-    <div class="card ann-banner p-4 mb-4 shadow">
-      <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3 pb-2 border-bottom border-secondary">
-        <div class="d-flex align-items-center gap-2">
-          <i class="bi bi-megaphone-fill text-info fs-4"></i>
-          <div>
-            <h4 class="mb-0 text-white fw-bold">مدیریت پیام و اطلاعیه صفحه اصلی اپلیکیشن</h4>
-            <small class="text-secondary">کنترل پیام‌های بالای صفحه اصلی، اعلام شروع دوره، مهلت پایان و برندگان</small>
-          </div>
-        </div>
-        <div class="d-flex gap-2 flex-wrap">
-          <button class="btn btn-outline-info fw-bold btn-sm px-3 py-2" onclick="openAnnouncementModal()">
-            <i class="bi bi-plus-circle me-1"></i> ایجاد پیام جدید
-          </button>
-        </div>
-      </div>
-
-      <!-- Active Announcement Details Card -->
-      <div id="activeAnnCard" class="card p-3 mb-3" style="background-color: #122338; border: 1px solid #38BDF8;">
-        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-          <div class="d-flex align-items-center gap-2">
-            <span class="badge bg-success" id="activeAnnStatusBadge"><i class="bi bi-check-circle-fill"></i> در حال نمایش در صفحه اصلی</span>
-            <span class="badge bg-primary" id="activeAnnTypeBadge">اطلاعیه</span>
-          </div>
-          <div class="d-flex gap-2">
-            <button class="btn btn-sm btn-outline-warning" onclick="editCurrentActiveAnn()">
-              <i class="bi bi-pencil-square"></i> ویرایش پیام
-            </button>
-            <button class="btn btn-sm btn-outline-danger" id="toggleActiveAnnBtn" onclick="toggleCurrentActiveAnn()">
-              <i class="bi bi-eye-slash"></i> غیرفعال‌سازی
-            </button>
-          </div>
-        </div>
-        <h5 class="gold-text mb-2" id="activeAnnTitle">-</h5>
-        <p class="text-white mb-2" id="activeAnnContent" style="white-space: pre-line;">-</p>
-        <div class="d-flex flex-wrap gap-3 text-secondary small">
-          <div><i class="bi bi-clock-history"></i> زمان ثبت: <span id="activeAnnStartsAt" class="text-white">-</span></div>
-          <div><i class="bi bi-hourglass-bottom text-warning"></i> زمان پایان اعلام‌شده: <span id="activeAnnEndsAt" class="text-warning">مشخص نشده</span></div>
-        </div>
-      </div>
-
-      <!-- Announcements History Table -->
-      <div class="mt-3">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-          <span class="text-secondary small fw-bold"><i class="bi bi-clock-history"></i> سوابق و آرشیو پیام‌های صفحه اصلی</span>
-        </div>
-        <div class="table-responsive">
-          <table class="table table-dark table-hover table-striped rounded align-middle mb-0">
-            <thead>
-              <tr class="text-secondary small">
-                <th>عنوان پیام</th>
-                <th>نوع</th>
-                <th>وضعیت</th>
-                <th>مهلت پایان</th>
-                <th>تاریخ ثبت</th>
-                <th>عملیات</th>
-              </tr>
-            </thead>
-            <tbody id="announcementsTbody">
-              <tr><td colspan="6" class="text-center py-3 text-secondary">در حال دریافت سوابق پیام‌ها...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- 3. Push Notifications Section (NEW) -->
-    <div class="card p-4 mb-4 shadow" style="background-color: #1E293B; border: 1px solid #6366F1;">
-      <h4 class="text-white fw-bold"><i class="bi bi-send-fill text-indigo-400"></i> ارسال اعلان پوش (Push Notification)</h4>
-      <div class="row g-3">
-        <div class="col-md-6">
-          <input type="text" id="pushTitle" class="form-control form-control-dark" placeholder="عنوان اعلان">
-        </div>
-        <div class="col-md-6">
-          <input type="text" id="pushMessage" class="form-control form-control-dark" placeholder="متن اعلان">
-        </div>
-        <div class="col-12">
-          <button class="btn btn-primary" onclick="sendPushNotification()">ارسال اعلان</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 3. Stats Overview -->
-    <div class="row g-3 mb-4">
-      <div class="col-md-3">
-        <div class="card p-3">
-          <span class="text-secondary"><i class="bi bi-people-fill text-info"></i> شرکت‌کنندگان دوره جاری</span>
-          <h3 class="gold-text mt-2 mb-0" id="totalUsers">۰ نفر</h3>
-          <small class="text-secondary mt-1">بدون احتساب داده آزمایشی</small>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="card p-3">
-          <span class="text-secondary"><i class="bi bi-star-fill text-warning"></i> مجموع امتیاز دوره جاری</span>
-          <h3 class="text-warning mt-2 mb-0" id="totalScores">۰ امتیاز</h3>
-          <small class="text-secondary mt-1">از تبلیغات تاییدشده مسابقه فعلی</small>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="card p-3">
-          <span class="text-secondary"><i class="bi bi-play-circle-fill text-success"></i> کل رویدادهای تپسل</span>
-          <h3 class="text-success mt-2 mb-0" id="totalAds">۰ رویداد</h3>
-          <small class="text-secondary mt-1">با توکن ضدتقلب</small>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="card p-3">
-          <span class="text-secondary"><i class="bi bi-archive-fill text-primary"></i> دوره‌های آرشیو شده</span>
-          <h3 class="text-white mt-2 mb-0" id="archivedCompsCount">۰ دوره</h3>
-          <small class="text-info mt-1">دارای کارنامه نهایی دائمی</small>
-        </div>
-      </div>
-    </div>
-
-    <!-- 4. Tables (Active Users & Ad Sessions) -->
-    <div class="row g-4 mb-4">
-      <!-- Users Table -->
-      <div class="col-lg-6">
-        <div class="card p-3 h-100">
-          <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="gold-text mb-0"><i class="bi bi-person-lines-fill"></i> جدول امتیازات مسابقه جاری</h5>
-            <input type="text" id="userSearchInput" class="form-control form-control-sm form-control-dark" style="width: 180px;" placeholder="جستجوی نام یا شماره..." onkeyup="filterUsers()">
-          </div>
-          <div class="table-responsive">
-            <table class="table table-dark table-hover table-striped rounded align-middle">
-              <thead>
-                <tr class="text-secondary">
-                  <th>#</th>
-                  <th>شناسه کاربر</th>
-                  <th>نام و نام خانوادگی</th>
-                  <th>شماره موبایل</th>
-                  <th>امتیاز دوره جاری</th>
-                  <th>عملیات</th>
-                </tr>
-              </thead>
-              <tbody id="usersTbody">
-                <tr><td colspan="6" class="text-center py-4 text-secondary">در حال دریافت اطلاعات از سرور...</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- Recent Ad Sessions -->
-      <div class="col-lg-6">
-        <div class="card p-3 h-100">
-          <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="gold-text mb-0"><i class="bi bi-shield-check text-success"></i> لاگ تاییدیه تبلیغات سرور</h5>
-            <span class="badge bg-dark border border-secondary text-secondary">ضد تقلب (Anti-Cheat)</span>
-          </div>
-          <div class="table-responsive">
-            <table class="table table-dark table-hover table-striped rounded align-middle">
-              <thead>
-                <tr class="text-secondary">
-                  <th>شناسه رویداد</th>
-                  <th>مربع</th>
-                  <th>کاربر</th>
-                  <th>مدت تماشا</th>
-                  <th>وضعیت</th>
-                  <th>توکن امنیتی</th>
-                </tr>
-              </thead>
-              <tbody id="sessionsTbody">
-                <tr><td colspan="6" class="text-center py-4 text-secondary">در حال دریافت اطلاعات از سرور...</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 5. Historical Competitions Archive & Audit Logs -->
-    <div class="row g-4 mb-5">
-      <!-- Archived Competitions -->
-      <div class="col-lg-7">
-        <div class="card p-3 h-100">
-          <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="gold-text mb-0"><i class="bi bi-collection-play-fill text-warning"></i> آرشیو مسابقات پایان‌یافته</h5>
-            <span class="badge bg-dark border border-warning text-warning">ثبت دائمی و غیرقابل حذف</span>
-          </div>
-          <div class="table-responsive">
-            <table class="table table-dark table-hover table-striped rounded align-middle">
-              <thead>
-                <tr class="text-secondary">
-                  <th>دوره</th>
-                  <th>عنوان مسابقه</th>
-                  <th>شرکت‌کنندگان</th>
-                  <th>مجموع امتیاز آرشیو</th>
-                  <th>تاریخ پایان</th>
-                  <th>کارنامه نهایی</th>
-                </tr>
-              </thead>
-              <tbody id="archivedCompsTbody">
-                <tr><td colspan="6" class="text-center py-4 text-secondary">در حال بررسی آرشیو دوره‌ها...</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- Audit Logs -->
-      <div class="col-lg-5">
-        <div class="card p-3 h-100">
-          <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="gold-text mb-0"><i class="bi bi-journal-text text-info"></i> لاگ‌های نظارتی مسابقات</h5>
-            <span class="badge bg-secondary">Audit Trail</span>
-          </div>
-          <div class="table-responsive">
-            <table class="table table-dark table-hover table-striped rounded align-middle">
-              <thead>
-                <tr class="text-secondary">
-                  <th>تاریخ و زمان</th>
-                  <th>عملیات</th>
-                  <th>جزئیات</th>
-                </tr>
-              </thead>
-              <tbody id="logsTbody">
-                <tr><td colspan="3" class="text-center py-4 text-secondary">در حال دریافت لاگ‌ها...</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 4. Support Center Management Section -->
-    <div class="card p-4 mb-4 shadow" style="border: 1px solid #0284C7; background-color: #162C46;">
-      <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3 pb-2 border-bottom border-secondary">
-        <div class="d-flex align-items-center gap-2">
-          <i class="bi bi-headset text-info fs-3"></i>
-          <div>
-            <h4 class="mb-0 text-white fw-bold">مرکز پشتیبانی و پیام‌های کاربران</h4>
-            <small class="text-secondary">مشاهده و پاسخ‌گویی به تیکت‌های پشتیبانی کاربران اپلیکیشن و تغییر وضعیت</small>
-          </div>
-        </div>
-        <div class="d-flex gap-2 align-items-center flex-wrap">
-          <button class="btn btn-sm btn-outline-info" onclick="loadAdminSupportTickets()">
-            <i class="bi bi-arrow-clockwise me-1"></i> به‌روزرسانی تیکت‌ها
-          </button>
-        </div>
-      </div>
-
-      <!-- Support Counters -->
-      <div class="row g-2 mb-3">
-        <div class="col-md-3 col-6">
-          <div class="p-2 rounded text-center" style="background: rgba(14, 165, 233, 0.15); border: 1px solid rgba(14, 165, 233, 0.3);">
-            <div class="small text-info fw-bold">کل تیکت‌ها</div>
-            <div class="fs-5 fw-bold text-white" id="supportCountTotal">۰</div>
-          </div>
-        </div>
-        <div class="col-md-3 col-6">
-          <div class="p-2 rounded text-center" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3);">
-            <div class="small text-danger fw-bold">جدید / بی‌پاسخ</div>
-            <div class="fs-5 fw-bold text-danger" id="supportCountNew">۰</div>
-          </div>
-        </div>
-        <div class="col-md-3 col-6">
-          <div class="p-2 rounded text-center" style="background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.3);">
-            <div class="small text-warning fw-bold">در حال بررسی</div>
-            <div class="fs-5 fw-bold text-warning" id="supportCountInProgress">۰</div>
-          </div>
-        </div>
-        <div class="col-md-3 col-6">
-          <div class="p-2 rounded text-center" style="background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.3);">
-            <div class="small text-success fw-bold">پاسخ داده شده</div>
-            <div class="fs-5 fw-bold text-success" id="supportCountAnswered">۰</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Filters Bar -->
-      <div class="row g-2 align-items-center mb-3">
-        <div class="col-md-4">
-          <div class="input-group input-group-sm">
-            <span class="input-group-text bg-dark border-secondary text-secondary"><i class="bi bi-search"></i></span>
-            <input type="text" id="supportSearchInput" class="form-control form-control-dark" placeholder="جستجو بر اساس کد پیگیری، شماره یا نام..." oninput="filterSupportTickets()">
-          </div>
-        </div>
-        <div class="col-md-3">
-          <select id="supportStatusFilter" class="form-select form-select-sm form-select-dark" onchange="filterSupportTickets()">
-            <option value="ALL">تمام وضعیت‌ها</option>
-            <option value="NEW">جدید / منتظر پاسخ</option>
-            <option value="IN_PROGRESS">در حال بررسی</option>
-            <option value="ANSWERED">پاسخ داده شده</option>
-            <option value="CLOSED">بسته شده</option>
-          </select>
-        </div>
-        <div class="col-md-3">
-          <select id="supportCategoryFilter" class="form-select form-select-sm form-select-dark" onchange="filterSupportTickets()">
-            <option value="ALL">تمام موضوعات</option>
-            <option value="SCORES">امتیازها</option>
-            <option value="ADS">تبلیغات</option>
-            <option value="PRIZES">جوایز</option>
-            <option value="MEMBERSHIP">عضویت</option>
-            <option value="PURCHASE">خرید</option>
-            <option value="LOGIN">مشکل ورود</option>
-            <option value="OTHER">سایر موارد</option>
-          </select>
-        </div>
-        <div class="col-md-2 text-end">
-          <span class="text-secondary small" id="supportFilterSummary">نمایش تیکت‌ها</span>
-        </div>
-      </div>
-
-      <!-- Tickets Table -->
-      <div class="table-responsive">
-        <table class="table table-dark table-hover table-striped rounded align-middle mb-0">
-          <thead>
-            <tr class="text-secondary small">
-              <th>کد پیگیری</th>
-              <th>کاربر</th>
-              <th>موضوع</th>
-              <th>عنوان درخواست</th>
-              <th>وضعیت</th>
-              <th>آخرین پیام</th>
-              <th>به‌روزرسانی</th>
-              <th>عملیات</th>
-            </tr>
-          </thead>
-          <tbody id="supportTicketsTbody">
-            <tr><td colspan="8" class="text-center py-4 text-secondary">در حال دریافت تیکت‌های پشتیبانی...</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
   </div>
 
   <!-- Modal: Support Ticket Conversation & Reply -->

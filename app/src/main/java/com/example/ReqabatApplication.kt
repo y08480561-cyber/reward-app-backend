@@ -1,6 +1,7 @@
 package com.example
 
 import android.app.Application
+import androidx.work.*
 import com.onesignal.OneSignal
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -19,6 +20,18 @@ class ReqabatApplication : Application() {
 
         // OneSignal Initialization
         OneSignal.initWithContext(this, ONESIGNAL_APP_ID)
+
+        // Schedule Local Reminder
+        val workRequest = OneTimeWorkRequestBuilder<ReminderWorker>()
+            .setInitialDelay(24, java.util.concurrent.TimeUnit.HOURS)
+            .addTag("reminder_work")
+            .build()
+
+        WorkManager.getInstance(this).enqueueUniqueWork(
+            "reminder_work",
+            ExistingWorkPolicy.REPLACE,
+            workRequest
+        )
 
         // Request permission for notifications on Android 13+
         CoroutineScope(Dispatchers.IO).launch {
