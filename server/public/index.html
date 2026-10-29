@@ -2,381 +2,1074 @@
 <html lang="fa" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>پنل مدیریت واقعی | رقابت کن، جایزه ببر</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <title>پنل مدیریت حرفه‌ای | رقابت کن، جایزه ببر</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
   <style>
-    body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background-color: #0B192C; color: #F8FAFC; min-height: 100vh; }
-    .card { background-color: #1E3E62; border: 1px solid #2E5077; border-radius: 16px; color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.25); }
-    .gold-text { color: #FFB703; font-weight: bold; }
-    .badge-gold { background: linear-gradient(135deg, #FFB703, #FB8500); color: #0B192C; font-weight: 800; padding: 6px 12px; border-radius: 20px; }
-    .table-dark { background-color: #152A44; }
-    .form-control-dark, .form-select-dark { background-color: #152A44; border: 1px solid #2E5077; color: #fff; }
-    .form-control-dark:focus, .form-select-dark:focus { background-color: #1E3E62; border-color: #FFB703; color: #fff; box-shadow: 0 0 0 0.25rem rgba(255,183,3,0.25); }
-    .btn-gold { background: linear-gradient(135deg, #FFB703, #FB8500); color: #0B192C; font-weight: bold; border: none; }
-    .btn-gold:hover { background: linear-gradient(135deg, #FB8500, #FFB703); color: #0B192C; }
-    .auth-bar { background-color: #152A44; border-bottom: 2px solid #2E5077; }
-    .comp-banner { background: linear-gradient(135deg, #152A44 0%, #1E3E62 100%); border: 2px solid #FFB703; border-radius: 18px; }
-    .ann-banner { background: linear-gradient(135deg, #182C47 0%, #224263 100%); border: 1.5px solid #38BDF8; border-radius: 18px; }
-    .modal-dark .modal-content { background-color: #152A44; color: #fff; border: 1px solid #2E5077; border-radius: 18px; }
-    
-    /* Mobile App Banner Simulation */
-    .app-preview-box {
-      background: linear-gradient(135deg, #0B192C 0%, #1E3E62 100%);
-      border: 1.5px solid #FFB703;
-      border-radius: 16px;
-      padding: 14px 16px;
+    :root {
+      --bg-main: #0B192C;
+      --bg-card: #152A44;
+      --bg-card-hover: #1E3E62;
+      --border-color: #2E5077;
+      --gold-primary: #FFB703;
+      --gold-gradient: linear-gradient(135deg, #FFB703 0%, #FB8500 100%);
+      --text-muted: #94A3B8;
+      --sidebar-width: 270px;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Vazirmatn", Tahoma, sans-serif;
+      background-color: var(--bg-main);
+      color: #F8FAFC;
+      min-height: 100vh;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+    }
+
+    /* Layout Structure */
+    .admin-wrapper {
+      display: flex;
+      min-height: 100vh;
+      width: 100%;
+    }
+
+    /* Right Sidebar */
+    .admin-sidebar {
+      width: var(--sidebar-width);
+      background-color: #0E1E36;
+      border-left: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 1040;
+      transition: transform 0.25s ease-in-out;
+      box-shadow: -4px 0 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .sidebar-brand {
+      padding: 20px 18px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .sidebar-brand-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: var(--gold-gradient);
+      color: #0B192C;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      font-weight: 900;
+      box-shadow: 0 4px 12px rgba(255, 183, 3, 0.3);
+    }
+    .sidebar-brand-title {
+      font-size: 16px;
+      font-weight: 800;
       color: #fff;
-      box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+      line-height: 1.25;
+      margin: 0;
+    }
+    .sidebar-brand-subtitle {
+      font-size: 11px;
+      color: var(--gold-primary);
+      margin: 0;
+    }
+
+    .sidebar-menu {
+      padding: 16px 10px;
+      overflow-y: auto;
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .nav-category-header {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      padding: 12px 14px 4px 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .sidebar-link {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 11px 14px;
+      border-radius: 12px;
+      color: #CBD5E1;
+      text-decoration: none;
+      font-size: 13.5px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .sidebar-link-content {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .sidebar-link i {
+      font-size: 17px;
+      color: var(--text-muted);
+      transition: color 0.2s;
+    }
+    .sidebar-link:hover {
+      background-color: rgba(255, 183, 3, 0.08);
+      color: #fff;
+    }
+    .sidebar-link:hover i {
+      color: var(--gold-primary);
+    }
+    .sidebar-link.active {
+      background: linear-gradient(135deg, rgba(255, 183, 3, 0.16) 0%, rgba(251, 133, 0, 0.16) 100%);
+      color: var(--gold-primary);
+      border-color: rgba(255, 183, 3, 0.35);
+      font-weight: 700;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+    .sidebar-link.active i {
+      color: var(--gold-primary);
+    }
+
+    .sidebar-footer {
+      padding: 14px;
+      border-top: 1px solid var(--border-color);
+      background-color: #0B1728;
+    }
+
+    /* Main Content Area */
+    .admin-main {
+      flex-grow: 1;
+      margin-right: var(--sidebar-width);
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      transition: margin-right 0.25s ease-in-out;
+    }
+
+    /* Top Navbar */
+    .admin-topbar {
+      height: 70px;
+      background-color: #0E1E36;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      position: sticky;
+      top: 0;
+      z-index: 1020;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .menu-toggle-btn {
+      display: none;
+      background: none;
+      border: 1px solid var(--border-color);
+      color: #fff;
+      font-size: 20px;
+      border-radius: 8px;
+      padding: 6px 10px;
+    }
+
+    /* Main Container Content */
+    .admin-content {
+      padding: 24px;
+      flex-grow: 1;
+    }
+
+    /* Section Visibility Controller */
+    .admin-section {
+      display: none;
+      animation: fadeIn 0.2s ease-in-out;
+    }
+    .admin-section.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Custom Theme Cards */
+    .card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      color: #fff;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    }
+    .gold-text { color: var(--gold-primary); font-weight: bold; }
+    .badge-gold {
+      background: var(--gold-gradient);
+      color: #0B192C;
+      font-weight: 800;
+      padding: 6px 12px;
+      border-radius: 20px;
+    }
+    .btn-gold {
+      background: var(--gold-gradient);
+      color: #0B192C;
+      font-weight: 700;
+      border: none;
+      box-shadow: 0 4px 12px rgba(255, 183, 3, 0.25);
+      transition: all 0.2s;
+    }
+    .btn-gold:hover {
+      background: linear-gradient(135deg, #FB8500 0%, #FFB703 100%);
+      color: #0B192C;
+      box-shadow: 0 6px 16px rgba(255, 183, 3, 0.4);
+      transform: translateY(-1px);
+    }
+
+    .form-control-dark, .form-select-dark {
+      background-color: #0E1E36;
+      border: 1px solid var(--border-color);
+      color: #fff;
+      border-radius: 10px;
+    }
+    .form-control-dark:focus, .form-select-dark:focus {
+      background-color: #152A44;
+      border-color: var(--gold-primary);
+      color: #fff;
+      box-shadow: 0 0 0 0.25rem rgba(255, 183, 3, 0.25);
+    }
+
+    .comp-banner {
+      background: linear-gradient(135deg, #152A44 0%, #1E3E62 100%);
+      border: 2px solid var(--gold-primary);
+      border-radius: 18px;
+    }
+    .ann-banner {
+      background: linear-gradient(135deg, #182C47 0%, #224263 100%);
+      border: 1.5px solid #38BDF8;
+      border-radius: 18px;
+    }
+
+    /* Stat Cards */
+    .stat-card {
+      padding: 20px;
+      border-radius: 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      transition: transform 0.2s, box-shadow 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+    .stat-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+      border-color: rgba(255, 183, 3, 0.4);
+    }
+    .stat-card-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      margin-bottom: 12px;
+    }
+
+    /* Shortcut cards in dashboard */
+    .shortcut-card {
+      background: #11223A;
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      cursor: pointer;
+      text-decoration: none;
+      color: #fff;
+      transition: all 0.2s;
+    }
+    .shortcut-card:hover {
+      background: #193354;
+      border-color: var(--gold-primary);
+      color: var(--gold-primary);
+      transform: translateY(-2px);
+    }
+    .shortcut-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      background: rgba(255, 183, 3, 0.12);
+      color: var(--gold-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    /* Tables */
+    .table-dark {
+      background-color: var(--bg-card);
+    }
+    .table th {
+      border-color: var(--border-color);
+      font-weight: 700;
+      color: var(--text-muted);
+      font-size: 12.5px;
+      padding: 12px 14px;
+    }
+    .table td {
+      border-color: rgba(46, 80, 119, 0.45);
+      padding: 12px 14px;
+      vertical-align: middle;
+      font-size: 13.5px;
+    }
+
+    /* Mobile Backdrop */
+    .sidebar-backdrop {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.65);
+      z-index: 1030;
+      backdrop-filter: blur(2px);
+    }
+
+    /* Responsive */
+    @media (max-width: 991.98px) {
+      .admin-sidebar {
+        transform: translateX(100%);
+      }
+      .admin-sidebar.show {
+        transform: translateX(0);
+      }
+      .admin-main {
+        margin-right: 0;
+      }
+      .menu-toggle-btn {
+        display: block;
+      }
+      .sidebar-backdrop.show {
+        display: block;
+      }
+      .admin-content {
+        padding: 16px;
+      }
     }
   </style>
 </head>
 <body>
 
-  <!-- Top Admin Auth Bar -->
-  <div class="auth-bar py-2 px-4 mb-4">
-    <div class="container-fluid d-flex flex-wrap justify-content-between align-items-center gap-2">
-      <div class="d-flex align-items-center gap-2">
-        <i class="bi bi-shield-lock-fill text-warning fs-5"></i>
-        <span class="fw-bold">احراز هویت مدیریت:</span>
-        <span id="authStatusBadge" class="badge bg-secondary">در حال بررسی...</span>
-      </div>
-      <div class="d-flex align-items-center gap-2">
-        <input type="password" id="adminKeyInput" class="form-control form-control-sm form-control-dark" style="width: 230px;" placeholder="کلید امنیتی ادمین (ADMIN_KEY)...">
-        <button class="btn btn-sm btn-gold px-3" onclick="saveAdminKey()"><i class="bi bi-key-fill"></i> تایید کلید</button>
-      </div>
-    </div>
-  </div>
+  <!-- Mobile Backdrop -->
+  <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()"></div>
 
-  <div class="container-fluid px-4 max-w-7xl">
-    <!-- Header -->
-    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-3 border-bottom border-secondary gap-3">
-      <div>
-        <h2 class="gold-text mb-1"><i class="bi bi-trophy-fill text-warning"></i> پنل مدیریت زنده «رقابت کن، جایزه ببر»</h2>
-        <p class="text-secondary mb-0">مدیریت مسابقات دوره‌ای، پیام‌ها و اطلاعیه‌های صفحه اصلی و پایش آنلاین رویدادها</p>
-      </div>
-      <div class="d-flex gap-2 flex-wrap">
-        <a href="/admin/users" class="btn btn-outline-warning fw-bold px-3 py-2" title="مشاهده جدول کاربران در صفحه مستقل">
-          <i class="bi bi-table"></i> صفحه اختصاصی جدول کاربران
-        </a>
-        <button id="refreshBtn" class="btn btn-warning fw-bold px-3 py-2" onclick="loadDashboard()">
-          <span id="refreshSpinner" class="spinner-border spinner-border-sm d-none me-1" role="status"></span>
-          <i class="bi bi-arrow-clockwise"></i> به‌روزرسانی زنده
-        </button>
-      </div>
-    </div>
+  <div class="admin-wrapper">
 
-    <!-- Alert Box -->
-    <div id="alertBox" class="alert alert-danger d-none" role="alert"></div>
-
-    <!-- Stats Overview -->
-    <div class="row g-3 mb-4">
-      <div class="col-md-3">
-        <div class="card p-3 text-center h-100">
-          <div class="text-secondary small fw-bold mb-1"><i class="bi bi-people-fill text-info me-1"></i> کل کاربران ثبت‌شده</div>
-          <h3 id="totalUsers" class="gold-text mb-0">-</h3>
+    <!-- 1. Right Sidebar Navigation -->
+    <aside class="admin-sidebar" id="adminSidebar">
+      <!-- Brand Header -->
+      <div class="sidebar-brand">
+        <div class="sidebar-brand-icon">
+          <i class="bi bi-trophy-fill"></i>
         </div>
-      </div>
-      <div class="col-md-3">
-        <div class="card p-3 text-center h-100">
-          <div class="text-secondary small fw-bold mb-1"><i class="bi bi-star-fill text-warning me-1"></i> مجموع کل امتیازها</div>
-          <h3 id="totalScores" class="gold-text mb-0">-</h3>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="card p-3 text-center h-100">
-          <div class="text-secondary small fw-bold mb-1"><i class="bi bi-play-circle-fill text-success me-1"></i> تبلیغات تاییدشده</div>
-          <h3 id="totalAds" class="gold-text mb-0">-</h3>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="card p-3 text-center h-100">
-          <div class="text-secondary small fw-bold mb-1"><i class="bi bi-archive-fill text-primary me-1"></i> دوره‌های آرشیو شده</div>
-          <h3 id="archivedCompsCount" class="text-white mb-0">-</h3>
-        </div>
-      </div>
-    </div>
-
-    <!-- Active Competition Section -->
-    <div class="card comp-banner p-4 mb-4 shadow">
-      <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
-        <div class="d-flex align-items-center gap-3">
-          <div class="bg-warning text-dark rounded-circle p-3 d-flex align-items-center justify-content-center" style="width: 54px; height: 54px;">
-            <i class="bi bi-trophy-fill fs-3"></i>
-          </div>
-          <div>
-            <div class="d-flex align-items-center gap-2">
-              <span class="badge bg-warning text-dark fw-bold" id="activeCompNumber">دوره فعال</span>
-              <span class="badge bg-success"><i class="bi bi-circle-fill" style="font-size: 8px;"></i> در حال برگزاری</span>
-            </div>
-            <h4 class="gold-text mb-0 mt-1" id="activeCompTitle">در حال بارگذاری...</h4>
-          </div>
-        </div>
-        <button class="btn btn-outline-danger fw-bold px-3 py-2" onclick="openStartCompModal()">
-          <i class="bi bi-arrow-repeat me-1"></i> شروع مسابقه جدید و آرشیو دوره
-        </button>
-      </div>
-      <div class="row g-3 pt-3 border-top border-secondary">
-        <div class="col-md-6">
-          <span class="text-secondary small">تاریخ و ساعت آغاز دوره:</span>
-          <div class="fw-bold text-white" id="activeCompStartedAt">-</div>
-        </div>
-        <div class="col-md-6">
-          <span class="text-secondary small">مهلت پایان مسابقه:</span>
-          <div class="fw-bold text-warning" id="activeCompEndedAt">-</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Active Announcement Banner -->
-    <div class="card ann-banner p-4 mb-4 shadow" id="activeAnnCard">
-      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-        <div class="d-flex align-items-center gap-2 flex-wrap">
-          <i class="bi bi-megaphone-fill text-info fs-5"></i>
-          <span class="fw-bold text-white fs-5">پیام و اطلاعیه فعال در بالای صفحه اصلی اپلیکیشن</span>
-          <span id="activeAnnTypeBadge" class="badge bg-info text-dark fw-bold">-</span>
-          <span id="activeAnnStatusBadge" class="badge bg-success">-</span>
-        </div>
-        <div class="d-flex gap-2 flex-wrap">
-          <button id="toggleActiveAnnBtn" class="btn btn-sm btn-outline-danger" onclick="toggleCurrentActiveAnn()">
-            <i class="bi bi-eye-slash"></i> غیرفعال‌سازی
-          </button>
-          <button class="btn btn-sm btn-outline-warning" onclick="editCurrentActiveAnn()">
-            <i class="bi bi-pencil-square"></i> ویرایش پیام فعال
-          </button>
-          <button class="btn btn-sm btn-gold" onclick="openAnnouncementModal()">
-            <i class="bi bi-plus-circle"></i> ایجاد پیام جدید
-          </button>
-        </div>
-      </div>
-      <div class="p-3 rounded mb-3" style="background-color: rgba(11, 25, 44, 0.65); border: 1px solid #2E5077;">
-        <h5 class="gold-text mb-2" id="activeAnnTitle">-</h5>
-        <p class="text-white mb-0" id="activeAnnContent" style="white-space: pre-line;">-</p>
-      </div>
-      <div class="row g-2 text-secondary small">
-        <div class="col-md-6">آخرین به‌روزرسانی: <span class="text-white" id="activeAnnStartsAt">-</span></div>
-        <div class="col-md-6">مهلت پایان اعلام‌شده: <span class="text-warning" id="activeAnnEndsAt">-</span></div>
-      </div>
-    </div>
-
-    <!-- Announcements History Table -->
-    <div class="card p-4 mb-4 shadow">
-      <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="gold-text mb-0"><i class="bi bi-collection-fill me-2"></i> تاریخچه و فهرست کلیه پیام‌های صفحه اصلی</h5>
-        <button class="btn btn-sm btn-outline-warning" onclick="openAnnouncementModal()">
-          <i class="bi bi-plus-lg me-1"></i> پیام جدید
-        </button>
-      </div>
-      <div class="table-responsive">
-        <table class="table table-dark table-hover table-striped rounded align-middle">
-          <thead>
-            <tr class="text-secondary small">
-              <th>عنوان پیام</th>
-              <th>نوع</th>
-              <th>وضعیت</th>
-              <th>مهلت پایان</th>
-              <th>آخرین ویرایش</th>
-              <th>عملیات</th>
-            </tr>
-          </thead>
-          <tbody id="announcementsTbody">
-            <tr><td colspan="6" class="text-center py-3 text-secondary">در حال بارگذاری...</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Support Center Management -->
-    <div class="card p-4 mb-4 shadow" style="border: 1px solid #0284C7; background-color: #162C46;">
-      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <div>
-          <h4 class="text-info fw-bold mb-1"><i class="bi bi-headset me-2"></i> مرکز پشتیبانی و تیکت‌های کاربران</h4>
-          <p class="text-secondary small mb-0">مشاهده و پاسخ‌گویی آنلاین به درخواست‌ها و گزارش‌های کاربران</p>
-        </div>
-        <div class="d-flex align-items-center gap-2 flex-wrap">
-          <span class="badge bg-secondary p-2">کل: <strong id="supportCountTotal">0</strong></span>
-          <span class="badge bg-danger p-2">جدید: <strong id="supportCountNew">0</strong></span>
-          <span class="badge bg-warning text-dark p-2">در بررسی: <strong id="supportCountInProgress">0</strong></span>
-          <span class="badge bg-success p-2">پاسخ داده شد: <strong id="supportCountAnswered">0</strong></span>
+          <h1 class="sidebar-brand-title">رقابت کن، جایزه ببر</h1>
+          <p class="sidebar-brand-subtitle">پنل مدیریت یکپارچه</p>
         </div>
       </div>
 
-      <!-- Filters & Search -->
-      <div class="row g-2 mb-3">
-        <div class="col-md-5">
-          <input type="text" id="supportSearchInput" class="form-control form-control-sm form-control-dark" placeholder="جستجوی کد پیگیری، شماره موبایل، نام یا متن..." oninput="filterSupportTickets()">
-        </div>
-        <div class="col-md-3">
-          <select id="supportStatusFilter" class="form-select form-select-sm form-select-dark" onchange="filterSupportTickets()">
-            <option value="ALL">همه وضعیت‌ها</option>
-            <option value="NEW">جدید / بی‌پاسخ</option>
-            <option value="IN_PROGRESS">در حال بررسی</option>
-            <option value="ANSWERED">پاسخ داده شد</option>
-            <option value="CLOSED">بسته شده</option>
-          </select>
-        </div>
-        <div class="col-md-2">
-          <select id="supportCategoryFilter" class="form-select form-select-sm form-select-dark" onchange="filterSupportTickets()">
-            <option value="ALL">همه دسته‌ها</option>
-            <option value="SCORES">امتیازها</option>
-            <option value="ADS">تبلیغات</option>
-            <option value="PRIZES">جوایز</option>
-            <option value="MEMBERSHIP">عضویت</option>
-            <option value="PURCHASE">خرید</option>
-            <option value="LOGIN">مشکل ورود</option>
-            <option value="OTHER">سایر</option>
-          </select>
-        </div>
-        <div class="col-md-2 d-flex align-items-center justify-content-end">
-          <span class="text-secondary small" id="supportFilterSummary">-</span>
-        </div>
+      <!-- Navigation Menu -->
+      <div class="sidebar-menu">
+        <div class="nav-category-header">بخش اصلی</div>
+        <a class="sidebar-link active" onclick="navigateTo('dashboard')">
+          <div class="sidebar-link-content">
+            <i class="bi bi-speedometer2"></i>
+            <span>داشبورد اصلی</span>
+          </div>
+        </a>
+
+        <div class="nav-category-header">مسابقات و کاربران</div>
+        <a class="sidebar-link" onclick="navigateTo('users')">
+          <div class="sidebar-link-content">
+            <i class="bi bi-people-fill"></i>
+            <span>مدیریت کاربران</span>
+          </div>
+        </a>
+        <a class="sidebar-link" onclick="navigateTo('competitions')">
+          <div class="sidebar-link-content">
+            <i class="bi bi-trophy-fill"></i>
+            <span>مسابقات و جوایز</span>
+          </div>
+        </a>
+        <a class="sidebar-link" onclick="navigateTo('announcements')">
+          <div class="sidebar-link-content">
+            <i class="bi bi-megaphone-fill"></i>
+            <span>اعلان‌های صفحه اصلی</span>
+          </div>
+        </a>
+        <a class="sidebar-link" onclick="navigateTo('ads')">
+          <div class="sidebar-link-content">
+            <i class="bi bi-play-circle-fill"></i>
+            <span>تبلیغات و امتیازها</span>
+          </div>
+        </a>
+
+        <div class="nav-category-header">ارتباطات و اعلان‌ها</div>
+        <a class="sidebar-link" onclick="navigateTo('support')">
+          <div class="sidebar-link-content">
+            <i class="bi bi-headset"></i>
+            <span>مرکز پشتیبانی</span>
+          </div>
+          <span class="badge bg-danger rounded-pill" id="sidebarSupportBadge" style="display: none;">۰</span>
+        </a>
+        <a class="sidebar-link" onclick="navigateTo('push')">
+          <div class="sidebar-link-content">
+            <i class="bi bi-bell-fill"></i>
+            <span>اعلان پوش (OneSignal)</span>
+          </div>
+        </a>
+
+        <div class="nav-category-header">سیستم و تنظیمات</div>
+        <a class="sidebar-link" onclick="navigateTo('logs')">
+          <div class="sidebar-link-content">
+            <i class="bi bi-journal-text"></i>
+            <span>گزارش‌ها و سوابق</span>
+          </div>
+        </a>
+        <a class="sidebar-link" onclick="navigateTo('settings')">
+          <div class="sidebar-link-content">
+            <i class="bi bi-gear-fill"></i>
+            <span>تنظیمات و دسترسی</span>
+          </div>
+        </a>
       </div>
 
-      <div class="table-responsive">
-        <table class="table table-dark table-hover table-striped rounded align-middle">
-          <thead>
-            <tr class="text-secondary small">
-              <th>کد پیگیری</th>
-              <th>کاربر</th>
-              <th>دسته‌بندی</th>
-              <th>موضوع تیکت</th>
-              <th>وضعیت</th>
-              <th>آخرین پیام</th>
-              <th>تاریخ به‌روزرسانی</th>
-              <th>عملیات</th>
-            </tr>
-          </thead>
-          <tbody id="supportTicketsTbody">
-            <tr><td colspan="8" class="text-center py-4 text-secondary">در حال دریافت تیکت‌ها...</td></tr>
-          </tbody>
-        </table>
+      <!-- Sidebar Footer -->
+      <div class="sidebar-footer">
+        <div class="d-flex align-items-center justify-content-between">
+          <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-shield-check text-warning"></i>
+            <span class="small text-secondary">وضعیت سرور:</span>
+          </div>
+          <span id="authStatusBadge" class="badge bg-secondary">در حال بررسی...</span>
+        </div>
       </div>
-    </div>
+    </aside>
 
-    <!-- Users & Ad Sessions Tables -->
-    <div class="row g-4 mb-4">
-      <!-- Users Table Card -->
-      <div class="col-lg-6">
-        <div class="card p-3 shadow h-100">
-          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-            <h5 class="gold-text mb-0"><i class="bi bi-people-fill text-warning me-2"></i> شرکت‌کنندگان دوره فعلی</h5>
-            <div style="width: 200px;">
-              <input type="text" id="userSearchInput" class="form-control form-control-sm form-control-dark" placeholder="جستجوی کاربر..." oninput="filterUsers()">
+    <!-- 2. Main Content Area -->
+    <div class="admin-main">
+      
+      <!-- Topbar Header -->
+      <header class="admin-topbar">
+        <div class="topbar-right">
+          <button class="menu-toggle-btn" onclick="toggleSidebar()" aria-label="منو">
+            <i class="bi bi-list"></i>
+          </button>
+          <div>
+            <h2 class="h5 gold-text mb-0 d-flex align-items-center gap-2" id="currentSectionTitle">
+              <i class="bi bi-speedometer2"></i> داشبورد اصلی
+            </h2>
+            <small class="text-secondary d-none d-sm-block">پایش آنلاین رویدادها، مسابقات دوره‌ای و پیام‌های کاربران</small>
+          </div>
+        </div>
+
+        <div class="topbar-left">
+          <a href="/admin/users" class="btn btn-sm btn-outline-warning fw-bold px-3 py-1.5" title="مشاهده جدول مستقل کاربران">
+            <i class="bi bi-table me-1"></i> جدول کاربران
+          </a>
+          <button id="refreshBtn" class="btn btn-sm btn-warning fw-bold px-3 py-1.5" onclick="loadDashboard()">
+            <span id="refreshSpinner" class="spinner-border spinner-border-sm d-none me-1" role="status"></span>
+            <i class="bi bi-arrow-clockwise me-1"></i> به‌روزرسانی
+          </button>
+        </div>
+      </header>
+
+      <!-- Main Body Content -->
+      <main class="admin-content">
+        <!-- Global Alert Box -->
+        <div id="alertBox" class="alert alert-danger d-none shadow-sm mb-4" role="alert"></div>
+
+        <!-- ============================================================== -->
+        <!-- SECTION 1: داشبورد اصلی (Dashboard Overview) -->
+        <!-- ============================================================== -->
+        <section id="section-dashboard" class="admin-section active">
+          <!-- Stat Cards Row -->
+          <div class="row g-3 mb-4">
+            <div class="col-sm-6 col-xl-3">
+              <div class="stat-card">
+                <div class="stat-card-icon bg-info bg-opacity-10 text-info">
+                  <i class="bi bi-people-fill"></i>
+                </div>
+                <div class="text-secondary small fw-bold mb-1">کل کاربران ثبت‌شده</div>
+                <h3 id="totalUsers" class="gold-text mb-0">-</h3>
+              </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+              <div class="stat-card">
+                <div class="stat-card-icon bg-warning bg-opacity-10 text-warning">
+                  <i class="bi bi-star-fill"></i>
+                </div>
+                <div class="text-secondary small fw-bold mb-1">مجموع کل امتیازها</div>
+                <h3 id="totalScores" class="gold-text mb-0">-</h3>
+              </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+              <div class="stat-card">
+                <div class="stat-card-icon bg-success bg-opacity-10 text-success">
+                  <i class="bi bi-play-circle-fill"></i>
+                </div>
+                <div class="text-secondary small fw-bold mb-1">تبلیغات تاییدشده</div>
+                <h3 id="totalAds" class="gold-text mb-0">-</h3>
+              </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+              <div class="stat-card">
+                <div class="stat-card-icon bg-primary bg-opacity-10 text-primary">
+                  <i class="bi bi-archive-fill"></i>
+                </div>
+                <div class="text-secondary small fw-bold mb-1">دوره‌های آرشیو شده</div>
+                <h3 id="archivedCompsCount" class="text-white mb-0">-</h3>
+              </div>
             </div>
           </div>
-          <div class="table-responsive" style="max-height: 420px; overflow-y: auto;">
-            <table class="table table-dark table-hover table-striped rounded align-middle">
-              <thead>
-                <tr class="text-secondary small">
-                  <th>#</th>
-                  <th>شناسه</th>
-                  <th>نام</th>
-                  <th>موبایل</th>
-                  <th>امتیاز</th>
-                  <th>عملیات</th>
-                </tr>
-              </thead>
-              <tbody id="usersTbody">
-                <tr><td colspan="6" class="text-center py-4 text-secondary">در حال بارگذاری...</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
 
-      <!-- Recent Sessions Card -->
-      <div class="col-lg-6">
-        <div class="card p-3 shadow h-100">
-          <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="gold-text mb-0"><i class="bi bi-broadcast text-info me-2"></i> رویدادهای زنده تماشای تبلیغ</h5>
-            <span class="badge bg-secondary">تایید شده توسط سرور</span>
+          <!-- Quick Shortcuts Grid -->
+          <h6 class="text-secondary fw-bold mb-3"><i class="bi bi-grid-fill me-1"></i> دسترسی سریع به بخش‌های اصلی</h6>
+          <div class="row g-3 mb-4">
+            <div class="col-md-4 col-sm-6">
+              <div class="shortcut-card" onclick="navigateTo('competitions')">
+                <div class="shortcut-icon"><i class="bi bi-trophy-fill"></i></div>
+                <div>
+                  <div class="fw-bold">مدیریت مسابقات</div>
+                  <small class="text-secondary">شروع دوره جدید، جوایز و آرشیو</small>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4 col-sm-6">
+              <div class="shortcut-card" onclick="navigateTo('announcements')">
+                <div class="shortcut-icon"><i class="bi bi-megaphone-fill"></i></div>
+                <div>
+                  <div class="fw-bold">پیام صفحه اصلی</div>
+                  <small class="text-secondary">ویرایش و انتشار اطلاعیه زنده</small>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4 col-sm-6">
+              <div class="shortcut-card" onclick="navigateTo('support')">
+                <div class="shortcut-icon"><i class="bi bi-headset"></i></div>
+                <div>
+                  <div class="fw-bold">پشتیبانی کاربران</div>
+                  <small class="text-secondary">مشاهده و پاسخ‌گویی به تیکت‌ها</small>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4 col-sm-6">
+              <div class="shortcut-card" onclick="navigateTo('users')">
+                <div class="shortcut-icon"><i class="bi bi-people-fill"></i></div>
+                <div>
+                  <div class="fw-bold">فهرست و امتیاز کاربران</div>
+                  <small class="text-secondary">جستجو، رتبه‌بندی و ریست چرخه</small>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4 col-sm-6">
+              <div class="shortcut-card" onclick="navigateTo('push')">
+                <div class="shortcut-icon"><i class="bi bi-bell-fill"></i></div>
+                <div>
+                  <div class="fw-bold">ارسال اعلان پوش</div>
+                  <small class="text-secondary">ارسال نوتیفیکیشن همگانی وان‌سیگنال</small>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4 col-sm-6">
+              <div class="shortcut-card" onclick="navigateTo('settings')">
+                <div class="shortcut-icon"><i class="bi bi-shield-lock-fill"></i></div>
+                <div>
+                  <div class="fw-bold">تنظیمات امنیت</div>
+                  <small class="text-secondary">مدیریت کلید احراز هویت ADMIN_KEY</small>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="table-responsive" style="max-height: 420px; overflow-y: auto;">
-            <table class="table table-dark table-hover table-striped rounded align-middle">
-              <thead>
-                <tr class="text-secondary small">
-                  <th>نشست</th>
-                  <th>مربع</th>
-                  <th>کاربر</th>
-                  <th>مدت</th>
-                  <th>وضعیت</th>
-                  <th>توکن</th>
-                </tr>
-              </thead>
-              <tbody id="sessionsTbody">
-                <tr><td colspan="6" class="text-center py-4 text-secondary">در حال بارگذاری...</td></tr>
-              </tbody>
-            </table>
+
+          <!-- Active Highlights (Competition & Announcement Summary) -->
+          <div class="row g-4">
+            <div class="col-lg-6">
+              <div class="card p-3 h-100 shadow">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-trophy-fill text-warning fs-5"></i>
+                    <h6 class="gold-text mb-0">وضعیت مسابقه دوره جاری</h6>
+                  </div>
+                  <button class="btn btn-sm btn-outline-warning" onclick="navigateTo('competitions')">مدیریت کامل</button>
+                </div>
+                <div class="p-3 rounded mb-2" style="background-color: #0E1E36; border: 1px solid var(--border-color);">
+                  <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="badge bg-warning text-dark fw-bold" id="dashCompNumber">دوره فعال</span>
+                    <span class="badge bg-success">در حال برگزاری</span>
+                  </div>
+                  <h5 class="text-white mb-2" id="dashCompTitle">در حال بارگذاری...</h5>
+                  <div class="small text-secondary">مهلت پایان: <span class="text-warning fw-bold" id="dashCompEndedAt">-</span></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-lg-6">
+              <div class="card p-3 h-100 shadow">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-megaphone-fill text-info fs-5"></i>
+                    <h6 class="text-info fw-bold mb-0">اطلاعیه فعال بالای اپلیکیشن</h6>
+                  </div>
+                  <button class="btn btn-sm btn-outline-info" onclick="navigateTo('announcements')">ویرایش پیام</button>
+                </div>
+                <div class="p-3 rounded mb-2" style="background-color: #0E1E36; border: 1px solid var(--border-color);">
+                  <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="badge bg-info text-dark fw-bold" id="dashAnnType">اطلاعیه</span>
+                    <span class="badge bg-secondary" id="dashAnnStatus">-</span>
+                  </div>
+                  <h6 class="gold-text mb-1" id="dashAnnTitle">-</h6>
+                  <p class="text-white small mb-0 text-truncate" id="dashAnnContent">-</p>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        </section>
+
+        <!-- ============================================================== -->
+        <!-- SECTION 2: مدیریت کاربران (Users Management) -->
+        <!-- ============================================================== -->
+        <section id="section-users" class="admin-section">
+          <div class="card p-4 shadow">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4 pb-3 border-bottom border-secondary">
+              <div>
+                <h4 class="gold-text mb-1"><i class="bi bi-people-fill text-warning me-2"></i> شرکت‌کنندگان دوره مسابقه فعلی</h4>
+                <p class="text-secondary small mb-0">فهرست زنده کاربران، شماره موبایل، رتبه فعلی و امتیازها</p>
+              </div>
+              <div class="d-flex gap-2">
+                <div style="width: 250px;">
+                  <input type="text" id="userSearchInput" class="form-control form-control-sm form-control-dark" placeholder="جستجو بر اساس نام یا شماره..." oninput="filterUsers()">
+                </div>
+                <a href="/admin/users" class="btn btn-sm btn-outline-warning" target="_blank">
+                  <i class="bi bi-box-arrow-up-right me-1"></i> صفحه جداگانه
+                </a>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="table table-dark table-hover table-striped rounded align-middle">
+                <thead>
+                  <tr class="text-secondary small">
+                    <th style="width: 60px;">رتبه</th>
+                    <th>شناسه کاربری</th>
+                    <th>نام و نام خانوادگی</th>
+                    <th>شماره همراه</th>
+                    <th>مجموع امتیاز</th>
+                    <th style="width: 140px;">عملیات</th>
+                  </tr>
+                </thead>
+                <tbody id="usersTbody">
+                  <tr><td colspan="6" class="text-center py-4 text-secondary">در حال بارگذاری اطلاعات کاربران...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================== -->
+        <!-- SECTION 3: مسابقات و جوایز (Competitions & Prizes) -->
+        <!-- ============================================================== -->
+        <section id="section-competitions" class="admin-section">
+          <!-- Active Competition Banner -->
+          <div class="card comp-banner p-4 mb-4 shadow">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+              <div class="d-flex align-items-center gap-3">
+                <div class="bg-warning text-dark rounded-circle p-3 d-flex align-items-center justify-content-center" style="width: 54px; height: 54px;">
+                  <i class="bi bi-trophy-fill fs-3"></i>
+                </div>
+                <div>
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-warning text-dark fw-bold" id="activeCompNumber">دوره فعال</span>
+                    <span class="badge bg-success"><i class="bi bi-circle-fill" style="font-size: 8px;"></i> در حال برگزاری</span>
+                  </div>
+                  <h4 class="gold-text mb-0 mt-1" id="activeCompTitle">در حال بارگذاری...</h4>
+                </div>
+              </div>
+              <button class="btn btn-danger fw-bold px-4 py-2" onclick="openStartCompModal()">
+                <i class="bi bi-arrow-repeat me-1"></i> شروع مسابقه جدید و آرشیو دوره
+              </button>
+            </div>
+            <div class="row g-3 pt-3 border-top border-secondary">
+              <div class="col-md-6">
+                <span class="text-secondary small">تاریخ و ساعت آغاز دوره:</span>
+                <div class="fw-bold text-white fs-6" id="activeCompStartedAt">-</div>
+              </div>
+              <div class="col-md-6">
+                <span class="text-secondary small">مهلت پایان مسابقه:</span>
+                <div class="fw-bold text-warning fs-6" id="activeCompEndedAt">-</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Archived Competitions Table -->
+          <div class="card p-4 shadow">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <div>
+                <h5 class="gold-text mb-1"><i class="bi bi-award-fill text-warning me-2"></i> آرشیو مسابقات پایان‌یافته</h5>
+                <p class="text-secondary small mb-0">سوابق تاریخی، نتایج رسمی رتبه‌بندی و کارنامه برندگان</p>
+              </div>
+              <span class="badge bg-dark border border-secondary p-2">نتایج رسمی PostgreSQL</span>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-dark table-hover table-striped rounded align-middle">
+                <thead>
+                  <tr class="text-secondary small">
+                    <th>شماره دوره</th>
+                    <th>عنوان مسابقه</th>
+                    <th>تعداد شرکت‌کنندگان</th>
+                    <th>مجموع امتیازات</th>
+                    <th>تاریخ پایان</th>
+                    <th>مشاهده کارنامه</th>
+                  </tr>
+                </thead>
+                <tbody id="archivedCompsTbody">
+                  <tr><td colspan="6" class="text-center py-4 text-secondary">در حال دریافت آرشیو دوره‌ها...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================== -->
+        <!-- SECTION 4: اعلان‌های صفحه اصلی (Home Announcements) -->
+        <!-- ============================================================== -->
+        <section id="section-announcements" class="admin-section">
+          <!-- Active Announcement Card -->
+          <div class="card ann-banner p-4 mb-4 shadow" id="activeAnnCard">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+              <div class="d-flex align-items-center gap-2 flex-wrap">
+                <i class="bi bi-megaphone-fill text-info fs-5"></i>
+                <span class="fw-bold text-white fs-5">پیام و اطلاعیه فعال در بالای صفحه اصلی اپلیکیشن</span>
+                <span id="activeAnnTypeBadge" class="badge bg-info text-dark fw-bold">-</span>
+                <span id="activeAnnStatusBadge" class="badge bg-success">-</span>
+              </div>
+              <div class="d-flex gap-2 flex-wrap">
+                <button id="toggleActiveAnnBtn" class="btn btn-sm btn-outline-danger" onclick="toggleCurrentActiveAnn()">
+                  <i class="bi bi-eye-slash"></i> غیرفعال‌سازی
+                </button>
+                <button class="btn btn-sm btn-outline-warning" onclick="editCurrentActiveAnn()">
+                  <i class="bi bi-pencil-square"></i> ویرایش پیام فعال
+                </button>
+                <button class="btn btn-sm btn-gold" onclick="openAnnouncementModal()">
+                  <i class="bi bi-plus-circle"></i> ایجاد پیام جدید
+                </button>
+              </div>
+            </div>
+            <div class="p-3 rounded mb-3" style="background-color: rgba(11, 25, 44, 0.7); border: 1px solid #2E5077;">
+              <h5 class="gold-text mb-2" id="activeAnnTitle">-</h5>
+              <p class="text-white mb-0" id="activeAnnContent" style="white-space: pre-line;">-</p>
+            </div>
+            <div class="row g-2 text-secondary small">
+              <div class="col-md-6">آخرین به‌روزرسانی: <span class="text-white" id="activeAnnStartsAt">-</span></div>
+              <div class="col-md-6">مهلت پایان اعلام‌شده: <span class="text-warning" id="activeAnnEndsAt">-</span></div>
+            </div>
+          </div>
+
+          <!-- Announcements History Table -->
+          <div class="card p-4 shadow">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h5 class="gold-text mb-0"><i class="bi bi-collection-fill me-2"></i> سوابق تمام پیام‌های ثبت‌شده</h5>
+              <button class="btn btn-sm btn-outline-warning" onclick="openAnnouncementModal()">
+                <i class="bi bi-plus-lg me-1"></i> پیام جدید
+              </button>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-dark table-hover table-striped rounded align-middle">
+                <thead>
+                  <tr class="text-secondary small">
+                    <th>عنوان پیام</th>
+                    <th>نوع پیام</th>
+                    <th>وضعیت انتشار</th>
+                    <th>مهلت پایان</th>
+                    <th>تاریخ ویرایش</th>
+                    <th>عملیات</th>
+                  </tr>
+                </thead>
+                <tbody id="announcementsTbody">
+                  <tr><td colspan="6" class="text-center py-3 text-secondary">در حال بارگذاری پیام‌ها...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================== -->
+        <!-- SECTION 5: تبلیغات و امتیازها (Ads & Points) -->
+        <!-- ============================================================== -->
+        <section id="section-ads" class="admin-section">
+          <div class="card p-4 mb-4 shadow">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+              <div>
+                <h4 class="gold-text mb-1"><i class="bi bi-play-circle-fill text-success me-2"></i> نشست‌های زنده تماشای تبلیغ</h4>
+                <p class="text-secondary small mb-0">رویدادهای تاییدشده سرور با توکن‌های ضدتقلب (Nonce) و اختصاص امتیاز</p>
+              </div>
+              <span class="badge bg-success bg-opacity-25 text-success border border-success p-2">
+                <i class="bi bi-shield-check me-1"></i> ضد تقلب فعال
+              </span>
+            </div>
+
+            <div class="table-responsive">
+              <table class="table table-dark table-hover table-striped rounded align-middle">
+                <thead>
+                  <tr class="text-secondary small">
+                    <th>شناسه نشست</th>
+                    <th>شماره مربع</th>
+                    <th>کاربر</th>
+                    <th>مدت زمان</th>
+                    <th>وضعیت تایید</th>
+                    <th>توکن یکتا (Token)</th>
+                  </tr>
+                </thead>
+                <tbody id="sessionsTbody">
+                  <tr><td colspan="6" class="text-center py-4 text-secondary">در حال دریافت رویدادها...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================== -->
+        <!-- SECTION 6: پشتیبانی (Support Tickets) -->
+        <!-- ============================================================== -->
+        <section id="section-support" class="admin-section">
+          <div class="card p-4 shadow" style="border: 1px solid #0284C7; background-color: #12253B;">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+              <div>
+                <h4 class="text-info fw-bold mb-1"><i class="bi bi-headset me-2"></i> مرکز پشتیبانی و گفت‌وگو با کاربران</h4>
+                <p class="text-secondary small mb-0">بررسی، اولویت‌بندی و ارسال پاسخ مستقیم مدیریت به تیکت‌ها</p>
+              </div>
+              <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span class="badge bg-secondary p-2">کل: <strong id="supportCountTotal">0</strong></span>
+                <span class="badge bg-danger p-2">جدید: <strong id="supportCountNew">0</strong></span>
+                <span class="badge bg-warning text-dark p-2">در بررسی: <strong id="supportCountInProgress">0</strong></span>
+                <span class="badge bg-success p-2">پاسخ داده شد: <strong id="supportCountAnswered">0</strong></span>
+              </div>
+            </div>
+
+            <!-- Filters & Search -->
+            <div class="row g-2 mb-3">
+              <div class="col-md-5">
+                <input type="text" id="supportSearchInput" class="form-control form-control-sm form-control-dark" placeholder="جستجوی کد پیگیری، شماره موبایل، نام یا متن..." oninput="filterSupportTickets()">
+              </div>
+              <div class="col-md-3">
+                <select id="supportStatusFilter" class="form-select form-select-sm form-select-dark" onchange="filterSupportTickets()">
+                  <option value="ALL">همه وضعیت‌ها</option>
+                  <option value="NEW">جدید / بی‌پاسخ</option>
+                  <option value="IN_PROGRESS">در حال بررسی</option>
+                  <option value="ANSWERED">پاسخ داده شد</option>
+                  <option value="CLOSED">بسته شده</option>
+                </select>
+              </div>
+              <div class="col-md-2">
+                <select id="supportCategoryFilter" class="form-select form-select-sm form-select-dark" onchange="filterSupportTickets()">
+                  <option value="ALL">همه دسته‌ها</option>
+                  <option value="SCORES">امتیازها</option>
+                  <option value="ADS">تبلیغات</option>
+                  <option value="PRIZES">جوایز</option>
+                  <option value="MEMBERSHIP">عضویت</option>
+                  <option value="PURCHASE">خرید</option>
+                  <option value="LOGIN">مشکل ورود</option>
+                  <option value="OTHER">سایر</option>
+                </select>
+              </div>
+              <div class="col-md-2 d-flex align-items-center justify-content-end">
+                <span class="text-secondary small" id="supportFilterSummary">-</span>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="table table-dark table-hover table-striped rounded align-middle">
+                <thead>
+                  <tr class="text-secondary small">
+                    <th>کد پیگیری</th>
+                    <th>کاربر</th>
+                    <th>دسته‌بندی</th>
+                    <th>موضوع تیکت</th>
+                    <th>وضعیت</th>
+                    <th>آخرین پیام</th>
+                    <th>تاریخ به‌روزرسانی</th>
+                    <th>عملیات</th>
+                  </tr>
+                </thead>
+                <tbody id="supportTicketsTbody">
+                  <tr><td colspan="8" class="text-center py-4 text-secondary">در حال دریافت تیکت‌ها...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================== -->
+        <!-- SECTION 7: اعلان‌های پوش و OneSignal -->
+        <!-- ============================================================== -->
+        <section id="section-push" class="admin-section">
+          <div class="row g-4">
+            <div class="col-lg-7">
+              <div class="card p-4 shadow">
+                <h4 class="gold-text mb-3"><i class="bi bi-send-fill me-2"></i> ارسال اعلان پوش همگانی (Push Notification)</h4>
+                <p class="text-secondary small mb-4">
+                  ارسال پیام فوری به دستگاه کاربران از طریق سرویس ابری OneSignal. این پیام مستقیماً در نوار اعلان گوشی کاربران نمایش داده می‌شود.
+                </p>
+
+                <div class="mb-3">
+                  <label class="form-label text-secondary small fw-bold">عنوان اعلان:</label>
+                  <input type="text" id="pushTitle" class="form-control form-control-dark" placeholder="مثلاً: دوره جدید مسابقه آغاز شد!">
+                </div>
+
+                <div class="mb-3">
+                  <label class="form-label text-secondary small fw-bold">متن کامل پیام اعلان:</label>
+                  <textarea id="pushMessage" rows="3" class="form-control form-control-dark" placeholder="متن اعلان را اینجا بنویسید..."></textarea>
+                </div>
+
+                <div class="mb-4">
+                  <label class="form-label text-secondary small fw-bold">مخاطبان هدف:</label>
+                  <select id="pushAudience" class="form-select form-select-dark">
+                    <option value="ALL">همه کاربران فعال (All Subscribed Users)</option>
+                  </select>
+                </div>
+
+                <button id="sendPushBtn" class="btn btn-gold px-4 py-2" onclick="sendPushNotification()">
+                  <span id="pushSpinner" class="spinner-border spinner-border-sm d-none me-1" role="status"></span>
+                  <i class="bi bi-send-fill me-1"></i> ارسال فوری اعلان
+                </button>
+              </div>
+            </div>
+
+            <div class="col-lg-5">
+              <div class="card p-4 shadow h-100">
+                <h5 class="text-info mb-3"><i class="bi bi-shield-check me-2"></i> وضعیت سرویس OneSignal</h5>
+                <div id="onesignalStatusCard" class="p-3 rounded mb-3" style="background-color: #0E1E36; border: 1px solid var(--border-color);">
+                  <div class="d-flex align-items-center gap-2 mb-2">
+                    <span id="onesignalBadge" class="badge bg-secondary">در حال بررسی...</span>
+                  </div>
+                  <small class="text-secondary d-block">
+                    کلیدهای ارتباطی OneSignal به دلایل امنیتی در متغیرهای محیطی Render سرور نگهداری می‌شوند و هرگز در مرورگر کاربر فاش نمی‌شوند.
+                  </small>
+                </div>
+
+                <div class="alert alert-info border-0 small mb-0">
+                  <i class="bi bi-info-circle-fill me-1"></i>
+                  برای ارسال اعلان به کاربران واقعی، شناسه <code>ONESIGNAL_APP_ID</code> و <code>ONESIGNAL_REST_API_KEY</code> در پنل مدیریت متغیرهای محیطی سرویس Render قرار داده می‌شوند.
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================== -->
+        <!-- SECTION 8: گزارش‌ها و سوابق (Reports & Logs) -->
+        <!-- ============================================================== -->
+        <section id="section-logs" class="admin-section">
+          <div class="card p-4 shadow">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <div>
+                <h4 class="gold-text mb-1"><i class="bi bi-journal-text text-info me-2"></i> لاگ تغییرات و رویدادهای سیستم</h4>
+                <p class="text-secondary small mb-0">ثبت امن رویدادهای شروع مسابقه، انتشار اطلاعیه‌ها و جابه‌جایی دوره‌ها</p>
+              </div>
+              <span class="badge bg-secondary">Audit Trail</span>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-dark table-hover table-striped rounded align-middle">
+                <thead>
+                  <tr class="text-secondary small">
+                    <th style="width: 180px;">زمان ثبت رویداد</th>
+                    <th style="width: 160px;">نوع عملیات</th>
+                    <th>جزئیات تغییرات</th>
+                  </tr>
+                </thead>
+                <tbody id="logsTbody">
+                  <tr><td colspan="3" class="text-center py-4 text-secondary">در حال بارگذاری لاگ‌ها...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================== -->
+        <!-- SECTION 9: تنظیمات و دسترسی (Settings) -->
+        <!-- ============================================================== -->
+        <section id="section-settings" class="admin-section">
+          <div class="row g-4">
+            <div class="col-lg-6">
+              <div class="card p-4 shadow">
+                <h4 class="gold-text mb-3"><i class="bi bi-key-fill text-warning me-2"></i> احراز هویت مدیریت (ADMIN_KEY)</h4>
+                <p class="text-secondary small mb-3">
+                  برای امنیت پنل و جلوگیری از دسترسی غیرمجاز به اطلاعات کاربران، کلید امنیتی مدیریت در مرورگر شما ذخیره شده و با هر درخواست به سرور ارسال می‌شود.
+                </p>
+                <div class="mb-3">
+                  <label class="form-label text-secondary small fw-bold">کلید امنیتی فعلی:</label>
+                  <input type="password" id="adminKeyInput" class="form-control form-control-dark" placeholder="کلید امنیتی ادمین...">
+                </div>
+                <button class="btn btn-gold px-4" onclick="saveAdminKey()">
+                  <i class="bi bi-save me-1"></i> تایید و ذخیره کلید
+                </button>
+              </div>
+            </div>
+
+            <div class="col-lg-6">
+              <div class="card p-4 shadow">
+                <h4 class="text-info mb-3"><i class="bi bi-server me-2"></i> مشخصات فنی سرور و پایگاه داده</h4>
+                <ul class="list-unstyled text-secondary small d-flex flex-column gap-2 mb-0">
+                  <li><strong class="text-white">میزبانی سرور:</strong> Render Cloud Service (Node.js)</li>
+                  <li><strong class="text-white">پایگاه داده:</strong> Supabase Cloud PostgreSQL (Connection Pooler)</li>
+                  <li><strong class="text-white">اعلان‌های پوش:</strong> OneSignal REST API v1</li>
+                  <li><strong class="text-white">سیستم امنیت تبلیغات:</strong> توکن‌های یکبارمصرف و اعتبارسنجی تپسل پلاس</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </main>
     </div>
-
-    <!-- Past Competitions Archive & System Logs -->
-    <div class="row g-4 mb-4">
-      <!-- Historical Competitions Archive Card -->
-      <div class="col-lg-7">
-        <div class="card p-3 shadow h-100">
-          <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="gold-text mb-0"><i class="bi bi-award-fill text-warning me-2"></i> آرشیو مسابقات پایان‌یافته</h5>
-            <span class="badge bg-dark border border-secondary">نتایج رسمی ذخیره شده</span>
-          </div>
-          <div class="table-responsive" style="max-height: 380px; overflow-y: auto;">
-            <table class="table table-dark table-hover table-striped rounded align-middle">
-              <thead>
-                <tr class="text-secondary small">
-                  <th>دوره</th>
-                  <th>عنوان مسابقه</th>
-                  <th>شرکت‌کنندگان</th>
-                  <th>مجموع امتیاز</th>
-                  <th>تاریخ پایان</th>
-                  <th>کارنامه</th>
-                </tr>
-              </thead>
-              <tbody id="archivedCompsTbody">
-                <tr><td colspan="6" class="text-center py-4 text-secondary">در حال بارگذاری...</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- System Logs Card -->
-      <div class="col-lg-5">
-        <div class="card p-3 shadow h-100">
-          <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="gold-text mb-0"><i class="bi bi-journal-text text-info me-2"></i> تاریخچه رویدادهای سیستم</h5>
-            <span class="badge bg-secondary">لاگ خودکار</span>
-          </div>
-          <div class="table-responsive" style="max-height: 380px; overflow-y: auto;">
-            <table class="table table-dark table-hover table-striped rounded align-middle">
-              <thead>
-                <tr class="text-secondary small">
-                  <th>زمان</th>
-                  <th>عملیات</th>
-                  <th>جزئیات</th>
-                </tr>
-              </thead>
-              <tbody id="logsTbody">
-                <tr><td colspan="3" class="text-center py-4 text-secondary">در حال بارگذاری...</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-
-
-
-
-
   </div>
+
+  <!-- ============================================================== -->
+  <!-- MODALS (Support Conversation, Announcement, Start Competition, Archive) -->
+  <!-- ============================================================== -->
 
   <!-- Modal: Support Ticket Conversation & Reply -->
   <div class="modal fade modal-dark" id="ticketConversationModal" tabindex="-1" aria-labelledby="ticketConvModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
-      <div class="modal-content">
+      <div class="modal-content" style="background-color: #12253B; border: 1px solid var(--border-color); color: #fff;">
         <div class="modal-header border-secondary">
           <div class="d-flex align-items-center gap-2">
             <i class="bi bi-chat-left-text-fill text-info fs-5"></i>
@@ -391,8 +1084,7 @@
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="بستن"></button>
         </div>
         <div class="modal-body p-3">
-          <!-- Ticket Details bar -->
-          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 p-2 rounded mb-3" style="background: #112233; border: 1px solid #1E3E62;">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 p-2 rounded mb-3" style="background: #0B192C; border: 1px solid var(--border-color);">
             <div>
               <span class="badge bg-secondary me-1" id="ticketConvCategory">-</span>
               <span class="badge bg-primary" id="ticketConvStatusBadge">-</span>
@@ -409,15 +1101,13 @@
             </div>
           </div>
 
-          <!-- Message Thread Box -->
-          <div id="ticketMessagesContainer" class="p-3 rounded mb-3" style="max-height: 380px; overflow-y: auto; background-color: #0B192C; border: 1px solid #1E3E62; display: flex; flex-direction: column; gap: 12px;">
+          <div id="ticketMessagesContainer" class="p-3 rounded mb-3" style="max-height: 380px; overflow-y: auto; background-color: #0B192C; border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 12px;">
             <div class="text-center text-secondary py-3">در حال بارگذاری پیام‌ها...</div>
           </div>
 
-          <!-- Reply Box -->
           <div id="ticketReplyBox">
             <label class="form-label text-warning small fw-bold"><i class="bi bi-reply-fill"></i> ارسال پاسخ مدیریت به کاربر:</label>
-            <textarea id="adminReplyTextarea" rows="3" class="form-control form-control-dark mb-2" placeholder="متن پاسخ مدیریت به این کاربر را بنویسید..."></textarea>
+            <textarea id="adminReplyTextarea" rows="3" class="form-control form-control-dark mb-2" placeholder="متن پاسخ مدیریت را اینجا بنویسید..."></textarea>
             <div class="d-flex justify-content-between align-items-center">
               <div class="form-check form-check-inline small">
                 <input class="form-check-input" type="checkbox" id="replySetAnswered" checked>
@@ -437,7 +1127,7 @@
   <!-- Modal: Create / Edit Home Announcement -->
   <div class="modal fade modal-dark" id="announcementModal" tabindex="-1" aria-labelledby="announcementModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
-      <div class="modal-content">
+      <div class="modal-content" style="background-color: #12253B; border: 1px solid var(--border-color); color: #fff;">
         <div class="modal-header border-secondary">
           <h5 class="modal-title text-info fw-bold" id="announcementModalLabel"><i class="bi bi-megaphone-fill me-2"></i> مدیریت پیام و اطلاعیه صفحه اصلی</h5>
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="بستن"></button>
@@ -457,7 +1147,7 @@
                 <option value="COMPETITION_START">شروع مسابقه</option>
                 <option value="COMPETITION_END">اعلام زمان پایان</option>
                 <option value="WINNERS">اعلام برندگان</option>
-                <option value="CUSTOM">پیام دلخواه و ویژه</option>
+                <option value="CUSTOM">پیام ویژه</option>
               </select>
             </div>
 
@@ -467,14 +1157,13 @@
             </div>
 
             <div class="col-md-7">
-              <label class="form-label text-secondary small fw-bold">تاریخ و ساعت پایان مسابقه (اختیاری جهت نمایش زمان باقیمانده):</label>
+              <label class="form-label text-secondary small fw-bold">تاریخ و ساعت پایان مسابقه (اختیاری):</label>
               <input type="datetime-local" id="annEndsAtInput" class="form-control form-control-dark" onchange="updateLivePreview()">
             </div>
             <div class="col-md-5 d-flex align-items-end gap-1 flex-wrap">
               <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setQuickEndDate(3)">+۳ روز</button>
               <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setQuickEndDate(7)">+۷ روز</button>
               <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setQuickEndDate(14)">+۱۴ روز</button>
-              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setQuickEndDate(30)">+۳۰ روز</button>
               <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearEndDate()">حذف مهلت</button>
             </div>
 
@@ -488,17 +1177,16 @@
             <!-- Live Preview in App Simulation -->
             <div class="col-12 mt-3">
               <label class="form-label text-warning small fw-bold"><i class="bi bi-phone"></i> پیش‌نمایش زنده در صفحه اصلی اپلیکیشن:</label>
-              <div class="app-preview-box" id="livePreviewContainer">
+              <div class="card p-3 shadow" id="livePreviewContainer" style="background: linear-gradient(135deg, #0B192C 0%, #1E3E62 100%); border: 1.5px solid #FFB703;">
                 <div class="d-flex justify-content-between align-items-center mb-1">
                   <div class="d-flex align-items-center gap-2">
                     <span id="previewBadgeType" class="badge bg-warning text-dark fw-bold">اطلاعیه</span>
                     <strong id="previewTitle" class="gold-text">عنوان پیام</strong>
                   </div>
-                  <span id="previewEndDateBadge" class="badge bg-danger d-none">مهلت: ۲ روز باقیمانده</span>
+                  <span id="previewEndDateBadge" class="badge bg-danger d-none">مهلت</span>
                 </div>
-                <p id="previewContent" class="mb-0 text-white small" style="white-space: pre-line;">متن پیام در اینجا نمایش داده می‌شود...</p>
+                <p id="previewContent" class="mb-0 text-white small" style="white-space: pre-line;">متن پیام...</p>
               </div>
-              <small class="text-secondary mt-1 d-block">این کادر دقیقاً ظاهر کارتی است که در بالای صفحه اصلی اپلیکیشن اندروید قرار می‌گیرد.</small>
             </div>
           </div>
         </div>
@@ -516,7 +1204,7 @@
   <!-- Modal: Start New Competition with Integrated Announcement -->
   <div class="modal fade modal-dark" id="startCompModal" tabindex="-1" aria-labelledby="startCompModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
-      <div class="modal-content">
+      <div class="modal-content" style="background-color: #12253B; border: 1px solid var(--border-color); color: #fff;">
         <div class="modal-header border-secondary">
           <h5 class="modal-title gold-text" id="startCompModalLabel"><i class="bi bi-exclamation-triangle-fill text-danger me-2"></i> شروع مسابقه جدید، آرشیو امتیازها و انتشار پیام آغاز</h5>
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="بستن"></button>
@@ -531,7 +1219,7 @@
           <div class="row g-3">
             <div class="col-md-6">
               <label class="form-label text-secondary small fw-bold">عنوان دوره مسابقه جدید:</label>
-              <input type="text" id="newCompTitleInput" class="form-control form-control-dark" placeholder="مثلاً: مسابقه شماره ۲ (جایزه پلی‌استیشن ۵)" oninput="updateCompModalPreview()">
+              <input type="text" id="newCompTitleInput" class="form-control form-control-dark" placeholder="مثلاً: مسابقه دوره ۳ (جوایز ارزنده)" oninput="updateCompModalPreview()">
             </div>
             <div class="col-md-6">
               <label class="form-label text-secondary small fw-bold">تاریخ و ساعت پایان مسابقه جدید:</label>
@@ -545,12 +1233,12 @@
 
             <div class="col-12">
               <label class="form-label text-warning small fw-bold"><i class="bi bi-phone"></i> پیش‌نمایش اطلاعیه شروع دوره در اپلیکیشن:</label>
-              <div class="app-preview-box" id="newCompPreviewContainer">
+              <div class="card p-3 shadow" id="newCompPreviewContainer" style="background: linear-gradient(135deg, #0B192C 0%, #1E3E62 100%); border: 1.5px solid #FFB703;">
                 <div class="d-flex justify-content-between align-items-center mb-1">
                   <span class="badge bg-success text-white fw-bold">شروع مسابقه</span>
-                  <strong id="newCompPreviewTitle" class="gold-text">شروع مسابقه شماره ۲</strong>
+                  <strong id="newCompPreviewTitle" class="gold-text">شروع مسابقه</strong>
                 </div>
-                <p id="newCompPreviewContent" class="mb-0 text-white small">دوره جدید مسابقه آغاز شد! با مشاهده تبلیغات امتیاز کسب کرده و برنده جوایز شوید.</p>
+                <p id="newCompPreviewContent" class="mb-0 text-white small">دوره جدید مسابقه آغاز شد.</p>
               </div>
             </div>
 
@@ -574,7 +1262,7 @@
   <!-- Modal: View Archived Leaderboard -->
   <div class="modal fade modal-dark" id="viewArchiveModal" tabindex="-1" aria-labelledby="viewArchiveModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
-      <div class="modal-content">
+      <div class="modal-content" style="background-color: #12253B; border: 1px solid var(--border-color); color: #fff;">
         <div class="modal-header border-secondary">
           <h5 class="modal-title gold-text" id="viewArchiveModalLabel"><i class="bi bi-award-fill text-warning me-2"></i> رتبه‌بندی نهایی مسابقه آرشیو شده</h5>
           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="بستن"></button>
@@ -607,6 +1295,7 @@
     </div>
   </div>
 
+  <!-- Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     let cachedUsers = [];
@@ -620,7 +1309,76 @@
     let bootstrapAnnModal = null;
     let bootstrapTicketModal = null;
 
+    // Navigation section titles mapping
+    const SECTION_TITLES = {
+      'dashboard': { title: 'داشبورد اصلی', icon: 'bi-speedometer2' },
+      'users': { title: 'مدیریت کاربران', icon: 'bi-people-fill' },
+      'competitions': { title: 'مسابقات و جوایز', icon: 'bi-trophy-fill' },
+      'announcements': { title: 'اعلان‌های صفحه اصلی', icon: 'bi-megaphone-fill' },
+      'ads': { title: 'تبلیغات و امتیازها', icon: 'bi-play-circle-fill' },
+      'support': { title: 'مرکز پشتیبانی', icon: 'bi-headset' },
+      'push': { title: 'اعلان‌های پوش و OneSignal', icon: 'bi-bell-fill' },
+      'logs': { title: 'گزارش‌ها و سوابق', icon: 'bi-journal-text' },
+      'settings': { title: 'تنظیمات و دسترسی', icon: 'bi-gear-fill' }
+    };
+
+    function navigateTo(sectionId) {
+      if (!SECTION_TITLES[sectionId]) sectionId = 'dashboard';
+
+      // Update Section Visibility
+      document.querySelectorAll('.admin-section').forEach(sec => sec.classList.remove('active'));
+      const targetSec = document.getElementById(`section-${sectionId}`);
+      if (targetSec) targetSec.classList.add('active');
+
+      // Update Sidebar Links
+      document.querySelectorAll('.sidebar-link').forEach(link => {
+        const linkSec = link.getAttribute('onclick')?.match(/'([^']+)'/)?.[1];
+        if (linkSec === sectionId) {
+          link.classList.add('active');
+        } else {
+          link.classList.remove('active');
+        }
+      });
+
+      // Update Topbar Title
+      const titleInfo = SECTION_TITLES[sectionId];
+      const titleEl = document.getElementById('currentSectionTitle');
+      if (titleEl && titleInfo) {
+        titleEl.innerHTML = `<i class="bi ${titleInfo.icon}"></i> ${titleInfo.title}`;
+      }
+
+      // Update URL Hash
+      if (window.location.hash !== `#${sectionId}`) {
+        window.history.replaceState(null, '', `#${sectionId}`);
+      }
+
+      // Close mobile sidebar if open
+      closeSidebar();
+
+      // Scroll top
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function toggleSidebar() {
+      const sidebar = document.getElementById('adminSidebar');
+      const backdrop = document.getElementById('sidebarBackdrop');
+      if (sidebar && backdrop) {
+        sidebar.classList.toggle('show');
+        backdrop.classList.toggle('show');
+      }
+    }
+
+    function closeSidebar() {
+      const sidebar = document.getElementById('adminSidebar');
+      const backdrop = document.getElementById('sidebarBackdrop');
+      if (sidebar && backdrop) {
+        sidebar.classList.remove('show');
+        backdrop.classList.remove('show');
+      }
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
+      // Modals Initialization
       const sModalEl = document.getElementById('startCompModal');
       if (sModalEl) bootstrapStartModal = new bootstrap.Modal(sModalEl);
 
@@ -632,6 +1390,17 @@
 
       const tModalEl = document.getElementById('ticketConversationModal');
       if (tModalEl) bootstrapTicketModal = new bootstrap.Modal(tModalEl);
+
+      // Handle Initial Navigation from Hash
+      const initialHash = window.location.hash.replace('#', '');
+      if (initialHash && SECTION_TITLES[initialHash]) {
+        navigateTo(initialHash);
+      } else {
+        navigateTo('dashboard');
+      }
+
+      // Check OneSignal Status
+      checkOneSignalStatus();
     });
 
     function getAdminKey() {
@@ -642,21 +1411,41 @@
       const input = document.getElementById('adminKeyInput').value.trim();
       if (input) {
         localStorage.setItem('reqabat_admin_key', input);
+        alert('کلید مدیریت با موفقیت در مرورگر شما ذخیره شد.');
         loadDashboard();
       }
     }
 
     // Initialize key field
-    document.getElementById('adminKeyInput').value = getAdminKey();
+    const adminKeyField = document.getElementById('adminKeyInput');
+    if (adminKeyField) adminKeyField.value = getAdminKey();
 
     function showAlert(msg) {
       const el = document.getElementById('alertBox');
-      el.innerText = msg;
-      el.classList.remove('d-none');
+      if (el) {
+        el.innerText = msg;
+        el.classList.remove('d-none');
+      }
     }
 
     function hideAlert() {
-      document.getElementById('alertBox').classList.add('d-none');
+      const el = document.getElementById('alertBox');
+      if (el) el.classList.add('d-none');
+    }
+
+    function setElText(id, text) {
+      const el = document.getElementById(id);
+      if (el) el.innerText = text;
+    }
+
+    function setElHtml(id, html) {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = html;
+    }
+
+    function setElClass(id, className) {
+      const el = document.getElementById(id);
+      if (el) el.className = className;
     }
 
     function checkConfirmationPhrase() {
@@ -675,7 +1464,6 @@
       const nextNum = currentActiveComp ? (currentActiveComp.competitionNumber + 1) : 2;
       document.getElementById('newCompTitleInput').value = `مسابقه دوره ${nextNum} (جوایز ارزنده)`;
       
-      // Default end date: 14 days from now
       const d = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
       document.getElementById('newCompEndDateInput').value = d.toISOString().slice(0, 16);
       document.getElementById('newCompAnnContentInput').value = `دوره ${nextNum} مسابقه «رقابت کن، جایزه ببر» آغاز شد! با مشاهده تبلیغات و تکمیل ۵۰ مربع روزانه امتیاز کسب کنید و برنده جوایز ویژه شوید.`;
@@ -687,8 +1475,8 @@
     function updateCompModalPreview() {
       const title = document.getElementById('newCompTitleInput').value.trim() || 'شروع مسابقه جدید';
       const content = document.getElementById('newCompAnnContentInput').value.trim() || 'دوره جدید مسابقه آغاز شد.';
-      document.getElementById('newCompPreviewTitle').innerText = title;
-      document.getElementById('newCompPreviewContent').innerText = content;
+      setElText('newCompPreviewTitle', title);
+      setElText('newCompPreviewContent', content);
     }
 
     function setQuickEndDate(days) {
@@ -742,8 +1530,8 @@
       const endsAt = document.getElementById('annEndsAtInput').value;
       const isActive = document.getElementById('annIsActiveSwitch').checked;
 
-      document.getElementById('previewTitle').innerText = title;
-      document.getElementById('previewContent').innerText = content;
+      setElText('previewTitle', title);
+      setElText('previewContent', content);
 
       const badgeType = document.getElementById('previewBadgeType');
       const typeLabels = {
@@ -754,32 +1542,38 @@
         'CUSTOM': { text: 'پیام ویژه', cls: 'bg-info text-dark' }
       };
       const info = typeLabels[type] || { text: 'اطلاعیه', cls: 'bg-primary' };
-      badgeType.className = `badge ${info.cls} fw-bold`;
-      badgeType.innerText = info.text;
+      if (badgeType) {
+        badgeType.className = `badge ${info.cls} fw-bold`;
+        badgeType.innerText = info.text;
+      }
 
       const endBadge = document.getElementById('previewEndDateBadge');
-      if (endsAt) {
-        const diffMs = new Date(endsAt).getTime() - Date.now();
-        if (diffMs > 0) {
-          const days = Math.floor(diffMs / (24 * 3600 * 1000));
-          const hours = Math.floor((diffMs % (24 * 3600 * 1000)) / (3600 * 1000));
-          endBadge.innerText = days > 0 ? `مهلت: ${days} روز و ${hours} ساعت باقیمانده` : `مهلت: ${hours} ساعت باقیمانده`;
-          endBadge.classList.remove('d-none');
+      if (endBadge) {
+        if (endsAt) {
+          const diffMs = new Date(endsAt).getTime() - Date.now();
+          if (diffMs > 0) {
+            const days = Math.floor(diffMs / (24 * 3600 * 1000));
+            const hours = Math.floor((diffMs % (24 * 3600 * 1000)) / (3600 * 1000));
+            endBadge.innerText = days > 0 ? `مهلت: ${days} روز و ${hours} ساعت باقیمانده` : `مهلت: ${hours} ساعت باقیمانده`;
+            endBadge.classList.remove('d-none');
+          } else {
+            endBadge.innerText = 'زمان پایان سپری شده';
+            endBadge.classList.remove('d-none');
+          }
         } else {
-          endBadge.innerText = 'زمان پایان سپری شده';
-          endBadge.classList.remove('d-none');
+          endBadge.classList.add('d-none');
         }
-      } else {
-        endBadge.classList.add('d-none');
       }
 
       const container = document.getElementById('livePreviewContainer');
-      if (!isActive) {
-        container.style.opacity = '0.45';
-        container.style.filter = 'grayscale(60%)';
-      } else {
-        container.style.opacity = '1';
-        container.style.filter = 'none';
+      if (container) {
+        if (!isActive) {
+          container.style.opacity = '0.45';
+          container.style.filter = 'grayscale(60%)';
+        } else {
+          container.style.opacity = '1';
+          container.style.filter = 'none';
+        }
       }
     }
 
@@ -801,7 +1595,7 @@
       const btn = document.getElementById('saveAnnBtn');
       const spinner = document.getElementById('saveAnnSpinner');
       btn.setAttribute('disabled', 'true');
-      spinner.classList.remove('d-none');
+      if (spinner) spinner.classList.remove('d-none');
 
       try {
         const res = await fetch('/api/admin/announcements', {
@@ -810,14 +1604,7 @@
             'Content-Type': 'application/json',
             'x-admin-key': key
           },
-          body: JSON.stringify({
-            id,
-            title,
-            content,
-            type,
-            isActive,
-            endsAt
-          })
+          body: JSON.stringify({ id, title, content, type, isActive, endsAt })
         });
 
         const data = await res.json();
@@ -830,7 +1617,7 @@
       } catch (err) {
         alert('خطای ارتباط با سرور: ' + err.message);
       } finally {
-        spinner.classList.add('d-none');
+        if (spinner) spinner.classList.add('d-none');
         btn.removeAttribute('disabled');
       }
     }
@@ -845,9 +1632,7 @@
       try {
         const res = await fetch(`/api/admin/announcements/${annId}/toggle`, {
           method: 'PATCH',
-          headers: {
-            'x-admin-key': key
-          }
+          headers: { 'x-admin-key': key }
         });
         const data = await res.json();
         if (data.success) {
@@ -860,21 +1645,6 @@
       }
     }
 
-    function setElText(id, text) {
-      const el = document.getElementById(id);
-      if (el) el.innerText = text;
-    }
-
-    function setElHtml(id, html) {
-      const el = document.getElementById(id);
-      if (el) el.innerHTML = html;
-    }
-
-    function setElClass(id, className) {
-      const el = document.getElementById(id);
-      if (el) el.className = className;
-    }
-
     async function loadDashboard() {
       const spinner = document.getElementById('refreshSpinner');
       const authBadge = document.getElementById('authStatusBadge');
@@ -885,9 +1655,7 @@
 
       try {
         const res = await fetch('/api/admin/overview', {
-          headers: {
-            'x-admin-key': key
-          }
+          headers: { 'x-admin-key': key }
         });
 
         if (res.status === 401) {
@@ -895,8 +1663,8 @@
             authBadge.className = 'badge bg-danger';
             authBadge.innerText = 'کلید نامعتبر';
           }
-          showAlert('خطای دسترسی: کلید امنیتی مدیریت نامعتبر است. لطفاً کلید صحیح ADMIN_KEY را در کادر بالا وارد و تایید کنید.');
-          setElHtml('usersTbody', '<tr><td colspan="6" class="text-center text-danger py-4">دسترسی به اطلاعات سرور نیازمند کلید مدیریت است.</td></tr>');
+          showAlert('خطای دسترسی: کلید امنیتی مدیریت نامعتبر است. لطفاً در بخش «تنظیمات و دسترسی» کلید صحیح را وارد کنید.');
+          setElHtml('usersTbody', '<tr><td colspan="6" class="text-center text-danger py-4">دسترسی نیازمند کلید معتبر مدیریت است.</td></tr>');
           setElHtml('sessionsTbody', '<tr><td colspan="6" class="text-center text-danger py-4">دسترسی مسدود است.</td></tr>');
           return;
         }
@@ -919,15 +1687,23 @@
         // Active Competition
         if (data.activeCompetition) {
           currentActiveComp = data.activeCompetition;
-          setElText('activeCompNumber', 'دوره ' + data.activeCompetition.competitionNumber);
+          const compNumText = 'دوره ' + data.activeCompetition.competitionNumber;
+          setElText('activeCompNumber', compNumText);
           setElText('activeCompTitle', data.activeCompetition.title);
+          setElText('dashCompNumber', compNumText);
+          setElText('dashCompTitle', data.activeCompetition.title);
+
           const startDate = new Date(data.activeCompetition.startedAt);
           setElText('activeCompStartedAt', startDate.toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }));
+          
           if (data.activeCompetition.endedAt) {
             const endDate = new Date(data.activeCompetition.endedAt);
-            setElText('activeCompEndedAt', endDate.toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }));
+            const endText = endDate.toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            setElText('activeCompEndedAt', endText);
+            setElText('dashCompEndedAt', endText);
           } else {
             setElText('activeCompEndedAt', 'نامحدود / تعیین نشده');
+            setElText('dashCompEndedAt', 'نامحدود');
           }
         }
 
@@ -978,6 +1754,13 @@
         setElText('activeAnnContent', 'برای نمایش اطلاعیه یا پیام جدید به کاربران اپلیکیشن، روی دکمه «ایجاد پیام جدید» کلیک کنید.');
         setElText('activeAnnStartsAt', '-');
         setElText('activeAnnEndsAt', '-');
+
+        // Dashboard Summary Card
+        setElText('dashAnnType', 'غیرفعال');
+        setElText('dashAnnStatus', 'بدون پیام');
+        setElText('dashAnnTitle', 'پیام فعالی وجود ندارد');
+        setElText('dashAnnContent', 'برای ایجاد اطلاعیه جدید به بخش اعلان‌ها بروید.');
+
         if (toggleBtn) toggleBtn.classList.add('d-none');
         return;
       }
@@ -993,9 +1776,10 @@
         'WINNERS': 'اعلام برندگان',
         'CUSTOM': 'پیام ویژه'
       };
+      const labelText = typeLabels[ann.type] || 'اطلاعیه';
       if (typeBadge) {
         typeBadge.classList.remove('d-none');
-        typeBadge.innerText = typeLabels[ann.type] || 'اطلاعیه';
+        typeBadge.innerText = labelText;
       }
 
       setElText('activeAnnTitle', ann.title);
@@ -1009,6 +1793,13 @@
         setElText('activeAnnEndsAt', 'تعیین نشده');
       }
 
+      // Dashboard Summary
+      setElText('dashAnnType', labelText);
+      setElText('dashAnnStatus', ann.isActive ? 'در حال نمایش' : 'غیرفعال');
+      setElClass('dashAnnStatus', ann.isActive ? 'badge bg-success' : 'badge bg-secondary');
+      setElText('dashAnnTitle', ann.title);
+      setElText('dashAnnContent', ann.content);
+
       if (toggleBtn) {
         toggleBtn.innerHTML = ann.isActive ? '<i class="bi bi-eye-slash"></i> غیرفعال‌سازی' : '<i class="bi bi-eye"></i> فعال‌سازی';
         toggleBtn.className = ann.isActive ? 'btn btn-sm btn-outline-danger' : 'btn btn-sm btn-outline-success';
@@ -1017,6 +1808,8 @@
 
     function renderAnnouncements(list) {
       const tbody = document.getElementById('announcementsTbody');
+      if (!tbody) return;
+
       if (!list || list.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="text-center py-3 text-secondary"><i class="bi bi-info-circle"></i> هیچ پیامی ثبت نشده است.</td></tr>';
         return;
@@ -1060,6 +1853,8 @@
 
     function renderArchivedCompetitions(comps) {
       const tbody = document.getElementById('archivedCompsTbody');
+      if (!tbody) return;
+
       if (!comps || comps.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-secondary"><i class="bi bi-info-circle"></i> هنوز هیچ مسابقه‌ای به پایان نرسیده و آرشیو نشده است.</td></tr>';
         return;
@@ -1076,7 +1871,7 @@
             <td><small class="text-secondary">${endDate}</small></td>
             <td>
               <button class="btn btn-sm btn-outline-warning" onclick="viewArchivedLeaderboard('${c.id}')">
-                <i class="bi bi-eye-fill"></i> کارنامه نهایی
+                <i class="bi bi-eye-fill me-1"></i> کارنامه نهایی
               </button>
             </td>
           </tr>
@@ -1086,6 +1881,8 @@
 
     function renderLogs(logs) {
       const tbody = document.getElementById('logsTbody');
+      if (!tbody) return;
+
       if (!logs || logs.length === 0) {
         tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-secondary"><i class="bi bi-info-circle"></i> لاگی ثبت نشده است.</td></tr>';
         return;
@@ -1105,33 +1902,35 @@
 
     async function viewArchivedLeaderboard(compId) {
       const resultsTbody = document.getElementById('archiveResultsTbody');
-      resultsTbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-secondary">در حال دریافت کارنامه نهایی از دیتابیس...</td></tr>';
+      if (resultsTbody) resultsTbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-secondary">در حال دریافت کارنامه نهایی از دیتابیس...</td></tr>';
       if (bootstrapArchiveModal) bootstrapArchiveModal.show();
 
       try {
         const res = await fetch(`/api/competitions/${compId}/results`);
         const data = await res.json();
         if (data.success) {
-          document.getElementById('archiveModalCompTitle').innerText = data.competition.title;
-          document.getElementById('archiveModalCompStats').innerText = `شرکت‌کنندگان: ${data.competition.totalParticipants} نفر | مجموع امتیاز: ${data.competition.totalScore}`;
+          setElText('archiveModalCompTitle', data.competition.title);
+          setElText('archiveModalCompStats', `شرکت‌کنندگان: ${data.competition.totalParticipants} نفر | مجموع امتیاز: ${data.competition.totalScore}`);
           
           if (!data.results || data.results.length === 0) {
-            resultsTbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-secondary">هیچ رتبه‌ای برای این مسابقه ذخیره نشده است.</td></tr>';
+            if (resultsTbody) resultsTbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-secondary">هیچ رتبه‌ای برای این مسابقه ذخیره نشده است.</td></tr>';
           } else {
-            resultsTbody.innerHTML = data.results.map(r => `
-              <tr>
-                <td><span class="badge ${r.rank <= 3 ? 'bg-warning text-dark fw-bold' : 'bg-secondary'}">#${r.rank}</span></td>
-                <td class="fw-bold">${r.displayName}</td>
-                <td dir="ltr" class="text-secondary">${r.phoneNumber}</td>
-                <td><span class="badge badge-gold">${r.finalScore} امتیاز</span></td>
-              </tr>
-            `).join('');
+            if (resultsTbody) {
+              resultsTbody.innerHTML = data.results.map(r => `
+                <tr>
+                  <td><span class="badge ${r.rank <= 3 ? 'bg-warning text-dark fw-bold' : 'bg-secondary'}">#${r.rank}</span></td>
+                  <td class="fw-bold">${r.displayName}</td>
+                  <td dir="ltr" class="text-secondary">${r.phoneNumber}</td>
+                  <td><span class="badge badge-gold">${r.finalScore} امتیاز</span></td>
+                </tr>
+              `).join('');
+            }
           }
         } else {
-          resultsTbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger py-4">${data.error || 'خطا در دریافت'}</td></tr>`;
+          if (resultsTbody) resultsTbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger py-4">${data.error || 'خطا در دریافت'}</td></tr>`;
         }
       } catch (err) {
-        resultsTbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger py-4">خطای ارتباط: ${err.message}</td></tr>`;
+        if (resultsTbody) resultsTbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger py-4">خطای ارتباط: ${err.message}</td></tr>`;
       }
     }
 
@@ -1152,7 +1951,7 @@
       const spinner = document.getElementById('startCompSpinner');
 
       btn.setAttribute('disabled', 'true');
-      spinner.classList.remove('d-none');
+      if (spinner) spinner.classList.remove('d-none');
 
       try {
         const res = await fetch('/api/admin/competition/start-new', {
@@ -1181,13 +1980,15 @@
       } catch (err) {
         alert('خطای ارتباط با سرور: ' + err.message);
       } finally {
-        spinner.classList.add('d-none');
+        if (spinner) spinner.classList.add('d-none');
         btn.removeAttribute('disabled');
       }
     }
 
     function renderUsers(users) {
       const tbody = document.getElementById('usersTbody');
+      if (!tbody) return;
+
       if (!users || users.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-secondary"><i class="bi bi-info-circle"></i> هیچ کاربری در مسابقه فعلی ثبت نشده است.</td></tr>';
         return;
@@ -1195,7 +1996,7 @@
 
       tbody.innerHTML = users.map((u, index) => `
         <tr>
-          <td><span class="text-secondary">${index + 1}</span></td>
+          <td><span class="${index < 3 ? 'badge bg-warning text-dark fw-bold' : 'text-secondary'}">${index + 1}</span></td>
           <td><code class="text-warning">${u.id.substring(0, 8)}...</code></td>
           <td class="fw-bold">${u.firstName || ''} ${u.lastName || ''}</td>
           <td dir="ltr" class="text-end">${u.phoneNumber || '-'}</td>
@@ -1211,6 +2012,8 @@
 
     function renderSessions(sessions) {
       const tbody = document.getElementById('sessionsTbody');
+      if (!tbody) return;
+
       if (!sessions || sessions.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-secondary"><i class="bi bi-info-circle"></i> هنوز هیچ تبلیغی در این دوره تکمیل و ثبت نشده است.</td></tr>';
         return;
@@ -1229,7 +2032,7 @@
     }
 
     function filterUsers() {
-      const q = document.getElementById('userSearchInput').value.trim().toLowerCase();
+      const q = (document.getElementById('userSearchInput')?.value || '').trim().toLowerCase();
       if (!q) {
         renderUsers(cachedUsers);
         return;
@@ -1268,9 +2071,8 @@
     }
 
     // ====================================================================
-    // Support Tickets Management JavaScript (Admin Panel)
+    // Support Tickets Management
     // ====================================================================
-
     function escapeHtml(str) {
       if (!str) return '';
       return String(str)
@@ -1315,6 +2117,17 @@
             setElText('supportCountNew', data.stats.newCount || 0);
             setElText('supportCountInProgress', data.stats.inProgressCount || 0);
             setElText('supportCountAnswered', data.stats.answeredCount || 0);
+
+            // Sidebar notification badge
+            const sideBadge = document.getElementById('sidebarSupportBadge');
+            if (sideBadge) {
+              if (data.stats.newCount > 0) {
+                sideBadge.innerText = data.stats.newCount;
+                sideBadge.style.display = 'inline-block';
+              } else {
+                sideBadge.style.display = 'none';
+              }
+            }
           }
 
           filterSupportTickets();
@@ -1349,11 +2162,7 @@
         );
       }
 
-      const summaryEl = document.getElementById('supportFilterSummary');
-      if (summaryEl) {
-        summaryEl.innerText = `${filtered.length} تیکت از ${cachedTickets.length}`;
-      }
-
+      setElText('supportFilterSummary', `${filtered.length} تیکت از ${cachedTickets.length}`);
       renderSupportTickets(filtered);
     }
 
@@ -1400,7 +2209,7 @@
             <td><small class="text-secondary">${updateDate}</small></td>
             <td>
               <button class="btn btn-sm btn-outline-info" onclick="openSupportTicketModal('${t.id}')">
-                <i class="bi bi-chat-dots me-1"></i> مشاهده و پاسخ
+                <i class="bi bi-chat-dots me-1"></i> پاسخ
               </button>
             </td>
           </tr>
@@ -1412,12 +2221,14 @@
       currentOpenTicket = null;
       const key = getAdminKey();
 
-      document.getElementById('ticketConvTitle').innerText = 'در حال بارگذاری...';
-      document.getElementById('ticketConvCode').innerText = '...';
-      document.getElementById('ticketConvUser').innerText = '...';
-      document.getElementById('ticketConvPhone').innerText = '...';
-      document.getElementById('ticketMessagesContainer').innerHTML = '<div class="text-center text-secondary py-4"><span class="spinner-border spinner-border-sm me-2"></span>در حال دریافت پیام‌ها...</div>';
-      document.getElementById('adminReplyTextarea').value = '';
+      setElText('ticketConvTitle', 'در حال بارگذاری...');
+      setElText('ticketConvCode', '...');
+      setElText('ticketConvUser', '...');
+      setElText('ticketConvPhone', '...');
+      setElHtml('ticketMessagesContainer', '<div class="text-center text-secondary py-4"><span class="spinner-border spinner-border-sm me-2"></span>در حال دریافت پیام‌ها...</div>');
+      
+      const replyArea = document.getElementById('adminReplyTextarea');
+      if (replyArea) replyArea.value = '';
 
       if (bootstrapTicketModal) bootstrapTicketModal.show();
 
@@ -1432,31 +2243,33 @@
           renderTicketConversation(data.ticket, data.messages || []);
         }
       } catch (err) {
-        document.getElementById('ticketMessagesContainer').innerHTML = `<div class="alert alert-danger mb-0">${escapeHtml(err.message)}</div>`;
+        setElHtml('ticketMessagesContainer', `<div class="alert alert-danger mb-0">${escapeHtml(err.message)}</div>`);
       }
     }
 
     function renderTicketConversation(ticket, messages) {
-      document.getElementById('ticketConvTitle').innerText = ticket.subject;
-      document.getElementById('ticketConvCode').innerText = ticket.trackingCode;
-      document.getElementById('ticketConvUser').innerText = ticket.userName;
-      document.getElementById('ticketConvPhone').innerText = ticket.phoneNumber;
+      setElText('ticketConvTitle', ticket.subject);
+      setElText('ticketConvCode', ticket.trackingCode);
+      setElText('ticketConvUser', ticket.userName);
+      setElText('ticketConvPhone', ticket.phoneNumber);
 
       const cat = SUPPORT_CATEGORY_MAP[ticket.category] || SUPPORT_CATEGORY_MAP['OTHER'];
       const stat = SUPPORT_STATUS_MAP[ticket.status] || SUPPORT_STATUS_MAP['NEW'];
-      document.getElementById('ticketConvCategory').innerText = cat.label;
-      document.getElementById('ticketConvStatusBadge').className = stat.cls;
-      document.getElementById('ticketConvStatusBadge').innerText = stat.label;
+      setElText('ticketConvCategory', cat.label);
+      setElClass('ticketConvStatusBadge', stat.cls);
+      setElText('ticketConvStatusBadge', stat.label);
 
       const createdDate = new Date(ticket.createdAtMs).toLocaleDateString('fa-IR', {
         year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
       });
-      document.getElementById('ticketConvCreated').innerText = createdDate;
+      setElText('ticketConvCreated', createdDate);
 
       const select = document.getElementById('ticketConvStatusSelect');
       if (select) select.value = ticket.status;
 
       const container = document.getElementById('ticketMessagesContainer');
+      if (!container) return;
+
       if (!messages || messages.length === 0) {
         container.innerHTML = '<div class="text-center text-secondary py-3">هیچ پیامی ثبت نشده است.</div>';
         return;
@@ -1494,14 +2307,13 @@
         }
       }).join('');
 
-      // Auto scroll to latest message
       container.scrollTop = container.scrollHeight;
     }
 
     async function sendAdminReply() {
       if (!currentOpenTicket) return;
       const textarea = document.getElementById('adminReplyTextarea');
-      const text = textarea.value.trim();
+      const text = textarea ? textarea.value.trim() : '';
       if (!text) {
         alert('لطفاً متن پاسخ را وارد نمایید.');
         return;
@@ -1512,8 +2324,8 @@
 
       const btn = document.getElementById('sendReplyBtn');
       const spinner = document.getElementById('sendReplySpinner');
-      btn.setAttribute('disabled', 'true');
-      spinner.classList.remove('d-none');
+      if (btn) btn.setAttribute('disabled', 'true');
+      if (spinner) spinner.classList.remove('d-none');
 
       const key = getAdminKey();
       try {
@@ -1523,18 +2335,13 @@
             'Content-Type': 'application/json',
             'x-admin-key': key
           },
-          body: JSON.stringify({
-            message: text,
-            newStatus
-          })
+          body: JSON.stringify({ message: text, newStatus })
         });
 
         const data = await res.json();
         if (data.success) {
-          textarea.value = '';
-          // Reload ticket messages
+          if (textarea) textarea.value = '';
           await openSupportTicketModal(currentOpenTicket.id);
-          // Reload dashboard tickets list
           loadAdminSupportTickets();
         } else {
           alert('خطا: ' + (data.error || 'ارسال پاسخ ناموفق بود'));
@@ -1542,15 +2349,16 @@
       } catch (err) {
         alert('خطای ارتباط: ' + err.message);
       } finally {
-        btn.removeAttribute('disabled');
-        spinner.classList.add('d-none');
+        if (btn) btn.removeAttribute('disabled');
+        if (spinner) spinner.classList.add('d-none');
       }
     }
 
     async function updateTicketStatusFromSelect() {
       if (!currentOpenTicket) return;
       const select = document.getElementById('ticketConvStatusSelect');
-      const status = select.value;
+      const status = select ? select.value : null;
+      if (!status) return;
       const key = getAdminKey();
 
       try {
@@ -1566,8 +2374,8 @@
         if (data.success) {
           currentOpenTicket.status = status;
           const stat = SUPPORT_STATUS_MAP[status] || SUPPORT_STATUS_MAP['NEW'];
-          document.getElementById('ticketConvStatusBadge').className = stat.cls;
-          document.getElementById('ticketConvStatusBadge').innerText = stat.label;
+          setElClass('ticketConvStatusBadge', stat.cls);
+          setElText('ticketConvStatusBadge', stat.label);
           loadAdminSupportTickets();
         } else {
           alert('خطا: ' + (data.error || 'تغییر وضعیت ناموفق بود'));
@@ -1576,7 +2384,78 @@
         alert('خطای ارتباط: ' + err.message);
       }
     }
-    // Auto-refresh every 12 seconds
+
+    // ====================================================================
+    // OneSignal & Push Notification
+    // ====================================================================
+    async function checkOneSignalStatus() {
+      const key = getAdminKey();
+      const badge = document.getElementById('onesignalBadge');
+      try {
+        const res = await fetch('/api/admin/onesignal/status', {
+          headers: { 'x-admin-key': key }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (badge) {
+          if (data.configured) {
+            badge.className = 'badge bg-success';
+            badge.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> پیکربندی‌شده و متصل';
+          } else {
+            badge.className = 'badge bg-warning text-dark';
+            badge.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-1"></i> کلیدها در Render تنظیم نشده‌اند';
+          }
+        }
+      } catch (e) {
+        if (badge) {
+          badge.className = 'badge bg-secondary';
+          badge.innerText = 'عدم دسترسی به وضعیت';
+        }
+      }
+    }
+
+    async function sendPushNotification() {
+      const title = (document.getElementById('pushTitle')?.value || '').trim();
+      const message = (document.getElementById('pushMessage')?.value || '').trim();
+      const audience = document.getElementById('pushAudience')?.value || 'ALL';
+
+      if (!title || !message) {
+        alert('لطفاً عنوان و متن اعلان پوش را وارد کنید.');
+        return;
+      }
+
+      const btn = document.getElementById('sendPushBtn');
+      const spinner = document.getElementById('pushSpinner');
+      if (btn) btn.setAttribute('disabled', 'true');
+      if (spinner) spinner.classList.remove('d-none');
+
+      const key = getAdminKey();
+      try {
+        const res = await fetch('/api/admin/push-notification', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-key': key
+          },
+          body: JSON.stringify({ title, message, audience })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('اعلان پوش با موفقیت به سرویس OneSignal ارسال گردید.');
+          document.getElementById('pushTitle').value = '';
+          document.getElementById('pushMessage').value = '';
+        } else {
+          alert('خطا در ارسال اعلان: ' + (data.error || 'پاسخ ناموفق'));
+        }
+      } catch (err) {
+        alert('خطای ارتباط با سرور: ' + err.message);
+      } finally {
+        if (btn) btn.removeAttribute('disabled');
+        if (spinner) spinner.classList.add('d-none');
+      }
+    }
+
+    // Auto-refresh every 12 seconds with live data
     loadDashboard();
     setInterval(loadDashboard, 12000);
   </script>

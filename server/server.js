@@ -2611,6 +2611,59 @@ app.patch('/api/admin/support/tickets/:id/status', requireAdminAuth, ensureDatab
   }
 });
 
+// Admin: Check OneSignal Configuration Status
+app.get('/api/admin/onesignal/status', requireAdminAuth, (req, res) => {
+  const isConfigured = Boolean(process.env.ONESIGNAL_APP_ID && process.env.ONESIGNAL_REST_API_KEY);
+  return res.json({
+    success: true,
+    configured: isConfigured,
+    appId: process.env.ONESIGNAL_APP_ID ? `${process.env.ONESIGNAL_APP_ID.substring(0, 8)}...` : null
+  });
+});
+
+// Admin: Send Push Notification via OneSignal REST API
+app.post('/api/admin/push-notification', requireAdminAuth, async (req, res) => {
+  try {
+    const { title, message, audience } = req.body;
+    if (!title || !message) {
+      return res.status(400).json({ error: "عنوان و متن اعلان الزامی است." });
+    }
+    const appId = process.env.ONESIGNAL_APP_ID;
+    const apiKey = process.env.ONESIGNAL_REST_API_KEY;
+
+    if (!appId || !apiKey) {
+      return res.status(503).json({ 
+        error: "کلیدهای ONESIGNAL_APP_ID یا ONESIGNAL_REST_API_KEY در متغیرهای محیطی Render سرور تنظیم نشده‌اند." 
+      });
+    }
+
+    const response = await fetch('https://onesignal.com/api/v1/notifications', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${apiKey}`
+      },
+      body: JSON.stringify({
+        app_id: appId,
+        headings: { en: title },
+        contents: { en: message },
+        included_segments: audience === 'ALL' ? ['All'] : ['Subscribed Users']
+      })
+    });
+
+    const data = await response.json();
+    if (response.ok) {
+      return res.json({ success: true, data });
+    } else {
+      const errDetail = Array.isArray(data.errors) ? data.errors.join(', ') : (data.errors || 'خطا از سوی وان‌سیگنال');
+      return res.status(500).json({ success: false, error: errDetail });
+    }
+  } catch (err) {
+    console.error('[Push Notification Error]', err);
+    return res.status(500).json({ success: false, error: "خطا در برقراری ارتباط با وان‌سیگنال." });
+  }
+});
+
 // Global Error Handler
 app.use((err, req, res, next) => {
   console.error('[Global Error]', err);
