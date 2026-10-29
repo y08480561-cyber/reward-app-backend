@@ -321,6 +321,7 @@ async function initDatabaseTables() {
 
     // 14. Add auth_token to users table for robust server-side token validation
     `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS auth_token TEXT;`,
+    `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS notifications_enabled BOOLEAN NOT NULL DEFAULT true;`,
     `CREATE INDEX IF NOT EXISTS idx_users_auth_token ON public.users(auth_token);`,
 
     // 15. Support Tickets Table
@@ -2660,3 +2661,18 @@ app.post('/api/admin/push-notification', requireAdminAuth, async (req, res) => {
   }
 });
 
+// User Notification Preference Toggle
+app.post('/api/user/settings/notifications', requireUserAuth, async (req, res) => {
+  try {
+    const { enabled } = req.body;
+    const userId = req.user.id;
+    await pool.query(
+      `UPDATE public.users SET notifications_enabled = $1 WHERE id = $2`,
+      [enabled, userId]
+    );
+    return res.json({ success: true, enabled });
+  } catch (err) {
+    console.error('[Notification Preference Error]', err);
+    return res.status(500).json({ success: false, error: "خطا در به‌روزرسانی تنظیمات اعلان." });
+  }
+});

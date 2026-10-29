@@ -70,83 +70,46 @@
     <!-- Alert Box -->
     <div id="alertBox" class="alert alert-danger d-none" role="alert"></div>
 
-    <div id="reconstructedContent">
+    <!-- Nav Tabs -->
+    <ul class="nav nav-tabs mb-4" id="adminTabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-stats" type="button" role="tab"><i class="bi bi-graph-up"></i> آمار و مسابقات</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-announcements" type="button" role="tab"><i class="bi bi-megaphone"></i> پیام‌ها و اعلان‌ها</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-support" type="button" role="tab"><i class="bi bi-headset"></i> پشتیبانی</button>
+      </li>
+    </ul>
+
+    <div class="tab-content">
+      <!-- Tab 1: Stats & Competitions -->
+      <div class="tab-pane fade show active" id="tab-stats" role="tabpanel">
+        <!-- Competitions Section -->
+        <div class="card comp-banner p-4 mb-4 shadow">...</div>
         <!-- Stats Overview -->
-        <div class="row g-3 mb-4">
-            <div class="col-md-4">
-                <div class="card p-3 text-center">
-                    <h6 class="text-secondary">کل کاربران</h6>
-                    <h3 id="totalUsers" class="gold-text">-</h3>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card p-3 text-center">
-                    <h6 class="text-secondary">مجموع امتیازها</h6>
-                    <h3 id="totalScores" class="gold-text">-</h3>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card p-3 text-center">
-                    <h6 class="text-secondary">رویدادهای تبلیغاتی</h6>
-                    <h3 id="totalAds" class="gold-text">-</h3>
-                </div>
-            </div>
-        </div>
+        <div class="row g-3 mb-4">...</div>
+        <!-- Tables -->
+        <div class="row g-4 mb-4">...</div>
+        <!-- Historical Competitions Archive -->
+        <div class="row g-4 mb-5">...</div>
+      </div>
 
-        <!-- Active Competition -->
-        <div class="card comp-banner p-4 mb-4">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h4 class="gold-text mb-0"><i class="bi bi-trophy-fill text-warning me-2"></i> مسابقه فعال فعلی</h4>
-                <button class="btn btn-sm btn-outline-danger" onclick="openStartCompModal()">شروع مسابقه جدید</button>
-            </div>
-            <div class="row">
-                <div class="col-md-3"><strong>شماره دوره:</strong> <span id="activeCompNumber">-</span></div>
-                <div class="col-md-3"><strong>عنوان:</strong> <span id="activeCompTitle">-</span></div>
-                <div class="col-md-3"><strong>شروع:</strong> <span id="activeCompStartedAt">-</span></div>
-                <div class="col-md-3"><strong>پایان:</strong> <span id="activeCompEndedAt">-</span></div>
-            </div>
-        </div>
-
-        <!-- Announcements -->
-        <div class="card p-4 mb-4">
-            <h4 class="gold-text mb-3"><i class="bi bi-megaphone me-2"></i> اطلاعیه‌ها</h4>
-            <div id="activeAnnCard" class="alert alert-info">...</div>
-            <table class="table table-dark table-hover">
-                <thead><tr><th>عنوان</th><th>نوع</th><th>وضعیت</th><th>پایان</th><th>بروزرسانی</th><th>عملیات</th></tr></thead>
-                <tbody id="announcementsTbody"></tbody>
-            </table>
-        </div>
-
-        <!-- Users -->
-        <div class="card p-4 mb-4">
-            <h4 class="gold-text mb-3"><i class="bi bi-people me-2"></i> کاربران</h4>
-            <input type="text" id="userSearchInput" class="form-control mb-3" placeholder="جستجوی کاربر..." oninput="filterUsers()">
-            <table class="table table-dark table-hover">
-                <thead><tr><th>#</th><th>ID</th><th>نام</th><th>موبایل</th><th>امتیاز</th><th>عملیات</th></tr></thead>
-                <tbody id="usersTbody"></tbody>
-            </table>
-        </div>
-
-        <!-- Support Tickets -->
-        <div class="card p-4 mb-4">
-            <h4 class="gold-text mb-3"><i class="bi bi-headset me-2"></i> پشتیبانی</h4>
-            <table class="table table-dark table-hover">
-                <thead><tr><th>کد پیگیری</th><th>کاربر</th><th>موضوع</th><th>وضعیت</th><th>آخرین پیام</th><th>عملیات</th></tr></thead>
-                <tbody id="supportTicketsTbody"></tbody>
-            </table>
-        </div>
-
+      <!-- Tab 2: Announcements & Push Notifications -->
+      <div class="tab-pane fade" id="tab-announcements" role="tabpanel">
+        <!-- Announcements Management -->
+        <div class="card ann-banner p-4 mb-4 shadow">...</div>
         <!-- Push Notifications -->
-        <div class="card p-4 mb-4">
-            <h4 class="gold-text mb-3"><i class="bi bi-send me-2"></i> ارسال اعلان پوش</h4>
-            <input type="text" id="pushTitle" class="form-control mb-2" placeholder="عنوان اعلان">
-            <textarea id="pushMessage" class="form-control mb-2" placeholder="متن اعلان"></textarea>
-            <button class="btn btn-gold" onclick="sendPushNotification()">ارسال</button>
-        </div>
+        <div class="card p-4 mb-4 shadow" style="background-color: #1E293B; border: 1px solid #6366F1;">...</div>
+      </div>
+
+      <!-- Tab 3: Support -->
+      <div class="tab-pane fade" id="tab-support" role="tabpanel">
+        <!-- Support Center Management -->
+        <div class="card p-4 mb-4 shadow" style="border: 1px solid #0284C7; background-color: #162C46;">...</div>
+      </div>
     </div>
-
-
-
 
   </div>
 
