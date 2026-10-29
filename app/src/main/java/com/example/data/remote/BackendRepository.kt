@@ -1158,4 +1158,213 @@ class BackendRepository(
         val bytes = MessageDigest.getInstance("SHA-256").digest(input.toByteArray())
         return bytes.joinToString("") { "%02x".format(it) }
     }
+
+    // ==============================================================
+    // Independent Rewards Service Integration
+    // ==============================================================
+
+    suspend fun fetchRewardCategories(): Result<List<com.example.model.RewardCategoryItem>> = withContext(Dispatchers.IO) {
+        val url = "${prefs.serverUrl.trimEnd('/')}/api/rewards/categories"
+        try {
+            val request = Request.Builder().url(url).get().build()
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (response.isSuccessful) {
+                    val json = JSONObject(body)
+                    val arr = json.optJSONArray("categories") ?: org.json.JSONArray()
+                    val list = mutableListOf<com.example.model.RewardCategoryItem>()
+                    for (i in 0 until arr.length()) {
+                        val obj = arr.getJSONObject(i)
+                        list.add(
+                            com.example.model.RewardCategoryItem(
+                                id = obj.optString("id"),
+                                name = obj.optString("name"),
+                                slug = obj.optString("slug"),
+                                icon = obj.optString("icon", "gift"),
+                                sortOrder = obj.optInt("sort_order", 0),
+                                isActive = obj.optBoolean("is_active", true)
+                            )
+                        )
+                    }
+                    Result.Success(list)
+                } else {
+                    Result.Error("خطا در دریافت دسته‌بندی‌های جوایز")
+                }
+            }
+        } catch (e: Exception) {
+            Result.Error("خطای شبکه در دریافت دسته‌بندی‌ها: ${e.message}")
+        }
+    }
+
+    suspend fun fetchRewardAppearance(): Result<com.example.model.RewardAppearanceConfig> = withContext(Dispatchers.IO) {
+        val url = "${prefs.serverUrl.trimEnd('/')}/api/rewards/appearance"
+        try {
+            val request = Request.Builder().url(url).get().build()
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (response.isSuccessful) {
+                    val json = JSONObject(body)
+                    val obj = json.optJSONObject("appearance") ?: JSONObject()
+                    val config = com.example.model.RewardAppearanceConfig(
+                        id = obj.optString("id", "default"),
+                        heroTitle = obj.optString("hero_title", "ویترین جوایز و پاداش‌های ارزشمند"),
+                        heroSubtitle = obj.optString("hero_subtitle", "امتیازهای کسب‌شده خود را به کارت شارژ، بسته‌های اینترنت و جوایز نقدی تبدیل کنید"),
+                        heroBannerUrl = obj.optString("hero_banner_url", ""),
+                        primaryColor = obj.optString("primary_color", "#10B981"),
+                        termsText = obj.optString("terms_text", "درخواست‌های دریافت جایزه ظرف ۲۴ الی ۷۲ ساعت کاری پردازش و ارسال می‌شوند.")
+                    )
+                    Result.Success(config)
+                } else {
+                    Result.Success(com.example.model.RewardAppearanceConfig())
+                }
+            }
+        } catch (e: Exception) {
+            Result.Success(com.example.model.RewardAppearanceConfig())
+        }
+    }
+
+    suspend fun fetchRewards(
+        categorySlug: String? = null,
+        featuredOnly: Boolean = false,
+        searchQuery: String? = null
+    ): Result<List<com.example.model.RewardItem>> = withContext(Dispatchers.IO) {
+        val builder = android.net.Uri.parse("${prefs.serverUrl.trimEnd('/')}/api/rewards").buildUpon()
+        if (!categorySlug.isNullOrEmpty()) builder.appendQueryParameter("category", categorySlug)
+        if (featuredOnly) builder.appendQueryParameter("featured", "true")
+        if (!searchQuery.isNullOrBlank()) builder.appendQueryParameter("search", searchQuery)
+
+        try {
+            val request = Request.Builder().url(builder.build().toString()).get().build()
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (response.isSuccessful) {
+                    val json = JSONObject(body)
+                    val arr = json.optJSONArray("rewards") ?: org.json.JSONArray()
+                    val list = mutableListOf<com.example.model.RewardItem>()
+                    for (i in 0 until arr.length()) {
+                        val obj = arr.getJSONObject(i)
+                        list.add(
+                            com.example.model.RewardItem(
+                                id = obj.optString("id"),
+                                title = obj.optString("title"),
+                                description = obj.optString("description", ""),
+                                categoryId = obj.optString("category_id", null),
+                                categoryName = obj.optString("category_name", null),
+                                costPoints = obj.optInt("cost_points", 0),
+                                stockQuantity = obj.optInt("stock_quantity", 0),
+                                imageUrl = obj.optString("image_url", ""),
+                                isFeatured = obj.optBoolean("is_featured", false),
+                                isActive = obj.optBoolean("is_active", true),
+                                sortOrder = obj.optInt("sort_order", 0)
+                            )
+                        )
+                    }
+                    Result.Success(list)
+                } else {
+                    Result.Error("خطا در دریافت لیست جوایز (کد ${response.code})")
+                }
+            }
+        } catch (e: Exception) {
+            Result.Error("خطای شبکه در دریافت ویترین جوایز: ${e.message}")
+        }
+    }
+
+    suspend fun submitRewardClaim(
+        rewardId: String,
+        recipientName: String,
+        phone: String,
+        address: String
+    ): Result<com.example.model.RewardClaimRecord> = withContext(Dispatchers.IO) {
+        val userId = prefs.userId
+        if (userId.isEmpty()) {
+            return@withContext Result.Error("لطفاً ابتدا وارد حساب کاربری خود شوید.")
+        }
+
+        val url = "${prefs.serverUrl.trimEnd('/')}/api/rewards/claim"
+        val payload = JSONObject().apply {
+            put("user_id", userId)
+            put("reward_id", rewardId)
+            put("recipient_name", recipientName)
+            put("phone", phone)
+            put("shipping_address", address)
+        }
+
+        try {
+            val request = Request.Builder()
+                .url(url)
+                .header("Content-Type", "application/json")
+                .header("x-user-id", userId)
+                .header("Authorization", "Bearer ${prefs.authToken}")
+                .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                val json = try { JSONObject(body) } catch (e: Exception) { JSONObject() }
+
+                if (response.isSuccessful && json.optBoolean("success")) {
+                    val cObj = json.optJSONObject("claim") ?: JSONObject()
+                    val record = com.example.model.RewardClaimRecord(
+                        id = cObj.optString("id"),
+                        trackingCode = json.optString("tracking_code", cObj.optString("tracking_code")),
+                        userId = userId,
+                        rewardId = rewardId,
+                        costPoints = cObj.optInt("cost_points", 0),
+                        status = cObj.optString("status", "PENDING"),
+                        recipientName = recipientName,
+                        phone = phone,
+                        shippingAddress = address,
+                        createdAt = cObj.optString("created_at")
+                    )
+                    Result.Success(record)
+                } else {
+                    val msg = json.optString("message", "ثبت درخواست جایزه ناموفق بود")
+                    Result.Error(msg)
+                }
+            }
+        } catch (e: Exception) {
+            Result.Error("خطا در ارسال درخواست دریافت جایزه: ${e.message}")
+        }
+    }
+
+    suspend fun fetchUserClaimsHistory(userId: String): Result<List<com.example.model.RewardClaimRecord>> = withContext(Dispatchers.IO) {
+        val url = "${prefs.serverUrl.trimEnd('/')}/api/rewards/claims/user/$userId"
+        try {
+            val request = Request.Builder().url(url).get().build()
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (response.isSuccessful) {
+                    val json = JSONObject(body)
+                    val arr = json.optJSONArray("claims") ?: org.json.JSONArray()
+                    val list = mutableListOf<com.example.model.RewardClaimRecord>()
+                    for (i in 0 until arr.length()) {
+                        val obj = arr.getJSONObject(i)
+                        list.add(
+                            com.example.model.RewardClaimRecord(
+                                id = obj.optString("id"),
+                                trackingCode = obj.optString("tracking_code"),
+                                userId = userId,
+                                rewardId = obj.optString("reward_id"),
+                                rewardTitle = obj.optString("reward_title", ""),
+                                rewardImage = obj.optString("reward_image", ""),
+                                costPoints = obj.optInt("cost_points", 0),
+                                status = obj.optString("status", "PENDING"),
+                                recipientName = obj.optString("recipient_name", ""),
+                                phone = obj.optString("phone", ""),
+                                shippingAddress = obj.optString("shipping_address", ""),
+                                trackingNumber = obj.optString("tracking_number", ""),
+                                adminNotes = obj.optString("admin_notes", ""),
+                                createdAt = obj.optString("created_at", "")
+                            )
+                        )
+                    }
+                    Result.Success(list)
+                } else {
+                    Result.Error("خطا در دریافت سوابق جوایز")
+                }
+            }
+        } catch (e: Exception) {
+            Result.Error("خطا در ارتباط با سرور: ${e.message}")
+        }
+    }
 }

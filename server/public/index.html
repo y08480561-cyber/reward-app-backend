@@ -490,6 +490,34 @@
             <i class="bi bi-bell-fill"></i>
             <span>اعلان پوش (OneSignal)</span>
           </div>
+        <div class="nav-category-header">ویترین جوایز و هدایا</div>
+        <a class="sidebar-link" onclick="navigateTo('rewards')">
+          <div class="sidebar-link-content">
+            <i class="bi bi-gift-fill"></i>
+            <span>مدیریت جوایز و هدایا</span>
+          </div>
+        </a>
+        <a class="sidebar-link" onclick="navigateTo('rewards_appearance')">
+          <div class="sidebar-link-content">
+            <i class="bi bi-palette-fill"></i>
+            <span>تنظیمات ظاهر جوایز</span>
+          </div>
+        </a>
+        <a class="sidebar-link" onclick="navigateTo('reward_claims')">
+          <div class="sidebar-link-content">
+            <i class="bi bi-inbox-fill"></i>
+            <span>درخواست‌های دریافت جایزه</span>
+          </div>
+          <span class="badge bg-danger rounded-pill" id="sidebarClaimsBadge">۰</span>
+        </a>
+
+        <div class="nav-category-header">فروشگاه و درآمد</div>
+        <a class="sidebar-link" onclick="navigateTo('store')">
+          <div class="sidebar-link-content">
+            <i class="bi bi-shop"></i>
+            <span>مدیریت فروشگاه و بسته‌ها</span>
+          </div>
+          <span class="badge bg-warning text-dark rounded-pill" id="sidebarStoreBadge">۴ بسته</span>
         </a>
 
         <div class="nav-category-header">سیستم و تنظیمات</div>
@@ -1006,6 +1034,239 @@
         </section>
 
         <!-- ============================================================== -->
+        <!-- SECTION: فروشگاه و بسته‌های بازگشایی مایکت (In-App Store) -->
+        <!-- ============================================================== -->
+        <section id="section-store" class="admin-section">
+          <!-- Overview Metric Cards -->
+          <div class="row g-3 mb-4">
+            <div class="col-md-3 col-6">
+              <div class="stat-card">
+                <div class="stat-card-header">
+                  <span class="stat-label">تعداد بسته‌های فروشگاه</span>
+                  <div class="stat-icon-wrap" style="color: #FFB703; background: rgba(255,183,3,0.15);">
+                    <i class="bi bi-box-seam-fill"></i>
+                  </div>
+                </div>
+                <div class="stat-value" id="storePackagesCount">۴ بسته</div>
+                <div class="stat-subtext text-warning"><i class="bi bi-check-circle me-1"></i> فعال و قابل ارتقا</div>
+              </div>
+            </div>
+            <div class="col-md-3 col-6">
+              <div class="stat-card">
+                <div class="stat-card-header">
+                  <span class="stat-label">تعداد خریدهای موفق</span>
+                  <div class="stat-icon-wrap" style="color: #10B981; background: rgba(16,185,129,0.15);">
+                    <i class="bi bi-bag-check-fill"></i>
+                  </div>
+                </div>
+                <div class="stat-value text-success" id="storeTotalPurchases">۰ تراکنش</div>
+                <div class="stat-subtext text-secondary">ثبت شده در سرور</div>
+              </div>
+            </div>
+            <div class="col-md-3 col-6">
+              <div class="stat-card">
+                <div class="stat-card-header">
+                  <span class="stat-label">مجموع فروش فروشگاه</span>
+                  <div class="stat-icon-wrap" style="color: #38BDF8; background: rgba(56,189,248,0.15);">
+                    <i class="bi bi-cash-stack"></i>
+                  </div>
+                </div>
+                <div class="stat-value text-info" id="storeTotalRevenue">۰ تومان</div>
+                <div class="stat-subtext text-secondary">درآمد ناخالص بسته‌ها</div>
+              </div>
+            </div>
+            <div class="col-md-3 col-6">
+              <div class="stat-card">
+                <div class="stat-card-header">
+                  <span class="stat-label">اتصال پرداخت مایکت</span>
+                  <div class="stat-icon-wrap" style="color: #A855F7; background: rgba(168,85,247,0.15);">
+                    <i class="bi bi-shield-check"></i>
+                  </div>
+                </div>
+                <div class="stat-value text-warning" style="font-size: 16px;" id="storeMyketStatus">آماده‌سازی کنسول</div>
+                <div class="stat-subtext text-secondary">IAB رسمی نسخه ۳ مایکت</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Product Management Card -->
+          <div class="card p-4 shadow mb-4" style="border: 1px solid #FFB703; background-color: #12253B;">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+              <div>
+                <h4 class="gold-text fw-bold mb-1"><i class="bi bi-shop me-2"></i> بسته‌های بازگشایی مربع‌ها و ارتقای حساب</h4>
+                <p class="text-secondary small mb-0">تعیین قیمت‌ها، تعداد مربع‌های بازگشایی و وضعیت فعال‌سازی در مایکت به صورت زنده</p>
+              </div>
+              <div class="d-flex gap-2">
+                <button class="btn btn-outline-warning btn-sm" onclick="loadStoreProducts()"><i class="bi bi-arrow-clockwise me-1"></i> بروزرسانی</button>
+                <button class="btn btn-warning btn-sm fw-bold" onclick="openAddProductModal()"><i class="bi bi-plus-circle-fill me-1"></i> افزودن بسته جدید</button>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="table table-hover align-middle mb-0 text-white">
+                <thead class="table-dark" style="border-bottom: 2px solid var(--border-color);">
+                  <tr class="small text-secondary">
+                    <th>عنوان بسته</th>
+                    <th>نوع محصول</th>
+                    <th>سهمیه اعطایی</th>
+                    <th>قیمت (تومان)</th>
+                    <th>شناسه مایکت (SKU)</th>
+                    <th>وضعیت مایکت</th>
+                    <th>نمایش در برنامه</th>
+                    <th>عملیات</th>
+                  </tr>
+                </thead>
+                <tbody id="storeProductsTbody">
+                  <tr><td colspan="8" class="text-center text-secondary py-4"><span class="spinner-border spinner-border-sm me-2"></span> در حال بارگذاری بسته‌ها...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Purchase Orders & Transactions Audit Card -->
+          <div class="card p-4 shadow" style="border: 1px solid var(--border-color); background-color: #12253B;">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+              <div>
+                <h4 class="text-info fw-bold mb-1"><i class="bi bi-receipt-cutoff me-2"></i> گزارش تراکنش‌ها و سفارش‌های خرید مایکت</h4>
+                <p class="text-secondary small mb-0">سوابق اعتبارسنجی توکن، سفارش‌های تکمیل‌شده و لاگ خطاهای پرداخت</p>
+              </div>
+              <button class="btn btn-outline-info btn-sm" onclick="loadStorePurchases()"><i class="bi bi-arrow-clockwise me-1"></i> بروزرسانی لاگ</button>
+            </div>
+
+            <div class="table-responsive">
+              <table class="table table-hover align-middle mb-0 text-white">
+                <thead class="table-dark" style="border-bottom: 2px solid var(--border-color);">
+                  <tr class="small text-secondary">
+                    <th>شناسه سفارش</th>
+                    <th>کاربر / موبایل</th>
+                    <th>بسته خریداری‌شده</th>
+                    <th>مبلغ پرداختی</th>
+                    <th>توکن خرید مایکت</th>
+                    <th>وضعیت وریفای</th>
+                    <th>تاریخ ثبت</th>
+                  </tr>
+                </thead>
+                <tbody id="storePurchasesTbody">
+                  <tr><td colspan="7" class="text-center text-secondary py-4">در حال بارگذاری تراکنش‌ها...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================== -->
+        <!-- SECTION: ویترین و مدیریت جوایز (Rewards Management) -->
+        <!-- ============================================================== -->
+        <section id="section-rewards" class="admin-section">
+          <div class="card p-4 shadow mb-4" style="border: 1px solid var(--border-color); background-color: #12253B;">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+              <div>
+                <h4 class="gold-text mb-1"><i class="bi bi-gift-fill me-2"></i> مدیریت ویترین جوایز و پاداش‌ها</h4>
+                <p class="text-secondary small mb-0">تعریف جوایز، تعیین امتیاز لازم، موجودی انبار، تصویر و دسته‌بندی جوایز</p>
+              </div>
+              <div class="d-flex gap-2">
+                <button class="btn btn-outline-info btn-sm" onclick="loadRewardsData()"><i class="bi bi-arrow-clockwise me-1"></i> بروزرسانی</button>
+                <button class="btn btn-warning btn-sm fw-bold" onclick="openAddRewardModal()"><i class="bi bi-plus-circle-fill me-1"></i> افزودن جایزه جدید</button>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="table table-hover align-middle mb-0 text-white">
+                <thead class="table-dark" style="border-bottom: 2px solid var(--border-color);">
+                  <tr class="small text-secondary">
+                    <th>تصویر & عنوان جایزه</th>
+                    <th>دسته‌بندی</th>
+                    <th>امتیاز لازم</th>
+                    <th>موجودی انبار</th>
+                    <th>ویژه (Featured)</th>
+                    <th>وضعیت نمایش</th>
+                    <th>عملیات</th>
+                  </tr>
+                </thead>
+                <tbody id="rewardsTbody">
+                  <tr><td colspan="7" class="text-center text-secondary py-4"><span class="spinner-border spinner-border-sm me-2"></span> در حال بارگذاری جوایز...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================== -->
+        <!-- SECTION: تنظیمات ظاهر ویترین جوایز (Rewards Appearance) -->
+        <!-- ============================================================== -->
+        <section id="section-rewards_appearance" class="admin-section">
+          <div class="card p-4 shadow" style="border: 1px solid var(--border-color); background-color: #12253B;">
+            <h4 class="text-info fw-bold mb-3"><i class="bi bi-palette-fill me-2"></i> تنظیمات ظاهری و بنرهای ویترین جوایز</h4>
+            <p class="text-secondary small mb-4">ویرایش داینامیک عنوان هدر، توضیحات، آدرس بنر تبلیغاتی، رنگ اصلی و قوانین بدون انتشار مجدد اپلیکیشن</p>
+
+            <form onsubmit="saveRewardAppearance(event)">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label text-secondary small fw-bold">عنوان بنر هدر (Hero Title):</label>
+                  <input type="text" id="rewAppHeroTitle" class="form-control form-control-dark" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label text-secondary small fw-bold">رنگ تم اصلی (Primary Accent Color):</label>
+                  <input type="color" id="rewAppColor" class="form-control form-control-color w-100 bg-dark border-secondary" style="height: 38px;">
+                </div>
+                <div class="col-12">
+                  <label class="form-label text-secondary small fw-bold">زیرعنوان و توضیحات بنر هدر:</label>
+                  <input type="text" id="rewAppHeroSubtitle" class="form-control form-control-dark">
+                </div>
+                <div class="col-12">
+                  <label class="form-label text-secondary small fw-bold">آدرس تصویر بنر هدر (Banner Image URL):</label>
+                  <input type="url" id="rewAppBannerUrl" class="form-control form-control-dark" placeholder="https://example.com/banner.jpg">
+                </div>
+                <div class="col-12">
+                  <label class="form-label text-secondary small fw-bold">متن قوانین و شرایط تحویل جوایز:</label>
+                  <textarea id="rewAppTermsText" rows="3" class="form-control form-control-dark"></textarea>
+                </div>
+                <div class="col-12 mt-4">
+                  <button type="submit" class="btn btn-gold px-4 fw-bold">
+                    <i class="bi bi-check-circle-fill me-1"></i> ذخیره و اعمال تغییرات ظاهر ویترین
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <!-- ============================================================== -->
+        <!-- SECTION: درخواست‌های دریافت جایزه (Reward Claims) -->
+        <!-- ============================================================== -->
+        <section id="section-reward_claims" class="admin-section">
+          <div class="card p-4 shadow" style="border: 1px solid var(--border-color); background-color: #12253B;">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+              <div>
+                <h4 class="gold-text mb-1"><i class="bi bi-inbox-fill me-2"></i> مدیریت درخواست‌های دریافت جایزه</h4>
+                <p class="text-secondary small mb-0">مشاهده درخواست‌های کاربران، تغییر وضعیت (تایید/ارسال/تکمیل)، ثبت کد رهگیری پستی و توضیحات ادمین</p>
+              </div>
+              <button class="btn btn-outline-warning btn-sm" onclick="loadRewardClaims()"><i class="bi bi-arrow-clockwise me-1"></i> بروزرسانی درخواست‌ها</button>
+            </div>
+
+            <div class="table-responsive">
+              <table class="table table-hover align-middle mb-0 text-white">
+                <thead class="table-dark" style="border-bottom: 2px solid var(--border-color);">
+                  <tr class="small text-secondary">
+                    <th>کد پیگیری</th>
+                    <th>کاربر & شماره</th>
+                    <th>جایزه درخواستی</th>
+                    <th>امتیاز مصرفی</th>
+                    <th>اطلاعات گیرنده & آدرس</th>
+                    <th>وضعیت درخواست</th>
+                    <th>تاریخ ثبت</th>
+                    <th>مدیریت</th>
+                  </tr>
+                </thead>
+                <tbody id="rewardClaimsTbody">
+                  <tr><td colspan="8" class="text-center text-secondary py-4"><span class="spinner-border spinner-border-sm me-2"></span> در حال بارگذاری درخواست‌ها...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================== -->
         <!-- SECTION 7: اعلان‌های پوش و OneSignal -->
         <!-- ============================================================== -->
         <section id="section-push" class="admin-section">
@@ -1361,6 +1622,184 @@
         </div>
       </div>
     </div>
+  <!-- Modal: Add/Edit Store Product -->
+  <div class="modal fade modal-dark" id="storeProductModal" tabindex="-1" aria-labelledby="storeProductModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content" style="background-color: #12253B; border: 1px solid var(--border-color); color: #fff;">
+        <div class="modal-header border-secondary">
+          <h5 class="modal-title gold-text fw-bold" id="storeProductModalLabel"><i class="bi bi-shop me-2"></i> افزودن / ویرایش بسته فروشگاه</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <form id="storeProductForm" onsubmit="saveStoreProduct(event)">
+            <input type="hidden" id="storeProdId" value="">
+            
+            <div class="row g-3">
+              <div class="col-md-8">
+                <label class="form-label text-secondary small fw-bold">عنوان بسته (نمایش در اپلیکیشن):</label>
+                <input type="text" id="storeProdTitle" class="form-control form-control-dark" placeholder="مثلاً: بسته بازگشایی ۱۰ مربع" required>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label text-secondary small fw-bold">برچسب اختصاصی (Badge):</label>
+                <input type="text" id="storeProdBadge" class="form-control form-control-dark" placeholder="مثلاً: محبوب‌ترین، سریع، ویژه">
+              </div>
+
+              <div class="col-12">
+                <label class="form-label text-secondary small fw-bold">توضیحات و مزایای بسته:</label>
+                <textarea id="storeProdDesc" rows="2" class="form-control form-control-dark" placeholder="توضیحاتی که زیر کارت بسته در اپلیکیشن نشان داده می‌شود..." required></textarea>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label text-secondary small fw-bold">نوع محصول:</label>
+                <select id="storeProdType" class="form-select form-control-dark" onchange="toggleStoreUnitsLabel()">
+                  <option value="SQUARE_UNLOCK">بازگشایی مربع مسابقه</option>
+                  <option value="ACCOUNT_UPGRADE">ارتقای حساب کاربری (VIP)</option>
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label text-secondary small fw-bold" id="storeUnitsLabel">تعداد مربع‌های اعطایی:</label>
+                <input type="number" id="storeProdUnits" class="form-control form-control-dark" min="1" value="10" required>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label text-secondary small fw-bold">قیمت به تومان:</label>
+                <input type="number" id="storeProdPrice" class="form-control form-control-dark" min="0" step="1000" placeholder="مثلاً: 29000" required>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label text-secondary small fw-bold">شناسه محصول در کنسول مایکت (SKU):</label>
+                <input type="text" id="storeProdSku" class="form-control form-control-dark font-monospace" placeholder="reqabat_unlock_10" required>
+                <div class="form-text text-secondary small">این شناسه دقیقاً باید با شناسه ایجاد شده در پنل توسعه‌دهندگان مایکت یکسان باشد.</div>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label text-secondary small fw-bold">ترتیب نمایش در فروشگاه:</label>
+                <input type="number" id="storeProdSort" class="form-control form-control-dark" min="1" value="1">
+              </div>
+
+              <div class="col-12 mt-3">
+                <div class="form-check form-switch mb-2">
+                  <input class="form-check-input" type="checkbox" id="storeProdIsActive" checked>
+                  <label class="form-check-label text-white fw-bold" for="storeProdIsActive">نمایش و فعال بودن در فروشگاه اپلیکیشن</label>
+                </div>
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" id="storeProdIsReadyInMyket">
+                  <label class="form-check-label text-info fw-bold" for="storeProdIsReadyInMyket">محصول در کنسول مایکت تایید شده و آماده فروش است</label>
+                  <div class="form-text text-secondary small">اگر این گزینه خاموش باشد، برنامه به کاربران وضعیت «در حال آماده‌سازی در مایکت» را نشان می‌دهد و از خطای پرداخت جلوگیری می‌شود.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="modal-footer border-secondary mt-4 pb-0 px-0">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">انصراف</button>
+              <button type="submit" class="btn btn-warning fw-bold"><i class="bi bi-save me-1"></i> ذخیره تغییرات بسته</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Add/Edit Reward -->
+  <div class="modal fade modal-dark" id="rewardModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content" style="background-color: #12253B; border: 1px solid var(--border-color); color: #fff;">
+        <div class="modal-header border-secondary">
+          <h5 class="modal-title gold-text" id="rewardModalLabel"><i class="bi bi-gift-fill me-2"></i> افزودن / ویرایش جایزه</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="بستن"></button>
+        </div>
+        <form onsubmit="saveReward(event)">
+          <div class="modal-body">
+            <input type="hidden" id="rewModalId" value="">
+            <div class="row g-3">
+              <div class="col-md-8">
+                <label class="form-label text-secondary small fw-bold">عنوان جایزه:</label>
+                <input type="text" id="rewModalTitle" class="form-control form-control-dark" required placeholder="مثلاً: کارت شارژ ۱۰ هزار تومانی ایرانسل">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label text-secondary small fw-bold">دسته‌بندی:</label>
+                <select id="rewModalCategory" class="form-select form-select-dark">
+                  <option value="cat_recharge">کارت شارژ</option>
+                  <option value="cat_internet">بسته‌های اینترنت</option>
+                  <option value="cat_cash">جوایز نقدی و هدیه</option>
+                  <option value="cat_digital">گیفت کارت دیجیتال</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label text-secondary small fw-bold">امتیاز موردنیاز برای تحویل:</label>
+                <input type="number" id="rewModalCost" class="form-control form-control-dark" required min="0" placeholder="100">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label text-secondary small fw-bold">موجودی انبار (تعداد موجود):</label>
+                <input type="number" id="rewModalStock" class="form-control form-control-dark" required min="0" placeholder="50">
+              </div>
+              <div class="col-12">
+                <label class="form-label text-secondary small fw-bold">آدرس تصویر (Image URL):</label>
+                <input type="url" id="rewModalImageUrl" class="form-control form-control-dark" placeholder="https://images.unsplash.com/...">
+              </div>
+              <div class="col-12">
+                <label class="form-label text-secondary small fw-bold">توضیحات کامل جایزه:</label>
+                <textarea id="rewModalDesc" rows="3" class="form-control form-control-dark" placeholder="نحوه تحویل، شرایط و توضیحات..."></textarea>
+              </div>
+              <div class="col-md-6">
+                <div class="form-check form-switch mt-2">
+                  <input class="form-check-input" type="checkbox" id="rewModalIsFeatured" checked>
+                  <label class="form-check-label text-white fw-bold" for="rewModalIsFeatured">جایزه ویژه (نمایش در هدر ویترین)</label>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-check form-switch mt-2">
+                  <input class="form-check-input" type="checkbox" id="rewModalIsActive" checked>
+                  <label class="form-check-label text-white fw-bold" for="rewModalIsActive">نمایش فعال در اپلیکیشن</label>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer border-secondary">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">انصراف</button>
+            <button type="submit" class="btn btn-gold fw-bold px-4">ذخیره جایزه</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Edit Claim Status -->
+  <div class="modal fade modal-dark" id="claimModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content" style="background-color: #12253B; border: 1px solid var(--border-color); color: #fff;">
+        <div class="modal-header border-secondary">
+          <h5 class="modal-title gold-text"><i class="bi bi-pencil-square me-2"></i> تغییر وضعیت درخواست دریافت جایزه</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="بستن"></button>
+        </div>
+        <form onsubmit="saveClaimStatus(event)">
+          <div class="modal-body">
+            <input type="hidden" id="claimModalId" value="">
+            <div class="mb-3">
+              <label class="form-label text-secondary small fw-bold">وضعیت جدید درخواست:</label>
+              <select id="claimModalStatus" class="form-select form-select-dark" required>
+                <option value="PENDING">در حال بررسی (PENDING)</option>
+                <option value="APPROVED">تایید شده - در صف ارسال (APPROVED)</option>
+                <option value="PROCESSING">در حال پردازش / سفارش خرید (PROCESSING)</option>
+                <option value="SHIPPED">ارسال شده (SHIPPED)</option>
+                <option value="COMPLETED">تکمیل و تحویل داده شد (COMPLETED)</option>
+                <option value="REJECTED">رد شد (REJECTED)</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label text-secondary small fw-bold">کد رهگیری پستی / کدرهگیری تراکنش:</label>
+              <input type="text" id="claimModalTracking" class="form-control form-control-dark" placeholder="مثلاً: 1234567890123456">
+            </div>
+            <div class="mb-3">
+              <label class="form-label text-secondary small fw-bold">یادداشت و توضیحات مدیر برای کاربر:</label>
+              <textarea id="claimModalNotes" rows="3" class="form-control form-control-dark" placeholder="توضیحات تحویل یا علت عدم تایید..."></textarea>
+            </div>
+          </div>
+          <div class="modal-footer border-secondary">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">انصراف</button>
+            <button type="submit" class="btn btn-gold fw-bold px-4">اعمال تغییرات</button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 
   <!-- Scripts -->
@@ -1376,15 +1815,22 @@
     let bootstrapArchiveModal = null;
     let bootstrapAnnModal = null;
     let bootstrapTicketModal = null;
+    let bootstrapStoreModal = null;
+    let cachedStoreProducts = [];
+    let cachedStorePurchases = [];
 
     // Navigation section titles mapping
     const SECTION_TITLES = {
       'dashboard': { title: 'داشبورد اصلی', icon: 'bi-speedometer2' },
       'users': { title: 'مدیریت کاربران', icon: 'bi-people-fill' },
       'competitions': { title: 'مسابقات و جوایز', icon: 'bi-trophy-fill' },
+      'rewards': { title: 'ویترین و مدیریت جوایز', icon: 'bi-gift-fill' },
+      'rewards_appearance': { title: 'تنظیمات ظاهر جوایز', icon: 'bi-palette-fill' },
+      'reward_claims': { title: 'درخواست‌های دریافت جایزه', icon: 'bi-inbox-fill' },
       'announcements': { title: 'اعلان‌های صفحه اصلی', icon: 'bi-megaphone-fill' },
       'ads': { title: 'تبلیغات و امتیازها', icon: 'bi-play-circle-fill' },
       'support': { title: 'مرکز پشتیبانی', icon: 'bi-headset' },
+      'store': { title: 'مدیریت فروشگاه و بسته‌ها', icon: 'bi-shop' },
       'push': { title: 'اعلان‌های پوش و OneSignal', icon: 'bi-bell-fill' },
       'logs': { title: 'گزارش‌ها و سوابق', icon: 'bi-journal-text' },
       'settings': { title: 'تنظیمات و دسترسی', icon: 'bi-gear-fill' }
@@ -1418,6 +1864,18 @@
       // Update URL Hash
       if (window.location.hash !== `#${sectionId}`) {
         window.history.replaceState(null, '', `#${sectionId}`);
+      }
+
+      // Trigger Section Specific Data Loading
+      if (sectionId === 'store') {
+        loadStoreProducts();
+        loadStorePurchases();
+      } else if (sectionId === 'rewards') {
+        loadRewardsData();
+      } else if (sectionId === 'rewards_appearance') {
+        loadRewardAppearance();
+      } else if (sectionId === 'reward_claims') {
+        loadRewardClaims();
       }
 
       // Close mobile sidebar if open
@@ -2520,6 +2978,550 @@
       } finally {
         if (btn) btn.removeAttribute('disabled');
         if (spinner) spinner.classList.add('d-none');
+      }
+    }
+
+    // ==============================================================
+    // Store Management Functions
+    // ==============================================================
+    function toggleStoreUnitsLabel() {
+      const type = document.getElementById('storeProdType')?.value;
+      const label = document.getElementById('storeUnitsLabel');
+      const unitsInput = document.getElementById('storeProdUnits');
+      if (type === 'ACCOUNT_UPGRADE') {
+        if (label) label.innerText = 'سطح ارتقا (۱ = VIP کامل):';
+        if (unitsInput) unitsInput.value = 1;
+      } else {
+        if (label) label.innerText = 'تعداد مربع‌های اعطایی:';
+        if (unitsInput && unitsInput.value == 1) unitsInput.value = 10;
+      }
+    }
+
+    async function loadStoreProducts() {
+      const tbody = document.getElementById('storeProductsTbody');
+      const key = getAdminKey();
+
+      try {
+        const res = await fetch('/api/admin/store/products', {
+          headers: { 'x-admin-key': key }
+        });
+        if (!res.ok) throw new Error('خطا در دریافت بسته‌ها (کد ' + res.status + ')');
+        const data = await res.json();
+        cachedStoreProducts = data.products || [];
+
+        // Update counts
+        const countEl = document.getElementById('storePackagesCount');
+        if (countEl) countEl.innerText = `${cachedStoreProducts.length} بسته`;
+        const sidebarBadge = document.getElementById('sidebarStoreBadge');
+        if (sidebarBadge) sidebarBadge.innerText = `${cachedStoreProducts.length} بسته`;
+
+        if (!tbody) return;
+        if (cachedStoreProducts.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="8" class="text-center text-secondary py-4">هیچ بسته‌ای در فروشگاه تعریف نشده است.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = cachedStoreProducts.map(p => {
+          const typeLabel = p.product_type === 'ACCOUNT_UPGRADE' 
+            ? '<span class="badge bg-warning text-dark"><i class="bi bi-star-fill me-1"></i> ارتقای حساب (VIP)</span>' 
+            : '<span class="badge bg-primary"><i class="bi bi-grid-fill me-1"></i> بازگشایی مربع</span>';
+          
+          const unitsLabel = p.product_type === 'ACCOUNT_UPGRADE'
+            ? 'اشتراک VIP کامل'
+            : `<strong class="text-warning">${Number(p.units_granted).toLocaleString('fa-IR')}</strong> مربع`;
+
+          const priceFormatted = Number(p.price_toman).toLocaleString('fa-IR') + ' تومان';
+
+          const myketStatus = p.is_ready_in_myket
+            ? '<span class="badge bg-success"><i class="bi bi-check-circle me-1"></i> فعال در مایکت</span>'
+            : '<span class="badge bg-secondary"><i class="bi bi-clock me-1"></i> در حال آماده‌سازی</span>';
+
+          const activeBadge = p.is_active
+            ? '<span class="badge bg-success-subtle text-success border border-success">نمایش فعال</span>'
+            : '<span class="badge bg-danger-subtle text-danger border border-danger">مخفی / غیرفعال</span>';
+
+          const badgeDisplay = p.badge ? `<span class="badge bg-dark border border-warning text-warning ms-1">${escapeHtml(p.badge)}</span>` : '';
+
+          return `
+            <tr>
+              <td>
+                <div class="fw-bold text-white">${escapeHtml(p.title)} ${badgeDisplay}</div>
+                <div class="text-secondary small text-truncate" style="max-width: 250px;">${escapeHtml(p.description)}</div>
+              </td>
+              <td>${typeLabel}</td>
+              <td>${unitsLabel}</td>
+              <td class="fw-bold text-info">${priceFormatted}</td>
+              <td><code class="text-warning" style="font-size: 11px;">${escapeHtml(p.myket_sku)}</code></td>
+              <td>${myketStatus}</td>
+              <td>${activeBadge}</td>
+              <td>
+                <div class="btn-group btn-group-sm">
+                  <button class="btn btn-outline-warning" onclick="openEditProductModal('${p.id}')" title="ویرایش"><i class="bi bi-pencil-fill"></i></button>
+                  <button class="btn btn-outline-danger" onclick="deleteStoreProduct('${p.id}')" title="حذف"><i class="bi bi-trash-fill"></i></button>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">خطا: ${escapeHtml(err.message)}</td></tr>`;
+      }
+    }
+
+    async function loadStorePurchases() {
+      const tbody = document.getElementById('storePurchasesTbody');
+      const key = getAdminKey();
+
+      try {
+        const res = await fetch('/api/admin/store/purchases', {
+          headers: { 'x-admin-key': key }
+        });
+        if (!res.ok) throw new Error('خطا در دریافت سوابق تراکنش‌ها');
+        const data = await res.json();
+        cachedStorePurchases = data.purchases || [];
+
+        // Update metric summaries
+        const purchasesCountEl = document.getElementById('storeTotalPurchases');
+        if (purchasesCountEl) purchasesCountEl.innerText = `${cachedStorePurchases.length} تراکنش`;
+
+        let totalRev = 0;
+        cachedStorePurchases.forEach(item => {
+          if (item.status === 'SUCCESS') totalRev += Number(item.amount || 0);
+        });
+        const revEl = document.getElementById('storeTotalRevenue');
+        if (revEl) revEl.innerText = `${totalRev.toLocaleString('fa-IR')} تومان`;
+
+        if (!tbody) return;
+        if (cachedStorePurchases.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" class="text-center text-secondary py-4">تاکنون تراکنشی ثبت نشده است.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = cachedStorePurchases.map(row => {
+          const userMasked = (row.first_name || '') + ' ' + (row.last_name || '') + (row.phone_number ? ` (${row.phone_number})` : '');
+          const statusBadge = row.status === 'SUCCESS' 
+            ? '<span class="badge bg-success"><i class="bi bi-check-lg me-1"></i> تایید شده</span>'
+            : `<span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i> ${escapeHtml(row.status)}</span>`;
+
+          const tokenDisplay = row.purchase_token 
+            ? `<code class="text-secondary" style="font-size: 11px;">${escapeHtml(row.purchase_token.substring(0, 16))}...</code>`
+            : '<span class="text-muted small">ندارد</span>';
+
+          const dateStr = row.created_at ? new Date(row.created_at).toLocaleString('fa-IR') : '—';
+
+          return `
+            <tr>
+              <td><span class="font-monospace small text-info">${escapeHtml(row.purchase_id)}</span></td>
+              <td><span class="small text-white">${escapeHtml(userMasked || row.user_id)}</span></td>
+              <td><strong>${escapeHtml(row.product_title || row.product_id)}</strong></td>
+              <td class="text-warning fw-bold">${Number(row.amount).toLocaleString('fa-IR')} تومان</td>
+              <td>${tokenDisplay}</td>
+              <td>${statusBadge}</td>
+              <td class="small text-secondary">${dateStr}</td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">خطا: ${escapeHtml(err.message)}</td></tr>`;
+      }
+    }
+
+    function openAddProductModal() {
+      document.getElementById('storeProdId').value = '';
+      document.getElementById('storeProdTitle').value = '';
+      document.getElementById('storeProdDesc').value = '';
+      document.getElementById('storeProdType').value = 'SQUARE_UNLOCK';
+      document.getElementById('storeProdUnits').value = 10;
+      document.getElementById('storeProdPrice').value = '';
+      document.getElementById('storeProdSku').value = '';
+      document.getElementById('storeProdBadge').value = '';
+      document.getElementById('storeProdSort').value = cachedStoreProducts.length + 1;
+      document.getElementById('storeProdIsActive').checked = true;
+      document.getElementById('storeProdIsReadyInMyket').checked = false;
+      toggleStoreUnitsLabel();
+
+      document.getElementById('storeProductModalLabel').innerHTML = '<i class="bi bi-plus-circle-fill me-2"></i> افزودن بسته جدید به فروشگاه';
+      if (!bootstrapStoreModal) {
+        bootstrapStoreModal = new bootstrap.Modal(document.getElementById('storeProductModal'));
+      }
+      bootstrapStoreModal.show();
+    }
+
+    function openEditProductModal(id) {
+      const prod = cachedStoreProducts.find(p => p.id === id);
+      if (!prod) return;
+
+      document.getElementById('storeProdId').value = prod.id;
+      document.getElementById('storeProdTitle').value = prod.title || '';
+      document.getElementById('storeProdDesc').value = prod.description || '';
+      document.getElementById('storeProdType').value = prod.product_type || 'SQUARE_UNLOCK';
+      document.getElementById('storeProdUnits').value = prod.units_granted || 10;
+      document.getElementById('storeProdPrice').value = prod.price_toman || 0;
+      document.getElementById('storeProdSku').value = prod.myket_sku || '';
+      document.getElementById('storeProdBadge').value = prod.badge || '';
+      document.getElementById('storeProdSort').value = prod.sort_order || 1;
+      document.getElementById('storeProdIsActive').checked = Boolean(prod.is_active);
+      document.getElementById('storeProdIsReadyInMyket').checked = Boolean(prod.is_ready_in_myket);
+      toggleStoreUnitsLabel();
+
+      document.getElementById('storeProductModalLabel').innerHTML = '<i class="bi bi-pencil-square me-2"></i> ویرایش اطلاعات بسته فروشگاه';
+      if (!bootstrapStoreModal) {
+        bootstrapStoreModal = new bootstrap.Modal(document.getElementById('storeProductModal'));
+      }
+      bootstrapStoreModal.show();
+    }
+
+    async function saveStoreProduct(event) {
+      event.preventDefault();
+      const id = document.getElementById('storeProdId').value.trim();
+      const title = document.getElementById('storeProdTitle').value.trim();
+      const description = document.getElementById('storeProdDesc').value.trim();
+      const product_type = document.getElementById('storeProdType').value;
+      const units_granted = Number(document.getElementById('storeProdUnits').value);
+      const price_toman = Number(document.getElementById('storeProdPrice').value);
+      const myket_sku = document.getElementById('storeProdSku').value.trim();
+      const badge = document.getElementById('storeProdBadge').value.trim();
+      const sort_order = Number(document.getElementById('storeProdSort').value);
+      const is_active = document.getElementById('storeProdIsActive').checked;
+      const is_ready_in_myket = document.getElementById('storeProdIsReadyInMyket').checked;
+
+      const key = getAdminKey();
+      try {
+        const res = await fetch('/api/admin/store/products', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-key': key
+          },
+          body: JSON.stringify({
+            id: id || undefined,
+            title,
+            description,
+            product_type,
+            units_granted,
+            price_toman,
+            myket_sku,
+            badge,
+            sort_order,
+            is_active,
+            is_ready_in_myket
+          })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          if (bootstrapStoreModal) bootstrapStoreModal.hide();
+          loadStoreProducts();
+        } else {
+          alert('خطا در ذخیره بسته: ' + (data.error || 'پاسخ ناموفق'));
+        }
+      } catch (err) {
+        alert('خطای ارتباط با سرور: ' + err.message);
+      }
+    }
+
+    async function deleteStoreProduct(id) {
+      if (!confirm('آیا از حذف این بسته از فروشگاه اطمینان دارید؟')) return;
+      const key = getAdminKey();
+
+      try {
+        const res = await fetch(`/api/admin/store/products/${id}`, {
+          method: 'DELETE',
+          headers: { 'x-admin-key': key }
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadStoreProducts();
+        } else {
+          alert('خطا در حذف بسته: ' + (data.error || 'پاسخ ناموفق'));
+        }
+      } catch (err) {
+        alert('خطای ارتباط با سرور: ' + err.message);
+      }
+    }
+
+    // ==============================================================
+    // Rewards & Claims JS Functions
+    // ==============================================================
+    let cachedRewards = [];
+    let cachedCategories = [];
+    let cachedClaims = [];
+    let bootstrapRewardModal = null;
+    let bootstrapClaimModal = null;
+
+    async function loadRewardsData() {
+      const tbody = document.getElementById('rewardsTbody');
+      const key = getAdminKey();
+      try {
+        const res = await fetch('/api/rewards/admin/rewards', { headers: { 'x-admin-key': key } });
+        if (!res.ok) throw new Error('خطا در دریافت لیست جوایز');
+        const data = await res.json();
+        cachedRewards = data.rewards || [];
+
+        if (!tbody) return;
+        if (cachedRewards.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" class="text-center text-secondary py-4">هیچ جایزه‌ای ثبت نشده است.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = cachedRewards.map(r => {
+          const imgHtml = r.image_url 
+            ? `<img src="${escapeHtml(r.image_url)}" style="width:40px;height:40px;object-fit:cover;" class="rounded me-2">`
+            : `<div class="rounded me-2 d-inline-flex align-items-center justify-content-center bg-secondary" style="width:40px;height:40px;"><i class="bi bi-gift text-white"></i></div>`;
+          const featuredBadge = r.is_featured ? '<span class="badge bg-warning text-dark">ویژه</span>' : '<span class="text-muted small">—</span>';
+          const activeBadge = r.is_active ? '<span class="badge bg-success">فعال</span>' : '<span class="badge bg-danger">غیرفعال</span>';
+          const costText = Number(r.cost_points).toLocaleString('fa-IR') + ' امتیاز';
+
+          return `
+            <tr>
+              <td>
+                <div class="d-flex align-items-center">
+                  ${imgHtml}
+                  <div>
+                    <strong class="text-white">${escapeHtml(r.title)}</strong>
+                    <div class="text-secondary small">${escapeHtml(r.description || '')}</div>
+                  </div>
+                </div>
+              </td>
+              <td><span class="badge bg-dark border border-secondary">${escapeHtml(r.category_name || r.category_id || 'عمومی')}</span></td>
+              <td class="fw-bold text-warning">${costText}</td>
+              <td class="fw-bold text-info">${Number(r.stock_quantity).toLocaleString('fa-IR')} عدد</td>
+              <td>${featuredBadge}</td>
+              <td>${activeBadge}</td>
+              <td>
+                <div class="btn-group btn-group-sm">
+                  <button class="btn btn-outline-warning" onclick="openEditRewardModal('${r.id}')"><i class="bi bi-pencil-fill"></i></button>
+                  <button class="btn btn-outline-danger" onclick="deleteReward('${r.id}')"><i class="bi bi-trash-fill"></i></button>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">خطا: ${escapeHtml(err.message)}</td></tr>`;
+      }
+    }
+
+    function openAddRewardModal() {
+      document.getElementById('rewModalId').value = '';
+      document.getElementById('rewModalTitle').value = '';
+      document.getElementById('rewModalCost').value = 100;
+      document.getElementById('rewModalStock').value = 50;
+      document.getElementById('rewModalImageUrl').value = '';
+      document.getElementById('rewModalDesc').value = '';
+      document.getElementById('rewModalIsFeatured').checked = true;
+      document.getElementById('rewModalIsActive').checked = true;
+
+      document.getElementById('rewardModalLabel').innerHTML = '<i class="bi bi-plus-circle-fill me-2"></i> تعریف جایزه جدید';
+      if (!bootstrapRewardModal) bootstrapRewardModal = new bootstrap.Modal(document.getElementById('rewardModal'));
+      bootstrapRewardModal.show();
+    }
+
+    function openEditRewardModal(id) {
+      const r = cachedRewards.find(item => item.id === id);
+      if (!r) return;
+
+      document.getElementById('rewModalId').value = r.id;
+      document.getElementById('rewModalTitle').value = r.title || '';
+      document.getElementById('rewModalCategory').value = r.category_id || 'cat_recharge';
+      document.getElementById('rewModalCost').value = r.cost_points || 0;
+      document.getElementById('rewModalStock').value = r.stock_quantity || 0;
+      document.getElementById('rewModalImageUrl').value = r.image_url || '';
+      document.getElementById('rewModalDesc').value = r.description || '';
+      document.getElementById('rewModalIsFeatured').checked = Boolean(r.is_featured);
+      document.getElementById('rewModalIsActive').checked = Boolean(r.is_active);
+
+      document.getElementById('rewardModalLabel').innerHTML = '<i class="bi bi-pencil-square me-2"></i> ویرایش اطلاعات جایزه';
+      if (!bootstrapRewardModal) bootstrapRewardModal = new bootstrap.Modal(document.getElementById('rewardModal'));
+      bootstrapRewardModal.show();
+    }
+
+    async function saveReward(event) {
+      event.preventDefault();
+      const id = document.getElementById('rewModalId').value;
+      const title = document.getElementById('rewModalTitle').value.trim();
+      const category_id = document.getElementById('rewModalCategory').value;
+      const cost_points = Number(document.getElementById('rewModalCost').value);
+      const stock_quantity = Number(document.getElementById('rewModalStock').value);
+      const image_url = document.getElementById('rewModalImageUrl').value.trim();
+      const description = document.getElementById('rewModalDesc').value.trim();
+      const is_featured = document.getElementById('rewModalIsFeatured').checked;
+      const is_active = document.getElementById('rewModalIsActive').checked;
+
+      const key = getAdminKey();
+      const url = id ? `/api/rewards/admin/rewards/${id}` : '/api/rewards/admin/rewards';
+      const method = id ? 'PUT' : 'POST';
+
+      try {
+        const res = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json', 'x-admin-key': key },
+          body: JSON.stringify({ title, category_id, cost_points, stock_quantity, image_url, description, is_featured, is_active })
+        });
+        const data = await res.json();
+        if (data.success) {
+          if (bootstrapRewardModal) bootstrapRewardModal.hide();
+          loadRewardsData();
+        } else {
+          alert('خطا: ' + (data.message || 'ثبت جایزه ناموفق بود'));
+        }
+      } catch (err) {
+        alert('خطای ارتباط: ' + err.message);
+      }
+    }
+
+    async function deleteReward(id) {
+      if (!confirm('آیا از حذف این جایزه اطمینان دارید؟')) return;
+      const key = getAdminKey();
+      try {
+        const res = await fetch(`/api/rewards/admin/rewards/${id}`, { method: 'DELETE', headers: { 'x-admin-key': key } });
+        const data = await res.json();
+        if (data.success) {
+          loadRewardsData();
+        } else {
+          alert('خطا: ' + data.message);
+        }
+      } catch (err) {
+        alert('خطا: ' + err.message);
+      }
+    }
+
+    async function loadRewardAppearance() {
+      try {
+        const res = await fetch('/api/rewards/appearance');
+        const data = await res.json();
+        if (data.success && data.appearance) {
+          const app = data.appearance;
+          document.getElementById('rewAppHeroTitle').value = app.hero_title || '';
+          document.getElementById('rewAppColor').value = app.primary_color || '#10B981';
+          document.getElementById('rewAppHeroSubtitle').value = app.hero_subtitle || '';
+          document.getElementById('rewAppBannerUrl').value = app.hero_banner_url || '';
+          document.getElementById('rewAppTermsText').value = app.terms_text || '';
+        }
+      } catch (err) {
+        console.error('Error loading appearance:', err);
+      }
+    }
+
+    async function saveRewardAppearance(event) {
+      event.preventDefault();
+      const hero_title = document.getElementById('rewAppHeroTitle').value.trim();
+      const primary_color = document.getElementById('rewAppColor').value;
+      const hero_subtitle = document.getElementById('rewAppHeroSubtitle').value.trim();
+      const hero_banner_url = document.getElementById('rewAppBannerUrl').value.trim();
+      const terms_text = document.getElementById('rewAppTermsText').value.trim();
+
+      const key = getAdminKey();
+      try {
+        const res = await fetch('/api/rewards/admin/appearance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-admin-key': key },
+          body: JSON.stringify({ hero_title, primary_color, hero_subtitle, hero_banner_url, terms_text })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('تنظیمات ظاهری ویترین جوایز با موفقیت ذخیره گردید.');
+        } else {
+          alert('خطا: ' + (data.message || 'ثبت نا موفق بود'));
+        }
+      } catch (err) {
+        alert('خطا: ' + err.message);
+      }
+    }
+
+    async function loadRewardClaims() {
+      const tbody = document.getElementById('rewardClaimsTbody');
+      const key = getAdminKey();
+      try {
+        const res = await fetch('/api/rewards/admin/claims', { headers: { 'x-admin-key': key } });
+        if (!res.ok) throw new Error('خطا در دریافت لیست درخواست‌ها');
+        const data = await res.json();
+        cachedClaims = data.claims || [];
+
+        // Sidebar claims count badge
+        const pendingCount = cachedClaims.filter(c => c.status === 'PENDING').length;
+        const badge = document.getElementById('sidebarClaimsBadge');
+        if (badge) badge.innerText = pendingCount.toString();
+
+        if (!tbody) return;
+        if (cachedClaims.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="8" class="text-center text-secondary py-4">هیچ درخواستی ثبت نشده است.</td></tr>';
+          return;
+        }
+
+        const STATUS_MAP = {
+          'PENDING': { label: 'در حال بررسی', cls: 'bg-warning text-dark' },
+          'APPROVED': { label: 'تایید شده', cls: 'bg-info text-dark' },
+          'PROCESSING': { label: 'در حال ارسال', cls: 'bg-primary' },
+          'SHIPPED': { label: 'ارسال شد', cls: 'bg-success' },
+          'COMPLETED': { label: 'تکمیل شده', cls: 'bg-success' },
+          'REJECTED': { label: 'رد شد', cls: 'bg-danger' }
+        };
+
+        tbody.innerHTML = cachedClaims.map(c => {
+          const st = STATUS_MAP[c.status] || { label: c.status, cls: 'bg-secondary' };
+          const dateStr = c.created_at ? new Date(c.created_at).toLocaleString('fa-IR') : '—';
+          const userText = (c.first_name || '') + ' ' + (c.last_name || '') + (c.phone || c.phone_number ? ` (${c.phone || c.phone_number})` : '');
+
+          return `
+            <tr>
+              <td><code class="text-warning fw-bold">${escapeHtml(c.tracking_code)}</code></td>
+              <td><span class="small text-white">${escapeHtml(userText || c.user_id)}</span></td>
+              <td><strong>${escapeHtml(c.reward_title || c.reward_id)}</strong></td>
+              <td class="text-info fw-bold">${Number(c.cost_points || c.reward_cost || 0).toLocaleString('fa-IR')} امتیاز</td>
+              <td>
+                <div class="small fw-bold text-white">${escapeHtml(c.recipient_name || '—')}</div>
+                <div class="small text-secondary text-truncate" style="max-width: 200px;">${escapeHtml(c.shipping_address || 'تحویل دیجیتال')}</div>
+              </td>
+              <td><span class="badge ${st.cls}">${st.label}</span></td>
+              <td class="small text-secondary">${dateStr}</td>
+              <td>
+                <button class="btn btn-outline-warning btn-sm" onclick="openEditClaimModal('${c.id}')"><i class="bi bi-pencil-fill"></i> مدیریت</button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">خطا: ${escapeHtml(err.message)}</td></tr>`;
+      }
+    }
+
+    function openEditClaimModal(id) {
+      const c = cachedClaims.find(item => item.id === id);
+      if (!c) return;
+
+      document.getElementById('claimModalId').value = c.id;
+      document.getElementById('claimModalStatus').value = c.status || 'PENDING';
+      document.getElementById('claimModalTracking').value = c.tracking_number || '';
+      document.getElementById('claimModalNotes').value = c.admin_notes || '';
+
+      if (!bootstrapClaimModal) bootstrapClaimModal = new bootstrap.Modal(document.getElementById('claimModal'));
+      bootstrapClaimModal.show();
+    }
+
+    async function saveClaimStatus(event) {
+      event.preventDefault();
+      const id = document.getElementById('claimModalId').value;
+      const status = document.getElementById('claimModalStatus').value;
+      const tracking_number = document.getElementById('claimModalTracking').value.trim();
+      const admin_notes = document.getElementById('claimModalNotes').value.trim();
+
+      const key = getAdminKey();
+      try {
+        const res = await fetch(`/api/rewards/admin/claims/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'x-admin-key': key },
+          body: JSON.stringify({ status, tracking_number, admin_notes })
+        });
+        const data = await res.json();
+        if (data.success) {
+          if (bootstrapClaimModal) bootstrapClaimModal.hide();
+          loadRewardClaims();
+        } else {
+          alert('خطا: ' + (data.message || 'اعمال تغییرات ناموفق بود'));
+        }
+      } catch (err) {
+        alert('خطای ارتباط: ' + err.message);
       }
     }
 

@@ -317,3 +317,44 @@ BEGIN
     );
 END;
 $$;
+
+-- جدول بسته‌های فروشگاه مایکت
+CREATE TABLE IF NOT EXISTS public.store_products (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    product_type TEXT NOT NULL DEFAULT 'SQUARE_UNLOCK',
+    units_granted INTEGER NOT NULL DEFAULT 0,
+    price_toman BIGINT NOT NULL DEFAULT 0,
+    myket_sku TEXT NOT NULL,
+    badge TEXT DEFAULT '',
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    is_ready_in_myket BOOLEAN NOT NULL DEFAULT false,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- جدول سهمیه‌های بازگشایی سریع
+CREATE TABLE IF NOT EXISTS public.user_entitlements (
+    user_id UUID PRIMARY KEY REFERENCES public.users(id) ON DELETE CASCADE,
+    instant_unlock_credits INTEGER NOT NULL DEFAULT 0,
+    is_vip BOOLEAN NOT NULL DEFAULT false,
+    total_purchased_toman BIGINT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ستون‌های اعتباری در جدول کاربران
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS instant_unlock_credits INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS is_vip BOOLEAN NOT NULL DEFAULT false;
+
+-- بسته‌های پیش‌فرض
+INSERT INTO public.store_products 
+    (id, title, description, product_type, units_granted, price_toman, myket_sku, badge, is_active, is_ready_in_myket, sort_order)
+VALUES 
+    ('pkg_squares_10', 'بسته بازگشایی ۱۰ مربع', 'بازگشایی سریع و آنی ۱۰ مربع مسابقه بدون نیاز به مشاهده تبلیغ.', 'SQUARE_UNLOCK', 10, 29000, 'reqabat_unlock_10', 'سریع', true, false, 1),
+    ('pkg_squares_25', 'بسته بازگشایی ۲۵ مربع', 'صرفه‌جویی عالی در زمان! ۲۵ مربع مسابقه را بلافاصله باز کرده و ۲۵ امتیاز دریافت کنید.', 'SQUARE_UNLOCK', 25, 59000, 'reqabat_unlock_25', 'محبوب‌ترین', true, false, 2),
+    ('pkg_squares_50', 'بسته بازگشایی ۵۰ مربع', 'نیمی از ۱۰۰ مربع روزانه را با یک کلیک تکمیل کنید و ۵۰ امتیاز بدست آورید.', 'SQUARE_UNLOCK', 50, 99000, 'reqabat_unlock_50', 'به‌صرفه', true, false, 3),
+    ('pkg_account_vip', 'بسته ارتقای حساب کاربری (VIP)', 'عضویت ویژه طلایی مسابقه: دو برابر شدن امتیازها و اولویت در قرعه‌کشی.', 'ACCOUNT_UPGRADE', 1, 149000, 'reqabat_vip_upgrade', 'ویژه مسابقه', true, false, 4)
+ON CONFLICT (id) DO NOTHING;
+

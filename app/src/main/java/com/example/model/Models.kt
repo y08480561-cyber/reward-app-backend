@@ -226,5 +226,67 @@ data class SupportMessage(
         get() = senderType.equals("ADMIN", ignoreCase = true)
 }
 
+/**
+ * Reward item model for independent Prizes Service
+ */
+data class RewardItem(
+    val id: String,
+    val title: String,
+    val description: String = "",
+    val categoryId: String? = null,
+    val categoryName: String? = null,
+    val costPoints: Int,
+    val stockQuantity: Int = 0,
+    val imageUrl: String = "",
+    val isFeatured: Boolean = false,
+    val isActive: Boolean = true,
+    val sortOrder: Int = 0
+)
+
+/**
+ * Reward category model
+ */
+data class RewardCategoryItem(
+    val id: String,
+    val name: String,
+    val slug: String,
+    val icon: String = "gift",
+    val sortOrder: Int = 0,
+    val isActive: Boolean = true
+)
+
+/**
+ * Reward appearance customization model
+ */
+data class RewardAppearanceConfig(
+    val id: String = "default",
+    val heroTitle: String = "ویترین جوایز و پاداش‌های ارزشمند",
+    val heroSubtitle: String = "امتیازهای کسب‌شده خود را به کارت شارژ، بسته‌های اینترنت و جوایز نقدی تبدیل کنید",
+    val heroBannerUrl: String = "",
+    val primaryColor: String = "#10B981",
+    val termsText: String = "درخواست‌های دریافت جایزه ظرف ۲۴ الی ۷۲ ساعت کاری پردازش و ارسال می‌شوند."
+)
+
+/**
+ * User reward claim model
+ */
+data class RewardClaimRecord(
+    val id: String,
+    val trackingCode: String,
+    val userId: String,
+    val rewardId: String,
+    val rewardTitle: String = "",
+    val rewardImage: String = "",
+    val costPoints: Int,
+    val status: String = "PENDING",
+    val recipientName: String = "",
+    val phone: String = "",
+    val shippingAddress: String = "",
+    val trackingNumber: String = "",
+    val adminNotes: String = "",
+    val createdAt: String = ""
+)
+
+
 
 

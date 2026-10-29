@@ -6,9 +6,20 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="ir.mservices.market.billing.permission.BILLING" />
 
     <!-- Package visibility queries for Advertising ID and app stores on Android 11+ (API 30+) -->
     <queries>
+        <!-- Myket In-App Billing (IAB) & Advertising ID Services -->
+        <package android:name="ir.mservices.market" />
+        <package android:name="com.myket.android" />
+        <intent>
+            <action android:name="ir.mservices.market.billing.InAppBillingService.BIND" />
+        </intent>
+        <intent>
+            <action android:name="ir.mservices.market.service.AdvertisingIdService.BIND" />
+        </intent>
+
         <!-- Google Play Services Advertising ID -->
         <intent>
             <action android:name="com.google.android.gms.ads.identifier.service.START" />
@@ -21,12 +32,6 @@
             <action android:name="com.farsitel.bazaar.service.AdvertisingIdService.BIND" />
         </intent>
         <package android:name="com.farsitel.bazaar" />
-
-        <!-- Myket Advertising ID Service -->
-        <intent>
-            <action android:name="ir.mservices.market.service.AdvertisingIdService.BIND" />
-        </intent>
-        <package android:name="com.myket.android" />
 
         <!-- Huawei Mobile Services Advertising ID -->
         <intent>

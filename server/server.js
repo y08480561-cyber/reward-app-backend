@@ -14,6 +14,17 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Mount Independent Rewards Microservice Router
+try {
+  const rewardsModule = require(path.join(__dirname, '../rewards-service/server.js'));
+  if (rewardsModule && rewardsModule.rewardsRouter) {
+    app.use('/api/rewards', rewardsModule.rewardsRouter);
+    console.log('[Rewards Microservice] Successfully mounted /api/rewards routes.');
+  }
+} catch (e) {
+  console.error('[Rewards Microservice Mount Warning]', e.message);
+}
+
 // Standalone Admin Users Page (Pure users table)
 app.get(['/admin/users', '/admin/users/'], (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'users.html'));
@@ -362,7 +373,43 @@ async function initDatabaseTables() {
       message_text TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );`,
-    `CREATE INDEX IF NOT EXISTS idx_support_messages_ticket ON public.support_messages(ticket_id, created_at ASC);`
+    `CREATE INDEX IF NOT EXISTS idx_support_messages_ticket ON public.support_messages(ticket_id, created_at ASC);`,
+
+    // 17. Store Products Table (Dynamic store packages & pricing)
+    `CREATE TABLE IF NOT EXISTS public.store_products (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      description TEXT NOT NULL,
+      product_type TEXT NOT NULL DEFAULT 'SQUARE_UNLOCK',
+      units_granted INTEGER NOT NULL DEFAULT 0,
+      price_toman BIGINT NOT NULL DEFAULT 0,
+      myket_sku TEXT NOT NULL,
+      badge TEXT DEFAULT '',
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      is_ready_in_myket BOOLEAN NOT NULL DEFAULT false,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );`,
+    `CREATE INDEX IF NOT EXISTS idx_store_products_active ON public.store_products(is_active, sort_order ASC);`,
+
+    // 18. User Entitlements (Instant unlock credits & VIP account status)
+    `CREATE TABLE IF NOT EXISTS public.user_entitlements (
+      user_id TEXT PRIMARY KEY,
+      instant_unlock_credits INTEGER NOT NULL DEFAULT 0,
+      is_vip BOOLEAN NOT NULL DEFAULT false,
+      total_purchased_toman BIGINT NOT NULL DEFAULT 0,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );`,
+
+    // 19. Schema updates for users and purchases
+    `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS instant_unlock_credits INTEGER NOT NULL DEFAULT 0;`,
+    `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS is_vip BOOLEAN NOT NULL DEFAULT false;`,
+    `ALTER TABLE public.purchases ADD COLUMN IF NOT EXISTS myket_order_id TEXT;`,
+    `ALTER TABLE public.purchases ADD COLUMN IF NOT EXISTS units_granted INTEGER DEFAULT 0;`,
+    `ALTER TABLE public.purchases ADD COLUMN IF NOT EXISTS error_message TEXT;`,
+    `ALTER TABLE public.purchases ADD COLUMN IF NOT EXISTS verification_source TEXT DEFAULT 'MYKET_IAB';`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_purchases_token ON public.purchases(purchase_token) WHERE purchase_token IS NOT NULL;`
   ];
 
 
@@ -407,6 +454,80 @@ async function initDatabaseTables() {
     }
   } catch (err) {
     console.warn('[PostgreSQL Init Announcement Warning]', err.message);
+  }
+
+  // Ensure default store products exist
+  try {
+    const prodCheck = await pool.query(`SELECT id FROM public.store_products LIMIT 1`);
+    if (prodCheck.rows.length === 0) {
+      const defaultProducts = [
+        {
+          id: 'pkg_squares_10',
+          title: 'بسته بازگشایی ۱۰ مربع',
+          description: 'بازگشایی سریع و آنی ۱۰ مربع مسابقه همراه با ثبت کامل ۱۰ امتیاز بدون نیاز به مشاهده تبلیغ.',
+          product_type: 'SQUARE_UNLOCK',
+          units_granted: 10,
+          price_toman: 29000,
+          myket_sku: 'reqabat_unlock_10',
+          badge: 'سریع',
+          is_active: true,
+          is_ready_in_myket: false,
+          sort_order: 1
+        },
+        {
+          id: 'pkg_squares_25',
+          title: 'بسته بازگشایی ۲۵ مربع',
+          description: 'صرفه‌جویی عالی در زمان! ۲۵ مربع مسابقه را بلافاصله باز کرده و ۲۵ امتیاز به حساب خود واریز کنید.',
+          product_type: 'SQUARE_UNLOCK',
+          units_granted: 25,
+          price_toman: 59000,
+          myket_sku: 'reqabat_unlock_25',
+          badge: 'محبوب‌ترین',
+          is_active: true,
+          is_ready_in_myket: false,
+          sort_order: 2
+        },
+        {
+          id: 'pkg_squares_50',
+          title: 'بسته بازگشایی ۵۰ مربع',
+          description: 'نیمی از ۱۰۰ مربع روزانه را با یک کلیک تکمیل کنید و ۵۰ امتیاز مستقیم در جدول رتبه‌بندی بدست آورید.',
+          product_type: 'SQUARE_UNLOCK',
+          units_granted: 50,
+          price_toman: 99000,
+          myket_sku: 'reqabat_unlock_50',
+          badge: 'به‌صرفه',
+          is_active: true,
+          is_ready_in_myket: false,
+          sort_order: 3
+        },
+        {
+          id: 'pkg_account_vip',
+          title: 'بسته ارتقای حساب کاربری (VIP)',
+          description: 'عضویت طلایی مسابقه: دو برابر شدن تمام امتیازها در هر چرخه، اولویت در قرعه‌کشی و پشتیبانی اختصاصی.',
+          product_type: 'ACCOUNT_UPGRADE',
+          units_granted: 1,
+          price_toman: 149000,
+          myket_sku: 'reqabat_vip_upgrade',
+          badge: 'ویژه مسابقه',
+          is_active: true,
+          is_ready_in_myket: false,
+          sort_order: 4
+        }
+      ];
+
+      for (const p of defaultProducts) {
+        await pool.query(
+          `INSERT INTO public.store_products 
+            (id, title, description, product_type, units_granted, price_toman, myket_sku, badge, is_active, is_ready_in_myket, sort_order, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
+           ON CONFLICT (id) DO NOTHING`,
+          [p.id, p.title, p.description, p.product_type, p.units_granted, p.price_toman, p.myket_sku, p.badge, p.is_active, p.is_ready_in_myket, p.sort_order]
+        );
+      }
+      console.log('[PostgreSQL] Initial 4 store packages seeded successfully.');
+    }
+  } catch (err) {
+    console.warn('[PostgreSQL Store Products Seed Warning]', err.message);
   }
 
   console.log('[PostgreSQL] Database tables and schema verified/initialized.');
@@ -1166,6 +1287,452 @@ app.post('/api/purchases/verify', ensureDatabaseReady, async (req, res) => {
   } catch (err) {
     console.error('[Verify Purchase Error]', err);
     return res.status(500).json({ error: "خطا در تایید خرید و فعال‌سازی پنل." });
+  }
+});
+
+// ====================================================================
+// 3.5. Official In-App Store & Instant Unlock Endpoints
+// ====================================================================
+
+// 1. Get Active Store Products (Dynamic pricing from DB/Admin Panel)
+app.get('/api/store/products', ensureDatabaseReady, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT id, title, description, product_type, units_granted, price_toman, myket_sku, badge, is_active, is_ready_in_myket, sort_order
+      FROM public.store_products
+      WHERE is_active = true
+      ORDER BY sort_order ASC, created_at ASC
+    `);
+
+    const products = result.rows.map(row => ({
+      id: row.id,
+      title: row.title,
+      description: row.description,
+      productType: row.product_type,
+      unitsGranted: Number(row.units_granted),
+      priceToman: Number(row.price_toman),
+      myketSku: row.myket_sku,
+      badge: row.badge || '',
+      isActive: Boolean(row.is_active),
+      isReadyInMyket: Boolean(row.is_ready_in_myket),
+      sortOrder: Number(row.sort_order)
+    }));
+
+    return res.json({ success: true, products });
+  } catch (err) {
+    console.error('[API Store Products Error]', err);
+    return res.status(500).json({ error: "خطا در دریافت لیست بسته‌های فروشگاه." });
+  }
+});
+
+// 2. Get User Entitlements (Instant unlock credits, VIP status)
+app.get('/api/store/user-entitlements', ensureDatabaseReady, async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'] || req.query.userId;
+    if (!userId) {
+      return res.status(401).json({ error: "شناسه کاربر نامعتبر است." });
+    }
+
+    const entRes = await pool.query(
+      `SELECT instant_unlock_credits, is_vip, total_purchased_toman 
+       FROM public.user_entitlements 
+       WHERE user_id = $1 LIMIT 1`,
+      [userId]
+    );
+
+    let credits = 0;
+    let isVip = false;
+    let totalPurchased = 0;
+
+    if (entRes.rows.length > 0) {
+      credits = Number(entRes.rows[0].instant_unlock_credits);
+      isVip = Boolean(entRes.rows[0].is_vip);
+      totalPurchased = Number(entRes.rows[0].total_purchased_toman);
+    } else {
+      const uRes = await pool.query(
+        `SELECT instant_unlock_credits, is_vip FROM public.users WHERE id = $1 LIMIT 1`,
+        [userId]
+      );
+      if (uRes.rows.length > 0) {
+        credits = Number(uRes.rows[0].instant_unlock_credits || 0);
+        isVip = Boolean(uRes.rows[0].is_vip || false);
+      }
+    }
+
+    return res.json({
+      success: true,
+      entitlements: {
+        instantUnlockCredits: credits,
+        isVip: isVip,
+        totalPurchasedToman: totalPurchased
+      }
+    });
+  } catch (err) {
+    console.error('[API User Entitlements Error]', err);
+    return res.status(500).json({ error: "خطا در دریافت سهمیه‌های کاربر." });
+  }
+});
+
+// 3. Official Store Purchase Verification (Idempotent, Replay-Protected)
+app.post('/api/store/verify-purchase', ensureDatabaseReady, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const userId = req.headers['x-user-id'] || req.body.userId;
+    const { productId, purchaseToken, orderId, packageName } = req.body;
+
+    if (!userId || !productId) {
+      return res.status(400).json({ error: "شناسه کاربر و محصول الزامی است." });
+    }
+
+    // 1. Check idempotency: token replay protection
+    if (purchaseToken) {
+      const tokenCheck = await client.query(
+        `SELECT purchase_id, product_id, status FROM public.purchases WHERE purchase_token = $1 LIMIT 1`,
+        [purchaseToken]
+      );
+      if (tokenCheck.rows.length > 0) {
+        return res.status(409).json({
+          error: "این توکن خرید قبلاً در سیستم ثبت و تایید شده است (جلوگیری از ثبت تکراری).",
+          alreadyProcessed: true
+        });
+      }
+    }
+
+    // 2. Fetch product configuration from store_products
+    const prodRes = await client.query(
+      `SELECT id, title, product_type, units_granted, price_toman, myket_sku, is_active, is_ready_in_myket 
+       FROM public.store_products 
+       WHERE id = $1 LIMIT 1`,
+      [productId]
+    );
+
+    if (prodRes.rows.length === 0) {
+      return res.status(404).json({ error: "محصول مورد نظر در فروشگاه یافت نشد." });
+    }
+
+    const product = prodRes.rows[0];
+    if (!product.is_active) {
+      return res.status(400).json({ error: "این بسته در حال حاضر غیرفعال است." });
+    }
+
+    const purchaseId = orderId || ("PUR_" + crypto.randomBytes(8).toString('hex'));
+    const unitsGranted = Number(product.units_granted);
+    const amountToman = Number(product.price_toman);
+
+    await client.query('BEGIN');
+
+    // 3. Record purchase audit trail
+    await client.query(
+      `INSERT INTO public.purchases (purchase_id, user_id, product_id, amount, status, purchase_token, myket_order_id, units_granted, verification_source, created_at)
+       VALUES ($1, $2, $3, $4, 'SUCCESS', $5, $6, $7, 'MYKET_IAB', NOW())`,
+      [purchaseId, userId, productId, amountToman, purchaseToken || null, orderId || null, unitsGranted]
+    );
+
+    // 4. Grant Entitlements Atomically
+    let updatedCredits = 0;
+    let isVip = false;
+
+    if (product.product_type === 'SQUARE_UNLOCK') {
+      const entUpdate = await client.query(
+        `INSERT INTO public.user_entitlements (user_id, instant_unlock_credits, is_vip, total_purchased_toman, updated_at)
+         VALUES ($1, $2, false, $3, NOW())
+         ON CONFLICT (user_id) 
+         DO UPDATE SET 
+           instant_unlock_credits = public.user_entitlements.instant_unlock_credits + $2,
+           total_purchased_toman = public.user_entitlements.total_purchased_toman + $3,
+           updated_at = NOW()
+         RETURNING instant_unlock_credits, is_vip`,
+        [userId, unitsGranted, amountToman]
+      );
+      updatedCredits = Number(entUpdate.rows[0].instant_unlock_credits);
+      isVip = Boolean(entUpdate.rows[0].is_vip);
+
+      await client.query(
+        `UPDATE public.users SET instant_unlock_credits = $1, updated_at = NOW() WHERE id = $2`,
+        [updatedCredits, userId]
+      );
+    } else if (product.product_type === 'ACCOUNT_UPGRADE') {
+      const entUpdate = await client.query(
+        `INSERT INTO public.user_entitlements (user_id, instant_unlock_credits, is_vip, total_purchased_toman, updated_at)
+         VALUES ($1, 0, true, $2, NOW())
+         ON CONFLICT (user_id) 
+         DO UPDATE SET 
+           is_vip = true,
+           total_purchased_toman = public.user_entitlements.total_purchased_toman + $2,
+           updated_at = NOW()
+         RETURNING instant_unlock_credits, is_vip`,
+        [userId, amountToman]
+      );
+      updatedCredits = Number(entUpdate.rows[0].instant_unlock_credits);
+      isVip = true;
+
+      await client.query(
+        `UPDATE public.users SET is_vip = true, panel_type = 'vip', multiplier = 2, updated_at = NOW() WHERE id = $1`,
+        [userId]
+      );
+
+      const cycle = await getOrCreateActiveCycle(userId);
+      await client.query(
+        `INSERT INTO public.user_memberships (user_id, cycle_id, panel_type, multiplier, purchased_at)
+         VALUES ($1, $2, 'gold', 2, NOW())
+         ON CONFLICT (user_id, cycle_id)
+         DO UPDATE SET panel_type = 'gold', multiplier = 2, purchased_at = NOW()`,
+        [userId, cycle.cycleId]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    console.log(`[Store Purchase SUCCESS] User: ${userId}, Product: ${productId}, Units: ${unitsGranted}, Paid: ${amountToman} Toman`);
+
+    return res.json({
+      success: true,
+      message: `خرید «${product.title}» با موفقیت تایید و به حساب شما منظور شد.`,
+      product: {
+        id: product.id,
+        title: product.title,
+        productType: product.product_type,
+        unitsGranted
+      },
+      entitlements: {
+        instantUnlockCredits: updatedCredits,
+        isVip
+      }
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[API Store Verify Purchase Error]', err);
+    return res.status(500).json({ error: "خطا در اعتبارسنجی خرید و ثبت تراکنش در سرور." });
+  } finally {
+    client.release();
+  }
+});
+
+// 4. Instant Unlock Square with Purchased Credits (No fake ad impressions)
+app.post('/api/squares/instant-unlock', ensureDatabaseReady, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const userId = req.headers['x-user-id'] || req.body.userId;
+    const { squareNumber } = req.body;
+
+    if (!userId || !squareNumber || squareNumber < 1 || squareNumber > 100) {
+      return res.status(400).json({ error: "شماره مربع یا کاربر نامعتبر است (باید بین ۱ تا ۱۰۰ باشد)." });
+    }
+
+    const cycle = await getOrCreateActiveCycle(userId);
+    const now = Date.now();
+    if (now >= cycle.endTime) {
+      return res.status(400).json({ error: "دوره ۲۴ ساعته منقضی شده است. جدول مربع‌ها به‌روزرسانی شد." });
+    }
+
+    // Check user has available instant unlock credits
+    const entRes = await client.query(
+      `SELECT instant_unlock_credits FROM public.user_entitlements WHERE user_id = $1 LIMIT 1`,
+      [userId]
+    );
+
+    let credits = entRes.rows.length > 0 ? Number(entRes.rows[0].instant_unlock_credits) : 0;
+    if (credits <= 0) {
+      const uRes = await client.query(`SELECT instant_unlock_credits FROM public.users WHERE id = $1 LIMIT 1`, [userId]);
+      credits = uRes.rows.length > 0 ? Number(uRes.rows[0].instant_unlock_credits || 0) : 0;
+    }
+
+    if (credits <= 0) {
+      return res.status(403).json({
+        error: "سهمیه بازگشایی سریع شما به پایان رسیده است. لطفاً از بخش فروشگاه بسته جدید تهیه فرمایید.",
+        noCredits: true
+      });
+    }
+
+    // Check if square is already completed in current 24-hour cycle
+    const squareKey = `${userId}:${cycle.cycleId}:${squareNumber}`;
+    const squareCheck = await client.query(
+      `SELECT state_key FROM public.square_states WHERE state_key = $1 LIMIT 1`,
+      [squareKey]
+    );
+    if (squareCheck.rows.length > 0) {
+      return res.status(409).json({ error: "این مربع قبلاً در این دوره ۲۴ ساعته باز و تکمیل شده است." });
+    }
+
+    // Multiplier from membership (or VIP)
+    const memRes = await client.query(
+      `SELECT multiplier FROM public.user_memberships WHERE user_id = $1 AND cycle_id = $2 LIMIT 1`,
+      [userId, cycle.cycleId]
+    );
+    const awardedPoints = memRes.rows.length > 0 ? Number(memRes.rows[0].multiplier) : 1;
+
+    await client.query('BEGIN');
+
+    // Decrement credits
+    const updateEnt = await client.query(
+      `UPDATE public.user_entitlements 
+       SET instant_unlock_credits = instant_unlock_credits - 1, updated_at = NOW() 
+       WHERE user_id = $1 AND instant_unlock_credits >= 1 
+       RETURNING instant_unlock_credits`,
+      [userId]
+    );
+
+    if (updateEnt.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: "سهمیه بازگشایی سریع ناکافی است." });
+    }
+
+    const remainingCredits = Number(updateEnt.rows[0].instant_unlock_credits);
+
+    await client.query(
+      `UPDATE public.users SET instant_unlock_credits = $1, updated_at = NOW() WHERE id = $2`,
+      [remainingCredits, userId]
+    );
+
+    // Lock square in current cycle
+    await client.query(
+      `INSERT INTO public.square_states (state_key, user_id, cycle_id, square_number, status, completed_at, created_at)
+       VALUES ($1, $2, $3, $4, 'COMPLETED', $5, NOW())`,
+      [squareKey, userId, cycle.cycleId, squareNumber, now]
+    );
+
+    // Increment user score with real points (clean separation: no fake ad impression)
+    const scoreUpdate = await client.query(
+      `INSERT INTO public.user_scores (user_id, total_score, updated_at)
+       VALUES ($1, $2, NOW())
+       ON CONFLICT (user_id) 
+       DO UPDATE SET total_score = public.user_scores.total_score + $2, updated_at = NOW()
+       RETURNING total_score`,
+      [userId, awardedPoints]
+    );
+
+    const newScore = Number(scoreUpdate.rows[0].total_score);
+
+    if (schemaInfo.userHasTotalScore) {
+      await client.query(
+        `UPDATE public.users SET total_score = $1, updated_at = NOW() WHERE id = $2`,
+        [newScore, userId]
+      );
+    }
+
+    // Update active competition score
+    await client.query(
+      `UPDATE public.competitions 
+       SET total_score = total_score + $1 
+       WHERE status = 'ACTIVE'`,
+      [awardedPoints]
+    );
+
+    await client.query('COMMIT');
+
+    console.log(`[Instant Unlock] User ${userId} unlocked square #${squareNumber}. Remaining credits: ${remainingCredits}, Points: +${awardedPoints}`);
+
+    return res.json({
+      success: true,
+      message: `مربع شماره ${squareNumber} با موفقیت و بدون نیاز به تبلیغ باز شد! (${awardedPoints} امتیاز افزوده شد)`,
+      squareNumber,
+      awardedPoints,
+      newScore,
+      remainingCredits,
+      cycleId: cycle.cycleId
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[API Instant Unlock Error]', err);
+    return res.status(500).json({ error: "خطا در پردازش بازگشایی سریع مربع." });
+  } finally {
+    client.release();
+  }
+});
+
+// Admin Store Management Endpoints
+app.get('/api/admin/store/products', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
+  try {
+    const resProducts = await pool.query(`
+      SELECT id, title, description, product_type, units_granted, price_toman, myket_sku, badge, is_active, is_ready_in_myket, sort_order, created_at, updated_at
+      FROM public.store_products
+      ORDER BY sort_order ASC, created_at ASC
+    `);
+    return res.json({ success: true, products: resProducts.rows });
+  } catch (err) {
+    console.error('[Admin Store Products Error]', err);
+    return res.status(500).json({ error: "خطا در دریافت لیست محصولات برای پنل مدیریت." });
+  }
+});
+
+app.post('/api/admin/store/products', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
+  try {
+    const { id, title, description, product_type, units_granted, price_toman, myket_sku, badge, is_active, is_ready_in_myket, sort_order } = req.body;
+
+    if (!title || price_toman === undefined || !myket_sku) {
+      return res.status(400).json({ error: "عنوان بسته، قیمت و شناسه مایکت الزامی هستند." });
+    }
+
+    const prodId = id || ("pkg_" + crypto.randomBytes(4).toString('hex'));
+
+    await pool.query(
+      `INSERT INTO public.store_products 
+        (id, title, description, product_type, units_granted, price_toman, myket_sku, badge, is_active, is_ready_in_myket, sort_order, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
+       ON CONFLICT (id) 
+       DO UPDATE SET 
+         title = $2,
+         description = $3,
+         product_type = $4,
+         units_granted = $5,
+         price_toman = $6,
+         myket_sku = $7,
+         badge = $8,
+         is_active = $9,
+         is_ready_in_myket = $10,
+         sort_order = $11,
+         updated_at = NOW()`,
+      [prodId, title, description || '', product_type || 'SQUARE_UNLOCK', Number(units_granted || 0), Number(price_toman || 0), myket_sku, badge || '', is_active !== false, Boolean(is_ready_in_myket), Number(sort_order || 0)]
+    );
+
+    return res.json({ success: true, message: "اطلاعات محصول فروشگاه با موفقیت ذخیره شد." });
+  } catch (err) {
+    console.error('[Admin Save Store Product Error]', err);
+    return res.status(500).json({ error: "خطا در ذخیره تغییرات محصول فروشگاه." });
+  }
+});
+
+app.delete('/api/admin/store/products/:id', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query(`DELETE FROM public.store_products WHERE id = $1`, [id]);
+    return res.json({ success: true, message: "بسته با موفقیت حذف گردید." });
+  } catch (err) {
+    console.error('[Admin Delete Store Product Error]', err);
+    return res.status(500).json({ error: "خطا در حذف بسته از فروشگاه." });
+  }
+});
+
+app.get('/api/admin/store/purchases', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
+  try {
+    const resPurchases = await pool.query(`
+      SELECT 
+        p.purchase_id,
+        p.user_id,
+        p.product_id,
+        p.amount,
+        p.status,
+        p.purchase_token,
+        p.myket_order_id,
+        p.units_granted,
+        p.error_message,
+        p.verification_source,
+        p.created_at,
+        u.first_name,
+        u.last_name,
+        u.phone_number,
+        sp.title as product_title
+      FROM public.purchases p
+      LEFT JOIN public.users u ON p.user_id = u.id
+      LEFT JOIN public.store_products sp ON p.product_id = sp.id
+      ORDER BY p.created_at DESC
+      LIMIT 100
+    `);
+
+    return res.json({ success: true, purchases: resPurchases.rows });
+  } catch (err) {
+    console.error('[Admin Store Purchases Error]', err);
+    return res.status(500).json({ error: "خطا در دریافت سوابق تراکنش‌های فروشگاه." });
   }
 });
 
