@@ -15,14 +15,69 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Mount Independent Rewards Microservice Router
-try {
-  const rewardsModule = require(path.join(__dirname, '../rewards-service/server.js'));
-  if (rewardsModule && rewardsModule.rewardsRouter) {
-    app.use(['/api/rewards', '/api/prizes'], rewardsModule.rewardsRouter);
-    console.log('[Rewards Microservice] Successfully mounted /api/rewards and /api/prizes routes.');
+let rewardsMounted = false;
+const candidatePaths = [
+  path.join(__dirname, '../rewards-service/server.js'),
+  path.join(__dirname, 'rewards-service/server.js'),
+  path.join(process.cwd(), 'rewards-service/server.js'),
+  path.join(process.cwd(), '../rewards-service/server.js')
+];
+
+for (const p of candidatePaths) {
+  try {
+    if (fs.existsSync(p)) {
+      const rewardsModule = require(p);
+      if (rewardsModule && rewardsModule.rewardsRouter) {
+        app.use(['/api/rewards', '/api/prizes'], rewardsModule.rewardsRouter);
+        console.log(`[Rewards Microservice] Successfully mounted /api/rewards and /api/prizes from: ${p}`);
+        rewardsMounted = true;
+        break;
+      }
+    }
+  } catch (err) {
+    console.error(`[Rewards Microservice Load Warning from ${p}]:`, err.message);
   }
-} catch (e) {
-  console.error('[Rewards Microservice Mount Warning]', e.message);
+}
+
+if (!rewardsMounted) {
+  console.log('[Rewards Microservice] Mounting default inline rewards router fallback.');
+  const fallbackRewardsRouter = express.Router();
+  fallbackRewardsRouter.get(['/', '/list'], (req, res) => {
+    res.json({
+      success: true,
+      rewards: [
+        { id: 'rew_irancell_10k', title: 'کارت شارژ ۱۰ هزار تومانی ایرانسل', description: 'کد شارژ مستقیم ۱۰,۰۰۰ تومانی برای سیم‌کارت‌های اعتباری ایرانسل.', category_id: 'cat_recharge', cost_points: 100, stock_quantity: 50, image_url: 'https://images.unsplash.com/photo-1556742049-0a67568d0d9f?w=600&q=80', is_featured: true, is_active: true, sort_order: 1 },
+        { id: 'rew_mci_10k', title: 'کارت شارژ ۱۰ هزار تومانی همراه اول', description: 'کد شارژ مستقیم ۱۰,۰۰۰ تومانی برای سیم‌کارت‌های اعتباری همراه اول.', category_id: 'cat_recharge', cost_points: 100, stock_quantity: 50, image_url: 'https://images.unsplash.com/photo-1556742049-0a67568d0d9f?w=600&q=80', is_featured: false, is_active: true, sort_order: 2 },
+        { id: 'rew_irancell_net_5gb', title: 'بسته اینترنت ۵ گیگابایت یک‌ماهه', description: 'فعالسازی مستقیم بسته اینترنت ۵ گیگابایت یک‌ماهه بر روی شماره ایرانسل شما.', category_id: 'cat_internet', cost_points: 250, stock_quantity: 30, image_url: 'https://images.unsplash.com/photo-1544717297-fa95b6ee9643?w=600&q=80', is_featured: true, is_active: true, sort_order: 3 },
+        { id: 'rew_cash_50k', title: 'جایزه نقدی ۵۰,۰۰۰ تومانی', description: 'واریز پایا مستقیم به کارت بانکی متصل به شماره همراه شما.', category_id: 'cat_cash', cost_points: 500, stock_quantity: 20, image_url: 'https://images.unsplash.com/photo-1580519542036-c47de6196ba5?w=600&q=80', is_featured: true, is_active: true, sort_order: 4 }
+      ]
+    });
+  });
+  fallbackRewardsRouter.get('/categories', (req, res) => {
+    res.json({
+      success: true,
+      categories: [
+        { id: 'cat_recharge', name: 'کارت شارژ', slug: 'recharge-cards', icon: 'smartphone', sort_order: 1, is_active: true },
+        { id: 'cat_internet', name: 'بسته‌های اینترنت', slug: 'internet-packages', icon: 'wifi', sort_order: 2, is_active: true },
+        { id: 'cat_cash', name: 'جوایز نقدی و هدیه', slug: 'cash-gifts', icon: 'credit-card', sort_order: 3, is_active: true },
+        { id: 'cat_digital', name: 'گیفت کارت دیجیتال', slug: 'digital-giftcards', icon: 'gift', sort_order: 4, is_active: true }
+      ]
+    });
+  });
+  fallbackRewardsRouter.get('/appearance', (req, res) => {
+    res.json({
+      success: true,
+      appearance: {
+        id: 'default',
+        hero_title: 'ویترین جوایز و پاداش‌های ارزشمند',
+        hero_subtitle: 'امتیازهای کسب‌شده خود را به کارت شارژ، بسته‌های اینترنت و جوایز نقدی تبدیل کنید',
+        hero_banner_url: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?w=800&q=80',
+        primary_color: '#10B981',
+        terms_text: 'درخواست‌های دریافت جایزه ظرف ۲۴ الی ۷۲ ساعت کاری پردازش و ارسال می‌شوند.'
+      }
+    });
+  });
+  app.use(['/api/rewards', '/api/prizes'], fallbackRewardsRouter);
 }
 
 // Standalone Admin Users Page (Pure users table)
