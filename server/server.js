@@ -6,7 +6,7 @@ const fs = require('fs');
 const { Pool } = require('pg');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = (process.env.PORT && process.env.PORT !== '8080') ? process.env.PORT : 3000;
 const ADMIN_API_KEY = process.env.ADMIN_KEY || "ReqabatAdmin2026";
 const DATABASE_URL = process.env.DATABASE_URL;
 
