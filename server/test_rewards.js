@@ -1,6 +1,6 @@
 const assert = require('assert');
 const http = require('http');
-const { app, rewardsRouter, pool } = require('../rewards-service/server.js');
+const { app, rewardsRouter, pool } = require('./rewards-service/server.js');
 
 let server;
 const PORT = 3099;

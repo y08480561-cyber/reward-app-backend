@@ -16,7 +16,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Mount Independent Rewards Microservice Router
 try {
-  const rewardsModule = require(path.join(__dirname, '../rewards-service/server.js'));
+  const rewardsModule = require(path.join(__dirname, 'rewards-service/server.js'));
   if (rewardsModule && rewardsModule.rewardsRouter) {
     app.use(['/api/rewards', '/api/prizes'], rewardsModule.rewardsRouter);
     console.log('[Rewards Microservice] Successfully mounted /api/rewards and /api/prizes routes.');
