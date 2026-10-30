@@ -14,20 +14,6 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Mount Independent Rewards Microservice Router
-try {
-  const rewardsModule = require(path.join(__dirname, 'rewards-service/server.js'));
-  if (rewardsModule && rewardsModule.rewardsRouter) {
-    app.use(['/api/rewards', '/api/prizes'], rewardsModule.rewardsRouter);
-    console.log('[Rewards Microservice] Successfully mounted /api/rewards and /api/prizes routes.');
-  } else {
-    throw new Error('rewardsRouter export not found');
-  }
-} catch (e) {
-  console.error('[CRITICAL ERROR] Failed to mount rewards microservice:', e.message);
-  process.exit(1);
-}
-
 // Standalone Admin Users Page (Pure users table)
 app.get(['/admin/users', '/admin/users/'], (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'users.html'));
@@ -90,7 +76,7 @@ if (DATABASE_URL) {
   pool = new Pool({
     connectionString: DATABASE_URL,
     ssl: isLocalhost ? false : { rejectUnauthorized: false },
-    max: 10,
+    max: 20,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000,
   });
@@ -99,8 +85,40 @@ if (DATABASE_URL) {
     console.error('[PostgreSQL Pool Unexpected Error]', err.message);
     isDbConnected = false;
   });
+
+  // Share pool with rewards service if already loaded
+  try {
+    const rewardsPath = path.join(__dirname, 'rewards-service/server.js');
+    if (fs.existsSync(rewardsPath)) {
+      const rewardsModule = require(rewardsPath);
+      if (rewardsModule && rewardsModule.setPool) {
+        rewardsModule.setPool(pool);
+        console.log('[PostgreSQL] Database pool shared with Rewards Microservice.');
+      }
+    }
+  } catch (err) {
+    // Ignore early share errors
+  }
 } else {
   console.warn('[PostgreSQL Init] DATABASE_URL is not set in environment variables. Database operations will return HTTP 503 until configured in Render.');
+}
+
+// Mount Independent Rewards Microservice Router
+try {
+  const rewardsModule = require(path.join(__dirname, 'rewards-service/server.js'));
+  if (rewardsModule && rewardsModule.rewardsRouter) {
+    if (pool && rewardsModule.setPool) {
+      rewardsModule.setPool(pool);
+      console.log('[Rewards Microservice] Shared database pool linked.');
+    }
+    app.use(['/api/rewards', '/api/prizes'], rewardsModule.rewardsRouter);
+    console.log('[Rewards Microservice] Successfully mounted /api/rewards and /api/prizes routes.');
+  } else {
+    throw new Error('rewardsRouter export not found');
+  }
+} catch (e) {
+  console.error('[CRITICAL ERROR] Failed to mount rewards microservice:', e.message);
+  process.exit(1);
 }
 
 // Database Connection Test and Schema Initialization

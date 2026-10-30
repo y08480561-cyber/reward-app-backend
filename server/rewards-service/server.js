@@ -295,7 +295,10 @@ rewardsRouter.patch('/admin/claims/:id', requireAdminAuth, async (req, res) => {
 rewardsRouter.post('/admin/appearance', requireAdminAuth, async (req, res) => {
   try {
     const { hero_title, hero_subtitle, hero_banner_url, primary_color, active_sections, terms_text } = req.body;
-    const activeSecStr = active_sections ? (typeof active_sections === 'object' ? JSON.stringify(active_sections) : active_sections) : null;
+    const activeSecStr = active_sections 
+      ? (typeof active_sections === 'object' ? JSON.stringify(active_sections) : active_sections) 
+      : JSON.stringify({ featured: true, categories: true, history: true, banners: true });
+
     if (pool) {
       const result = await pool.query(`
         INSERT INTO public.reward_appearance (id, hero_title, hero_subtitle, hero_banner_url, primary_color, active_sections, terms_text, updated_at)
@@ -305,15 +308,30 @@ rewardsRouter.post('/admin/appearance', requireAdminAuth, async (req, res) => {
       `, [hero_title, hero_subtitle, hero_banner_url, primary_color, activeSecStr, terms_text]);
       return res.json({ success: true, appearance: result.rows[0] });
     }
-    return res.json({ success: true });
+
+    memoryDb.appearance = {
+      ...memoryDb.appearance,
+      hero_title: hero_title || memoryDb.appearance.hero_title,
+      hero_subtitle: hero_subtitle || memoryDb.appearance.hero_subtitle,
+      hero_banner_url: hero_banner_url || memoryDb.appearance.hero_banner_url,
+      primary_color: primary_color || memoryDb.appearance.primary_color,
+      active_sections: typeof activeSecStr === 'string' ? JSON.parse(activeSecStr) : activeSecStr,
+      terms_text: terms_text || memoryDb.appearance.terms_text
+    };
+
+    return res.json({ success: true, appearance: memoryDb.appearance });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'خطا در ذخیره ظاهر' });
   }
 });
+
+function setPool(newPool) {
+  pool = newPool;
+}
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use('/api/rewards', rewardsRouter);
 
-module.exports = { app, rewardsRouter, pool };
+module.exports = { app, rewardsRouter, pool, setPool };
