@@ -531,15 +531,15 @@ rewardsRouter.put('/admin/rewards/:id', requireAdminAuth, async (req, res) => {
         WHERE id = $10 AND deleted_at IS NULL
         RETURNING *
       `, [
-        title,
-        description,
-        category_id,
-        cost_points !== undefined ? parseInt(cost_points, 10) : null,
-        stock_quantity !== undefined ? parseInt(stock_quantity, 10) : null,
-        image_url,
-        is_featured,
-        is_active,
-        sort_order !== undefined ? parseInt(sort_order, 10) : null,
+        title !== undefined ? title : null,
+        description !== undefined ? description : null,
+        (category_id && String(category_id).trim() !== '') ? String(category_id).trim() : null,
+        (cost_points !== undefined && cost_points !== null) ? parseInt(cost_points, 10) : null,
+        (stock_quantity !== undefined && stock_quantity !== null) ? parseInt(stock_quantity, 10) : null,
+        image_url !== undefined ? image_url : null,
+        is_featured !== undefined ? Boolean(is_featured) : null,
+        is_active !== undefined ? Boolean(is_active) : null,
+        (sort_order !== undefined && sort_order !== null) ? parseInt(sort_order, 10) : null,
         id
       ]);
 
@@ -642,6 +642,10 @@ rewardsRouter.post('/admin/appearance', requireAdminAuth, async (req, res) => {
       return res.status(503).json({ success: false, message: 'اتصال به دیتابیس برقرار نیست.' });
     }
 
+    const activeSecStr = active_sections 
+      ? (typeof active_sections === 'object' ? JSON.stringify(active_sections) : String(active_sections))
+      : JSON.stringify({ featured: true, categories: true, history: true, banners: true });
+
     if (pool) {
       const result = await pool.query(`
         INSERT INTO public.reward_appearance (id, hero_title, hero_subtitle, hero_banner_url, primary_color, active_sections, terms_text, updated_at)
@@ -660,7 +664,7 @@ rewardsRouter.post('/admin/appearance', requireAdminAuth, async (req, res) => {
         hero_subtitle || '',
         hero_banner_url || '',
         primary_color || '#10B981',
-        typeof active_sections === 'object' ? JSON.stringify(active_sections) : active_sections,
+        activeSecStr,
         terms_text || ''
       ]);
       return res.json({ success: true, message: 'تنظیمات ظاهر با موفقیت بروزرسانی شد', appearance: result.rows[0] });
@@ -732,7 +736,12 @@ rewardsRouter.patch('/admin/claims/:id', requireAdminAuth, async (req, res) => {
             updated_at = NOW()
         WHERE id = $4
         RETURNING *
-      `, [status, admin_notes, tracking_number, id]);
+      `, [
+        status !== undefined ? status : null,
+        admin_notes !== undefined ? admin_notes : null,
+        tracking_number !== undefined ? tracking_number : null,
+        id
+      ]);
 
       if (result.rows.length === 0) {
         return res.status(404).json({ success: false, message: 'درخواست جایزه پیدا نشد' });
