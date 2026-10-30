@@ -430,7 +430,71 @@ async function initDatabaseTables() {
     `ALTER TABLE public.purchases ADD COLUMN IF NOT EXISTS units_granted INTEGER DEFAULT 0;`,
     `ALTER TABLE public.purchases ADD COLUMN IF NOT EXISTS error_message TEXT;`,
     `ALTER TABLE public.purchases ADD COLUMN IF NOT EXISTS verification_source TEXT DEFAULT 'MYKET_IAB';`,
-    `CREATE UNIQUE INDEX IF NOT EXISTS idx_purchases_token ON public.purchases(purchase_token) WHERE purchase_token IS NOT NULL;`
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_purchases_token ON public.purchases(purchase_token) WHERE purchase_token IS NOT NULL;`,
+
+    // 20. Reward Categories Table
+    `CREATE TABLE IF NOT EXISTS public.reward_categories (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      slug TEXT NOT NULL UNIQUE,
+      icon TEXT DEFAULT 'gift',
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );`,
+    `CREATE INDEX IF NOT EXISTS idx_reward_categories_active ON public.reward_categories(is_active, sort_order ASC);`,
+
+    // 21. Rewards Table
+    `CREATE TABLE IF NOT EXISTS public.rewards (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      category_id TEXT REFERENCES public.reward_categories(id) ON DELETE SET NULL,
+      cost_points INTEGER NOT NULL CHECK (cost_points >= 0),
+      stock_quantity INTEGER NOT NULL DEFAULT 0 CHECK (stock_quantity >= 0),
+      image_url TEXT DEFAULT '',
+      additional_images JSONB DEFAULT '[]',
+      is_featured BOOLEAN NOT NULL DEFAULT false,
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      deleted_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );`,
+    `CREATE INDEX IF NOT EXISTS idx_rewards_active ON public.rewards(is_active, sort_order ASC);`,
+    `CREATE INDEX IF NOT EXISTS idx_rewards_category ON public.rewards(category_id);`,
+
+    // 22. Reward Appearance Table
+    `CREATE TABLE IF NOT EXISTS public.reward_appearance (
+      id TEXT PRIMARY KEY DEFAULT 'default',
+      hero_title TEXT NOT NULL DEFAULT 'ویترین جوایز و پاداش‌های ارزشمند',
+      hero_subtitle TEXT DEFAULT 'امتیازهای کسب‌شده خود در مسابقات را به کارت شارژ، بسته‌های اینترنت و جوایز نقدی تبدیل کنید',
+      hero_banner_url TEXT DEFAULT '',
+      primary_color TEXT DEFAULT '#10B981',
+      active_sections JSONB DEFAULT '{"featured": true, "categories": true, "history": true, "banners": true}',
+      terms_text TEXT DEFAULT 'درخواست‌های دریافت جایزه پس از بررسی توسط تیم پشتیبانی ظرف ۲۴ الی ۷۲ ساعت کاری پردازش و ارسال خواهند شد.',
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );`,
+
+    // 23. Reward Claims Table
+    `CREATE TABLE IF NOT EXISTS public.reward_claims (
+      id TEXT PRIMARY KEY,
+      tracking_code TEXT NOT NULL UNIQUE,
+      user_id TEXT NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+      reward_id TEXT NOT NULL REFERENCES public.rewards(id) ON DELETE RESTRICT,
+      cost_points INTEGER NOT NULL CHECK (cost_points >= 0),
+      status TEXT NOT NULL DEFAULT 'PENDING',
+      recipient_name TEXT DEFAULT '',
+      phone TEXT DEFAULT '',
+      shipping_address TEXT DEFAULT '',
+      admin_notes TEXT DEFAULT '',
+      tracking_number TEXT DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );`,
+    `CREATE INDEX IF NOT EXISTS idx_reward_claims_user ON public.reward_claims(user_id, created_at DESC);`,
+    `CREATE INDEX IF NOT EXISTS idx_reward_claims_status ON public.reward_claims(status, created_at DESC);`,
+    `CREATE INDEX IF NOT EXISTS idx_reward_claims_tracking ON public.reward_claims(tracking_code);`
   ];
 
 
@@ -549,6 +613,43 @@ async function initDatabaseTables() {
     }
   } catch (err) {
     console.warn('[PostgreSQL Store Products Seed Warning]', err.message);
+  }
+
+  // 24. Ensure default reward categories exist
+  try {
+    const catCheck = await pool.query(`SELECT id FROM public.reward_categories LIMIT 1`);
+    if (catCheck.rows.length === 0) {
+      const defaultCats = [
+        ['cat_recharge', 'کارت شارژ', 'recharge-cards', 'smartphone', 1],
+        ['cat_internet', 'بسته‌های اینترنت', 'internet-packages', 'wifi', 2],
+        ['cat_cash', 'جوایز نقدی و هدیه', 'cash-gifts', 'credit-card', 3],
+        ['cat_digital', 'گیفت کارت دیجیتال', 'digital-giftcards', 'gift', 4]
+      ];
+      for (const c of defaultCats) {
+        await pool.query(
+          `INSERT INTO public.reward_categories (id, name, slug, icon, sort_order) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING`,
+          c
+        );
+      }
+      console.log('[PostgreSQL] Initial reward categories seeded.');
+    }
+  } catch (err) {
+    console.warn('[PostgreSQL Init Reward Categories Warning]', err.message);
+  }
+
+  // 25. Ensure default reward appearance exists
+  try {
+    const appCheck = await pool.query(`SELECT id FROM public.reward_appearance WHERE id = 'default' LIMIT 1`);
+    if (appCheck.rows.length === 0) {
+      await pool.query(
+        `INSERT INTO public.reward_appearance (id, hero_title, hero_subtitle, hero_banner_url, primary_color)
+         VALUES ('default', 'ویترین جوایز و پاداش‌های ارزشمند', 'امتیازهای کسب‌شده خود در مسابقات را به کارت شارژ، بسته‌های اینترنت و جوایز نقدی تبدیل کنید', '', '#10B981')
+         ON CONFLICT DO NOTHING`
+      );
+      console.log('[PostgreSQL] Initial reward appearance seeded.');
+    }
+  } catch (err) {
+    console.warn('[PostgreSQL Init Reward Appearance Warning]', err.message);
   }
 
   console.log('[PostgreSQL] Database tables and schema verified/initialized.');

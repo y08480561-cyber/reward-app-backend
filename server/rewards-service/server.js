@@ -125,6 +125,12 @@ rewardsRouter.get('/', async (req, res) => {
     }
     return res.json({ success: true, rewards: memoryDb.rewards });
   } catch (err) {
+    console.error('[Rewards API Error] GET /api/rewards failed:', {
+      message: err.message,
+      code: err.code,
+      detail: err.detail,
+      stack: err.stack
+    });
     return res.status(500).json({ success: false, message: 'خطا در دریافت لیست جوایز' });
   }
 });
@@ -180,6 +186,7 @@ rewardsRouter.get('/claims/user/:userId', requireUserAuth, async (req, res) => {
     const userClaims = memoryDb.claims.filter(c => c.user_id === userId);
     return res.json({ success: true, claims: userClaims });
   } catch (err) {
+    console.error('[Rewards API Error] GET /api/rewards/claims/user/:userId failed:', { message: err.message, userId: req.params.userId });
     return res.status(500).json({ success: false, message: 'خطا در دریافت سوابق' });
   }
 });
@@ -192,6 +199,7 @@ rewardsRouter.get('/admin/rewards', requireAdminAuth, async (req, res) => {
     }
     return res.json({ success: true, rewards: memoryDb.rewards });
   } catch (err) {
+    console.error('[Rewards Admin Error] GET /admin/rewards failed:', err.message);
     return res.status(500).json({ success: false, message: 'خطا در لیست جوایز' });
   }
 });
@@ -223,6 +231,7 @@ rewardsRouter.post('/admin/rewards', requireAdminAuth, async (req, res) => {
     memoryDb.rewards.push(newReward);
     return res.json({ success: true, reward: newReward });
   } catch (err) {
+    console.error('[Rewards Admin Error] POST /admin/rewards failed:', err.message);
     return res.status(500).json({ success: false, message: 'خطا در ایجاد جایزه' });
   }
 });
@@ -241,6 +250,7 @@ rewardsRouter.put('/admin/rewards/:id', requireAdminAuth, async (req, res) => {
     }
     return res.json({ success: true });
   } catch (err) {
+    console.error('[Rewards Admin Error] PUT /admin/rewards/:id failed:', err.message);
     return res.status(500).json({ success: false, message: 'خطا در ویرایش جایزه' });
   }
 });
@@ -254,6 +264,7 @@ rewardsRouter.delete('/admin/rewards/:id', requireAdminAuth, async (req, res) =>
     }
     return res.json({ success: true });
   } catch (err) {
+    console.error('[Rewards Admin Error] DELETE /admin/rewards/:id failed:', err.message);
     return res.status(500).json({ success: false, message: 'خطا در حذف' });
   }
 });
@@ -266,6 +277,7 @@ rewardsRouter.get('/admin/claims', requireAdminAuth, async (req, res) => {
     }
     return res.json({ success: true, claims: [] });
   } catch (err) {
+    console.error('[Rewards Admin Error] GET /admin/claims failed:', err.message);
     return res.status(500).json({ success: false, message: 'خطا در دریافت درخواست‌ها' });
   }
 });
@@ -288,6 +300,7 @@ rewardsRouter.patch('/admin/claims/:id', requireAdminAuth, async (req, res) => {
 
     return res.json({ success: true, message: 'وضعیت با موفقیت به‌روزرسانی شد', claim: c });
   } catch (err) {
+    console.error('[Rewards Admin Error] PATCH /admin/claims/:id failed:', err.message);
     return res.status(500).json({ success: false, message: 'خطا در بروزرسانی درخواست' });
   }
 });
@@ -321,6 +334,7 @@ rewardsRouter.post('/admin/appearance', requireAdminAuth, async (req, res) => {
 
     return res.json({ success: true, appearance: memoryDb.appearance });
   } catch (err) {
+    console.error('[Rewards Admin Error] POST /admin/appearance failed:', err.message);
     return res.status(500).json({ success: false, message: 'خطا در ذخیره ظاهر' });
   }
 });
