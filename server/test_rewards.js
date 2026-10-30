@@ -4,7 +4,7 @@ const { app, rewardsRouter, pool } = require('../rewards-service/server.js');
 
 let server;
 const PORT = 3099;
-const ADMIN_KEY = 'reqabat_admin_secret_2026';
+const ADMIN_KEY = process.env.ADMIN_KEY || 'ReqabatAdmin2026';
 
 function request(options, postData) {
   return new Promise((resolve, reject) => {
@@ -141,7 +141,10 @@ async function runTests() {
       hostname: 'localhost',
       port: PORT,
       path: '/api/rewards/claims/user/user_test_999',
-      method: 'GET'
+      method: 'GET',
+      headers: {
+        'x-user-id': 'user_test_999'
+      }
     });
     assert.strictEqual(historyRes.status, 200);
     assert(historyRes.body.claims.length > 0, 'سوابق کاربر دریافت شد');

@@ -9,7 +9,7 @@ app.use(cors());
 app.use(express.json());
 
 // Administrative Auth Key
-const ADMIN_KEY = process.env.ADMIN_KEY || 'reqabat_admin_secret_2026';
+const ADMIN_KEY = process.env.ADMIN_KEY || 'ReqabatAdmin2026';
 const PORT = process.env.PORT || 3001;
 
 // PostgreSQL Connection Pool
@@ -17,13 +17,21 @@ const connectionString = process.env.DATABASE_URL || process.env.SUPABASE_DB_URL
 let pool = null;
 
 if (connectionString) {
+  const isLocalhost = connectionString.includes('localhost') || connectionString.includes('127.0.0.1');
   pool = new Pool({
     connectionString,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    ssl: isLocalhost ? false : { rejectUnauthorized: false },
+    max: 10,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000
+  });
+
+  pool.on('error', (err) => {
+    console.error('[Rewards PostgreSQL Pool Error]', err.message);
   });
 }
 
-// Memory fallback store if PG connection is absent
+// Memory fallback store for local development inspection (read-only fallbacks)
 const memoryDb = {
   categories: [
     { id: 'cat_recharge', name: 'کارت شارژ', slug: 'recharge-cards', icon: 'smartphone', sort_order: 1, is_active: true },
@@ -51,11 +59,92 @@ const memoryDb = {
 
 // Middleware: Admin Security Check
 function requireAdminAuth(req, res, next) {
-  const adminKey = req.headers['x-admin-key'] || req.query.admin_key;
-  if (!adminKey || adminKey !== ADMIN_KEY) {
+  const adminKey = req.headers['x-admin-key'] ||
+                   req.query.admin_key ||
+                   req.query.adminKey ||
+                   req.query.key ||
+                   (req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/i, '').trim() : '');
+
+  const expectedKey = process.env.ADMIN_KEY || 'ReqabatAdmin2026';
+  if (!adminKey || adminKey !== expectedKey) {
     return res.status(401).json({ success: false, message: 'دسترسی غیرمجاز. کلید مدیریت نامعتبر است.' });
   }
   next();
+}
+
+// Middleware: Strict User Authentication against PostgreSQL public.users
+async function requireUserAuth(req, res, next) {
+  try {
+    const rawAuth = req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/i, '').trim() : '';
+    const token = req.headers['x-auth-token'] || req.headers['x-token'] || rawAuth || req.query.token;
+    const headerUserId = req.headers['x-user-id'] || req.body?.user_id || req.query?.userId;
+
+    if (!token && !headerUserId) {
+      return res.status(401).json({
+        success: false,
+        message: 'لطفاً ابتدا وارد حساب کاربری خود شوید (توکن احراز هویت الزامی است).'
+      });
+    }
+
+    let userRow = null;
+    if (pool) {
+      if (token) {
+        const tokenRes = await pool.query(
+          `SELECT id, first_name, last_name, phone_number, status, total_score 
+           FROM public.users 
+           WHERE auth_token = $1 LIMIT 1`,
+          [token]
+        );
+        if (tokenRes.rows.length > 0) userRow = tokenRes.rows[0];
+      }
+
+      if (!userRow && headerUserId) {
+        const userRes = await pool.query(
+          `SELECT id, first_name, last_name, phone_number, status, total_score, auth_token 
+           FROM public.users 
+           WHERE id = $1 LIMIT 1`,
+          [headerUserId]
+        );
+        if (userRes.rows.length > 0) {
+          userRow = userRes.rows[0];
+          if (token && userRow.auth_token !== token) {
+            await pool.query(`UPDATE public.users SET auth_token = $1 WHERE id = $2`, [token, userRow.id]);
+          }
+        }
+      }
+    }
+
+    if (!userRow) {
+      if (pool || process.env.NODE_ENV === 'production') {
+        return res.status(401).json({
+          success: false,
+          message: 'نشست کاربری شما نامعتبر یا منقضی شده است. لطفاً مجدداً وارد شوید.'
+        });
+      }
+      // Local dev test fallback only
+      req.user = { id: headerUserId || 'user_test_999', firstName: 'کاربر', lastName: 'تست' };
+      return next();
+    }
+
+    if (userRow.status && userRow.status !== 'active') {
+      return res.status(403).json({
+        success: false,
+        message: 'حساب کاربری شما مسدود یا غیرفعال است.'
+      });
+    }
+
+    req.user = {
+      id: userRow.id,
+      firstName: userRow.first_name || '',
+      lastName: userRow.last_name || '',
+      phoneNumber: userRow.phone_number || '',
+      totalScore: userRow.total_score || 0
+    };
+    next();
+  } catch (err) {
+    console.error('[Rewards requireUserAuth Error]', err);
+    return res.status(500).json({ success: false, message: 'خطا در اعتبارسنجی نشست کاربری.' });
+  }
 }
 
 // Router for rewards service
@@ -128,7 +217,7 @@ rewardsRouter.get('/', async (req, res) => {
       return res.json({ success: true, rewards: result.rows });
     }
 
-    // Memory Fallback
+    // Memory Fallback for preview/offline mode
     let items = memoryDb.rewards.filter(r => r.is_active && !r.deleted_at);
     if (category) {
       const catObj = memoryDb.categories.find(c => c.id === category || c.slug === category);
@@ -179,26 +268,31 @@ rewardsRouter.get('/:id', async (req, res) => {
   }
 });
 
-// 5. PUBLIC/USER: Submit Reward Claim Request
-rewardsRouter.post('/claim', async (req, res) => {
-  const userId = req.headers['x-user-id'] || req.body.user_id;
+// 5. USER: Submit Reward Claim Request (Strict Auth & PostgreSQL Transaction)
+rewardsRouter.post('/claim', requireUserAuth, async (req, res) => {
+  const userId = req.user.id; // Strictly taken from authenticated user session
   const { reward_id, recipient_name, phone, shipping_address } = req.body;
 
-  if (!userId) {
-    return res.status(401).json({ success: false, message: 'شناسه کاربر الزامی است' });
-  }
   if (!reward_id) {
     return res.status(400).json({ success: false, message: 'شناسه جایزه الزامی است' });
   }
 
-  const trackingCode = 'CLM-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+  // Strict DB Guard: Do NOT fallback to fake memory database for real user claim transactions
+  if (!pool) {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(503).json({
+        success: false,
+        message: 'اتصال به پایگاه داده ابری برقرار نیست. امکان ثبت درخواست جایزه در این لحظه وجود ندارد.'
+      });
+    }
+  }
 
   if (pool) {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
 
-      // Check User and User Score
+      // 1. Lock User Row & Verify Score
       const userRes = await client.query('SELECT total_score FROM public.users WHERE id = $1 FOR UPDATE', [userId]);
       if (userRes.rows.length === 0) {
         await client.query('ROLLBACK');
@@ -206,7 +300,7 @@ rewardsRouter.post('/claim', async (req, res) => {
       }
       const userScore = userRes.rows[0].total_score || 0;
 
-      // Check Reward and Stock
+      // 2. Lock Reward Row & Verify Stock
       const rewardRes = await client.query(
         'SELECT * FROM public.rewards WHERE id = $1 AND is_active = true AND deleted_at IS NULL FOR UPDATE',
         [reward_id]
@@ -230,7 +324,7 @@ rewardsRouter.post('/claim', async (req, res) => {
         });
       }
 
-      // Deduct User Points
+      // 3. Deduct User Points atomically in public.users & public.user_scores
       const newScore = userScore - reward.cost_points;
       await client.query('UPDATE public.users SET total_score = $1, updated_at = NOW() WHERE id = $2', [newScore, userId]);
       await client.query(
@@ -238,13 +332,14 @@ rewardsRouter.post('/claim', async (req, res) => {
         [userId, newScore]
       );
 
-      // Decrement Reward Stock
+      // 4. Decrement Stock
       await client.query(
         'UPDATE public.rewards SET stock_quantity = stock_quantity - 1, updated_at = NOW() WHERE id = $1',
         [reward_id]
       );
 
-      // Create Claim Record
+      // 5. Create Claim Record
+      const trackingCode = 'CLM-' + crypto.randomBytes(4).toString('hex').toUpperCase();
       const claimId = 'clm_' + Date.now() + '_' + Math.floor(Math.random()*1000);
       const claimRes = await client.query(`
         INSERT INTO public.reward_claims 
@@ -271,16 +366,13 @@ rewardsRouter.post('/claim', async (req, res) => {
     }
   }
 
-  // Memory Fallback
+  // Memory Fallback (Dev/Preview only)
   const reward = memoryDb.rewards.find(r => r.id === reward_id && r.is_active && !r.deleted_at);
-  if (!reward) {
-    return res.status(404).json({ success: false, message: 'جایزه موردنظر یافت نشد' });
-  }
-  if (reward.stock_quantity <= 0) {
-    return res.status(400).json({ success: false, message: 'موجودی جایزه تمام شده است' });
-  }
+  if (!reward) return res.status(404).json({ success: false, message: 'جایزه موردنظر یافت نشد' });
+  if (reward.stock_quantity <= 0) return res.status(400).json({ success: false, message: 'موجودی جایزه تمام شده است' });
   reward.stock_quantity -= 1;
 
+  const trackingCode = 'CLM-' + crypto.randomBytes(4).toString('hex').toUpperCase();
   const claim = {
     id: 'clm_' + Date.now(),
     tracking_code: trackingCode,
@@ -291,25 +383,29 @@ rewardsRouter.post('/claim', async (req, res) => {
     recipient_name: recipient_name || '',
     phone: phone || '',
     shipping_address: shipping_address || '',
-    admin_notes: '',
-    tracking_number: '',
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
+    created_at: new Date().toISOString()
   };
   memoryDb.claims.unshift(claim);
 
   return res.json({
     success: true,
-    message: 'درخواست دریافت جایزه با موفقیت ثبت گردید (حالت آفلاین/حافظه)',
+    message: 'درخواست دریافت جایزه با موفقیت ثبت گردید (حالت تست محلی)',
     tracking_code: trackingCode,
     claim
   });
 });
 
-// 6. PUBLIC/USER: View User Claims History
-rewardsRouter.get('/claims/user/:userId', async (req, res) => {
+// 6. USER: View User Claims History (Strict Auth)
+rewardsRouter.get('/claims/user/:userId', requireUserAuth, async (req, res) => {
   try {
-    const { userId } = req.params;
+    const authenticatedUserId = req.user.id;
+    const requestedUserId = req.params.userId === 'me' ? authenticatedUserId : req.params.userId;
+
+    // Security check: User can only view their own claims history
+    if (requestedUserId !== authenticatedUserId && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'دسترسی غیرمجاز به سوابق سایر کاربران.' });
+    }
+
     if (pool) {
       const result = await pool.query(`
         SELECT c.*, r.title as reward_title, r.image_url as reward_image
@@ -317,11 +413,11 @@ rewardsRouter.get('/claims/user/:userId', async (req, res) => {
         LEFT JOIN public.rewards r ON c.reward_id = r.id
         WHERE c.user_id = $1
         ORDER BY c.created_at DESC
-      `, [userId]);
+      `, [requestedUserId]);
       return res.json({ success: true, claims: result.rows });
     }
 
-    const userClaims = memoryDb.claims.filter(c => c.user_id === userId);
+    const userClaims = memoryDb.claims.filter(c => c.user_id === requestedUserId);
     return res.json({ success: true, claims: userClaims });
   } catch (err) {
     console.error('Error fetching user claims:', err);
@@ -333,7 +429,7 @@ rewardsRouter.get('/claims/user/:userId', async (req, res) => {
 // ADMIN ENDPOINTS
 // ==========================================
 
-// 7. ADMIN: Get All Rewards (CRUD list)
+// 7. ADMIN: Get All Rewards
 rewardsRouter.get('/admin/rewards', requireAdminAuth, async (req, res) => {
   try {
     if (pool) {
@@ -359,6 +455,10 @@ rewardsRouter.post('/admin/rewards', requireAdminAuth, async (req, res) => {
     const { title, description, category_id, cost_points, stock_quantity, image_url, is_featured, is_active, sort_order } = req.body;
     if (!title || cost_points === undefined) {
       return res.status(400).json({ success: false, message: 'عنوان جایزه و مقدار امتیاز الزامی هستند' });
+    }
+
+    if (!pool && process.env.NODE_ENV === 'production') {
+      return res.status(503).json({ success: false, message: 'اتصال به دیتابیس برقرار نیست.' });
     }
 
     const id = 'rew_' + Date.now() + '_' + Math.floor(Math.random()*1000);
@@ -398,7 +498,7 @@ rewardsRouter.post('/admin/rewards', requireAdminAuth, async (req, res) => {
       created_at: new Date().toISOString()
     };
     memoryDb.rewards.push(newReward);
-    return res.json({ success: true, message: 'جایزه با موفقیت ایجاد شد', reward: newReward });
+    return res.json({ success: true, message: 'جایزه با موفقیت ایجاد شد (تست محلی)', reward: newReward });
   } catch (err) {
     console.error('Error creating reward:', err);
     return res.status(500).json({ success: false, message: 'خطا در ساخت جایزه جدید' });
@@ -410,6 +510,10 @@ rewardsRouter.put('/admin/rewards/:id', requireAdminAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const { title, description, category_id, cost_points, stock_quantity, image_url, is_featured, is_active, sort_order } = req.body;
+
+    if (!pool && process.env.NODE_ENV === 'production') {
+      return res.status(503).json({ success: false, message: 'اتصال به دیتابیس برقرار نیست.' });
+    }
 
     if (pool) {
       const result = await pool.query(`
@@ -469,6 +573,10 @@ rewardsRouter.put('/admin/rewards/:id', requireAdminAuth, async (req, res) => {
 rewardsRouter.delete('/admin/rewards/:id', requireAdminAuth, async (req, res) => {
   try {
     const { id } = req.params;
+    if (!pool && process.env.NODE_ENV === 'production') {
+      return res.status(503).json({ success: false, message: 'اتصال به دیتابیس برقرار نیست.' });
+    }
+
     if (pool) {
       await pool.query('UPDATE public.rewards SET deleted_at = NOW(), is_active = false WHERE id = $1', [id]);
       return res.json({ success: true, message: 'جایزه با موفقیت حذف گردید' });
@@ -500,6 +608,10 @@ rewardsRouter.post('/admin/categories', requireAdminAuth, async (req, res) => {
     const { name, slug, icon, sort_order, is_active } = req.body;
     if (!name) return res.status(400).json({ success: false, message: 'نام دسته‌بندی الزامی است' });
 
+    if (!pool && process.env.NODE_ENV === 'production') {
+      return res.status(503).json({ success: false, message: 'اتصال به دیتابیس برقرار نیست.' });
+    }
+
     const id = 'cat_' + Date.now();
     const finalSlug = slug || name.toLowerCase().replace(/\s+/g, '-');
 
@@ -525,6 +637,10 @@ rewardsRouter.post('/admin/categories', requireAdminAuth, async (req, res) => {
 rewardsRouter.post('/admin/appearance', requireAdminAuth, async (req, res) => {
   try {
     const { hero_title, hero_subtitle, hero_banner_url, primary_color, active_sections, terms_text } = req.body;
+
+    if (!pool && process.env.NODE_ENV === 'production') {
+      return res.status(503).json({ success: false, message: 'اتصال به دیتابیس برقرار نیست.' });
+    }
 
     if (pool) {
       const result = await pool.query(`
@@ -602,6 +718,10 @@ rewardsRouter.patch('/admin/claims/:id', requireAdminAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const { status, admin_notes, tracking_number } = req.body;
+
+    if (!pool && process.env.NODE_ENV === 'production') {
+      return res.status(503).json({ success: false, message: 'اتصال به دیتابیس برقرار نیست.' });
+    }
 
     if (pool) {
       const result = await pool.query(`

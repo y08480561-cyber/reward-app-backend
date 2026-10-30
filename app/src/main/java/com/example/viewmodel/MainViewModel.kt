@@ -119,7 +119,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (screen == AppScreen.LEADERBOARD) {
             loadLeaderboard()
         } else if (screen == AppScreen.PRIZES) {
-            loadPrizes()
+            loadRewardsData()
         } else if (screen == AppScreen.MEMBERSHIP) {
             loadMembershipData()
         } else if (screen == AppScreen.SQUARES || screen == AppScreen.HOME) {
@@ -179,9 +179,92 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun loadPrizes() {
-        val prizes = backendRepository.getPrizes()
-        _uiState.update { it.copy(prizes = prizes) }
+    fun loadRewardsData(categorySlug: String? = null) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRewardsLoading = true, rewardsErrorMessage = null, selectedCategorySlug = categorySlug) }
+
+            // 1. Fetch Categories
+            val catRes = backendRepository.fetchRewardCategories()
+            val categories = if (catRes is Result.Success) catRes.data else emptyList()
+
+            // 2. Fetch Appearance
+            val appRes = backendRepository.fetchRewardAppearance()
+            val appearance = if (appRes is Result.Success) appRes.data else com.example.model.RewardAppearanceConfig()
+
+            // 3. Fetch Rewards List
+            val rewardsRes = backendRepository.fetchRewards(categorySlug = categorySlug)
+
+            // 4. Fetch User Claims History
+            val user = _uiState.value.currentUser
+            var claimsHistory = emptyList<com.example.model.RewardClaimRecord>()
+            if (user != null && user.id.isNotBlank()) {
+                val claimsRes = backendRepository.fetchUserClaimsHistory(user.id)
+                if (claimsRes is Result.Success) {
+                    claimsHistory = claimsRes.data
+                }
+            }
+
+            if (rewardsRes is Result.Success) {
+                _uiState.update {
+                    it.copy(
+                        rewardCategories = categories,
+                        rewardAppearance = appearance,
+                        rewardItems = rewardsRes.data,
+                        userClaimsHistory = claimsHistory,
+                        isRewardsLoading = false
+                    )
+                }
+            } else {
+                val err = (rewardsRes as? Result.Error)?.message ?: "خطا در دریافت ویترین جوایز"
+                _uiState.update {
+                    it.copy(
+                        rewardCategories = categories,
+                        rewardAppearance = appearance,
+                        userClaimsHistory = claimsHistory,
+                        isRewardsLoading = false,
+                        rewardsErrorMessage = err
+                    )
+                }
+            }
+        }
+    }
+
+    fun submitRewardClaim(
+        rewardId: String,
+        recipientName: String,
+        phone: String,
+        address: String,
+        onSuccess: () -> Unit
+    ) {
+        val user = _uiState.value.currentUser ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(claimingRewardId = rewardId, rewardsErrorMessage = null) }
+            when (val result = backendRepository.submitRewardClaim(rewardId, recipientName, phone, address)) {
+                is Result.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            claimingRewardId = null,
+                            claimSuccessMessage = "درخواست شما با کد پیگیری ${result.data.trackingCode} ثبت شد."
+                        )
+                    }
+                    loadRewardsData(_uiState.value.selectedCategorySlug)
+                    refreshData()
+                    onSuccess()
+                }
+                is Result.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            claimingRewardId = null,
+                            rewardsErrorMessage = result.message
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun clearRewardsMessages() {
+        _uiState.update { it.copy(rewardsErrorMessage = null, claimSuccessMessage = null) }
     }
 
     /**

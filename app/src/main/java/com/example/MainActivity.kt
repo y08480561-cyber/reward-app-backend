@@ -107,7 +107,11 @@ class MainActivity : ComponentActivity() {
                                 )
                             }
                             AppScreen.PRIZES -> {
-                                PrizesScreen(prizes = viewModel.backendRepository.getPrizes())
+                                PrizesScreen(
+                                    viewModel = viewModel,
+                                    uiState = uiState,
+                                    onBack = { viewModel.navigateTo(AppScreen.HOME) }
+                                )
                             }
                             AppScreen.PROFILE -> {
                                 uiState.currentUser?.let { user ->

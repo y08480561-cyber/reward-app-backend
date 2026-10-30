@@ -67,6 +67,16 @@ data class MainUiState(
     val isSupportLoading: Boolean = false,
     val isSendingTicketMessage: Boolean = false,
     val supportErrorMessage: String? = null,
-    val supportSuccessMessage: String? = null
+    val supportSuccessMessage: String? = null,
+    // Rewards Service State
+    val rewardCategories: List<com.example.model.RewardCategoryItem> = emptyList(),
+    val rewardAppearance: com.example.model.RewardAppearanceConfig = com.example.model.RewardAppearanceConfig(),
+    val rewardItems: List<com.example.model.RewardItem> = emptyList(),
+    val userClaimsHistory: List<com.example.model.RewardClaimRecord> = emptyList(),
+    val selectedCategorySlug: String? = null,
+    val isRewardsLoading: Boolean = false,
+    val rewardsErrorMessage: String? = null,
+    val claimSuccessMessage: String? = null,
+    val claimingRewardId: String? = null
 )
 
