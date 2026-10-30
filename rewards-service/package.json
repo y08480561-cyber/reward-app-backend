@@ -1,7 +1,7 @@
 {
   "name": "rewards-service",
   "version": "1.0.0",
-  "description": "Independent Microservice for Prizes and Rewards in 'Reqabat Kon, Jayeze Bor'",
+  "private": true,
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
