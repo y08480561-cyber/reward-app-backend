@@ -77,8 +77,25 @@ class PreferencesManager(context: Context) {
         set(value) = prefs.edit().putString(KEY_TAPSELL_ZONE, value).apply()
 
     var serverUrl: String
-        get() = prefs.getString(KEY_SERVER_URL, DEFAULT_SERVER_URL) ?: DEFAULT_SERVER_URL
-        set(value) = prefs.edit().putString(KEY_SERVER_URL, value).apply()
+        get() {
+            var raw = prefs.getString(KEY_SERVER_URL, DEFAULT_SERVER_URL) ?: DEFAULT_SERVER_URL
+            if (raw.isBlank() || raw.contains("localhost") || raw.contains("10.0.2.2") || raw.contains("ais-dev") || raw.contains("ais-pre") || !raw.startsWith("http")) {
+                raw = DEFAULT_SERVER_URL
+                prefs.edit().putString(KEY_SERVER_URL, raw).apply()
+            }
+            var clean = raw.trimEnd('/')
+            if (clean.endsWith("/api")) {
+                clean = clean.substringBeforeLast("/api").trimEnd('/')
+            }
+            return clean
+        }
+        set(value) {
+            var clean = value.trimEnd('/')
+            if (clean.endsWith("/api")) {
+                clean = clean.substringBeforeLast("/api").trimEnd('/')
+            }
+            prefs.edit().putString(KEY_SERVER_URL, clean).apply()
+        }
 
     var adminPin: String
         get() = prefs.getString(KEY_ADMIN_PIN, DEFAULT_ADMIN_PIN) ?: DEFAULT_ADMIN_PIN

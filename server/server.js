@@ -18,8 +18,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 try {
   const rewardsModule = require(path.join(__dirname, '../rewards-service/server.js'));
   if (rewardsModule && rewardsModule.rewardsRouter) {
-    app.use('/api/rewards', rewardsModule.rewardsRouter);
-    console.log('[Rewards Microservice] Successfully mounted /api/rewards routes.');
+    app.use(['/api/rewards', '/api/prizes'], rewardsModule.rewardsRouter);
+    console.log('[Rewards Microservice] Successfully mounted /api/rewards and /api/prizes routes.');
   }
 } catch (e) {
   console.error('[Rewards Microservice Mount Warning]', e.message);
