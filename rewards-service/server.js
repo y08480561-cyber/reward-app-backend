@@ -758,6 +758,11 @@ rewardsRouter.patch('/admin/claims/:id', requireAdminAuth, async (req, res) => {
 // Mount router under /api/rewards
 app.use('/api/rewards', rewardsRouter);
 
+// 404 Fallback for /api/rewards
+app.use('/api/rewards', (req, res) => {
+  res.status(404).json({ success: false, message: `مسیر مورد نظر یافت نشد: ${req.originalUrl}` });
+});
+
 // Standalone Server listening
 if (require.main === module) {
   app.listen(PORT, () => {

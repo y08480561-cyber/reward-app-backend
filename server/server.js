@@ -3244,10 +3244,15 @@ app.post('/api/admin/push-notification', requireAdminAuth, async (req, res) => {
   }
 });
 
+// 404 Fallback for API Routes (Always return JSON for /api/*, never HTML)
+app.use('/api', (req, res) => {
+  res.status(404).json({ success: false, error: `مسیر مورد نظر یافت نشد: ${req.originalUrl}` });
+});
+
 // Global Error Handler
 app.use((err, req, res, next) => {
   console.error('[Global Error]', err);
-  res.status(500).json({ error: 'خطای داخلی سرور رخ داد.' });
+  res.status(500).json({ success: false, error: 'خطای داخلی سرور رخ داد.' });
 });
 
 // Startup Server with PostgreSQL Verification
