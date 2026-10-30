@@ -393,8 +393,11 @@ rewardsRouter.patch('/admin/claims/:id', requireAdminAuth, async (req, res) => {
     }
     const oldClaim = claimRes.rows[0];
 
-    // 2. Handle Rejection Refund (if transitioning TO rejected from non-rejected)
-    if (status === 'REJECTED' && oldClaim.status !== 'REJECTED') {
+    // 2. Handle Rejection Refund (if transitioning TO rejected from a non-rejected state)
+    const normalizedOldStatus = (oldClaim.status || '').toUpperCase();
+    const normalizedNewStatus = (status || '').toUpperCase();
+
+    if (normalizedNewStatus === 'REJECTED' && normalizedOldStatus !== 'REJECTED') {
       // Return points to user
       await client.query('UPDATE public.user_scores SET total_score = total_score + $1, updated_at = NOW() WHERE user_id = $2', [oldClaim.cost_points, oldClaim.user_id]);
       await client.query('UPDATE public.users SET total_score = total_score + $1, updated_at = NOW() WHERE id = $2', [oldClaim.cost_points, oldClaim.user_id]);
