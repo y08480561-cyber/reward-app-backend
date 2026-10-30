@@ -652,6 +652,30 @@ async function initDatabaseTables() {
     console.warn('[PostgreSQL Init Reward Appearance Warning]', err.message);
   }
 
+  // 26. Ensure default rewards exist
+  try {
+    const rewCheck = await pool.query(`SELECT id FROM public.rewards LIMIT 1`);
+    if (rewCheck.rows.length === 0) {
+      const defaultRewards = [
+        ['rew_irancell_10k', 'کارت شارژ ۱۰ هزار تومانی ایرانسل', 'کد شارژ مستقیم ۱۰,۰۰۰ تومانی برای سیم‌کارت‌های اعتباری ایرانسل ارسال از طریق پیامک.', 'cat_recharge', 100, 50, 'https://images.unsplash.com/photo-1556742049-0a67568d0d9f?w=600&q=80', true, 1],
+        ['rew_mci_10k', 'کارت شارژ ۱۰ هزار تومانی همراه اول', 'کد شارژ مستقیم ۱۰,۰۰۰ تومانی برای سیم‌کارت‌های اعتباری همراه اول.', 'cat_recharge', 100, 50, 'https://images.unsplash.com/photo-1556742049-0a67568d0d9f?w=600&q=80', false, 2],
+        ['rew_irancell_net_5gb', 'بسته اینترنت ۵ گیگابایت یک‌ماهه', 'فعالسازی مستقیم بسته اینترنت ۵ گیگابایت یک‌ماهه بر روی شماره ایرانسل ثبت‌شده شما.', 'cat_internet', 250, 30, 'https://images.unsplash.com/photo-1544717297-fa95b6ee9643?w=600&q=80', true, 3],
+        ['rew_cash_50k', 'جایزه نقدی ۵۰,۰۰۰ تومانی', 'واریز پایا مستقیم به کارت بانکی متصل به شماره همراه شما.', 'cat_cash', 500, 20, 'https://images.unsplash.com/photo-1580519542036-c47de6196ba5?w=600&q=80', true, 4]
+      ];
+      for (const r of defaultRewards) {
+        await pool.query(
+          `INSERT INTO public.rewards (id, title, description, category_id, cost_points, stock_quantity, image_url, is_featured, sort_order)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+           ON CONFLICT DO NOTHING`,
+          r
+        );
+      }
+      console.log('[PostgreSQL] Initial default rewards seeded.');
+    }
+  } catch (err) {
+    console.warn('[PostgreSQL Init Rewards Warning]', err.message);
+  }
+
   console.log('[PostgreSQL] Database tables and schema verified/initialized.');
 }
 
