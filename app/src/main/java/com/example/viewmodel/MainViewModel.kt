@@ -40,6 +40,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var countdownJob: Job? = null
     private var otpTimerJob: Job? = null
 
+    var isTickerEnabled: Boolean = true
+        set(value) {
+            field = value
+            if (!value) {
+                countdownJob?.cancel()
+            } else if (countdownJob?.isActive != true) {
+                startCycleCountdownTicker()
+            }
+        }
+
     init {
         checkSavedSession()
         observeTapsellAdState()
@@ -274,9 +284,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * Continuous 1-second ticker to update 24-hour cycle countdown and handle auto-resets
      */
     private fun startCycleCountdownTicker() {
+        if (!isTickerEnabled) return
         countdownJob?.cancel()
         countdownJob = viewModelScope.launch {
-            while (isActive) {
+            while (isActive && isTickerEnabled) {
                 delay(1000)
                 val cycle = _uiState.value.dailyCycle
                 if (cycle != null) {

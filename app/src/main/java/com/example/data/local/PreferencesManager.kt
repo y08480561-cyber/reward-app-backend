@@ -82,7 +82,7 @@ class PreferencesManager(context: Context) {
     var serverUrl: String
         get() {
             var raw = prefs.getString(KEY_SERVER_URL, DEFAULT_SERVER_URL) ?: DEFAULT_SERVER_URL
-            if (raw.isBlank() || raw.contains("localhost") || raw.contains("10.0.2.2") || raw.contains("ais-dev") || raw.contains("ais-pre") || !raw.startsWith("http")) {
+            if (raw.isBlank() || !raw.startsWith("http")) {
                 raw = DEFAULT_SERVER_URL
                 prefs.edit().putString(KEY_SERVER_URL, raw).apply()
             }
@@ -155,6 +155,8 @@ class PreferencesManager(context: Context) {
             .putString(KEY_PHONE, "")
             .putString(KEY_AUTH_TOKEN, "")
             .putInt(KEY_TOTAL_SCORE, 0)
+            .putBoolean(KEY_FEEDBACK_SHOWN, false)
+            .putBoolean(KEY_FEEDBACK_REWARDED, false)
             .putString("panel_type", "free")
             .putInt("multiplier", 1)
             .apply()

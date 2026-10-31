@@ -159,7 +159,8 @@ object NetworkClientProvider {
             .connectionSpecs(
                 listOf(
                     ConnectionSpec.MODERN_TLS,
-                    ConnectionSpec.COMPATIBLE_TLS
+                    ConnectionSpec.COMPATIBLE_TLS,
+                    ConnectionSpec.CLEARTEXT
                 )
             )
             // Support HTTP/2 with transparent HTTP/1.1 fallback
