@@ -15,7 +15,8 @@ enum class AppScreen {
     PRIZES,
     PROFILE,
     MEMBERSHIP,
-    SUPPORT
+    SUPPORT,
+    STORE
 }
 
 enum class AuthMode {
@@ -77,6 +78,15 @@ data class MainUiState(
     val isRewardsLoading: Boolean = false,
     val rewardsErrorMessage: String? = null,
     val claimSuccessMessage: String? = null,
-    val claimingRewardId: String? = null
+    val claimingRewardId: String? = null,
+    // Store State
+    val storeProducts: List<com.example.model.StoreProduct> = emptyList(),
+    val userEntitlements: com.example.model.UserEntitlements = com.example.model.UserEntitlements(),
+    val isStoreLoading: Boolean = false,
+    val storeErrorMessage: String? = null,
+    // Feedback State
+    val showFeedbackDialog: Boolean = false,
+    val isSubmittingFeedback: Boolean = false,
+    val feedbackSuccessMessage: String? = null
 )
 

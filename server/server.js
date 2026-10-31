@@ -3390,7 +3390,86 @@ app.post('/api/admin/push-notification', requireAdminAuth, async (req, res) => {
   }
 });
 
-// 404 Fallback for API Routes (Always return JSON for /api/*, never HTML)
+// ====================================================================
+// 11. User Feedback & Reward System (Internal Feedback for Points)
+// ====================================================================
+app.post('/api/user/feedback', requireUserAuth, ensureDatabaseReady, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const userId = req.user.id;
+    const { rating, comment } = req.body;
+
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ error: "امتیاز وارد شده باید بین ۱ تا ۵ باشد." });
+    }
+
+    const REWARD_POINTS = 2;
+
+    // 1. Start atomic transaction
+    await client.query('BEGIN');
+
+    // 2. Conditional check and update to prevent race conditions
+    const updateRes = await client.query(
+      `UPDATE public.users 
+       SET feedback_reward_claimed = true, 
+           total_score = total_score + $1, 
+           updated_at = NOW() 
+       WHERE id = $2 AND feedback_reward_claimed = false
+       RETURNING total_score`,
+      [REWARD_POINTS, userId]
+    );
+
+    if (updateRes.rows.length === 0) {
+      // Either user doesn't exist or already claimed
+      await client.query('ROLLBACK');
+      const checkAgain = await client.query(`SELECT id, feedback_reward_claimed FROM public.users WHERE id = $1`, [userId]);
+      if (checkAgain.rows.length === 0) {
+        return res.status(404).json({ error: "کاربر یافت نشد." });
+      } else {
+        return res.status(409).json({ error: "پاداش بازخورد قبلاً توسط شما دریافت شده است." });
+      }
+    }
+
+    const newScoreUsers = Number(updateRes.rows[0].total_score);
+
+    // 3. Insert feedback record
+    await client.query(
+      `INSERT INTO public.user_feedback (user_id, rating, comment, created_at)
+       VALUES ($1, $2, $3, NOW())`,
+      [userId, rating, comment || null]
+    );
+
+    // 4. Atomic increment in user_scores table (primary score source)
+    const scoreUpdate = await client.query(
+      `INSERT INTO public.user_scores (user_id, total_score, updated_at)
+       VALUES ($1, $2, NOW())
+       ON CONFLICT (user_id) 
+       DO UPDATE SET total_score = public.user_scores.total_score + $3, updated_at = NOW()
+       RETURNING total_score`,
+      [userId, REWARD_POINTS, REWARD_POINTS]
+    );
+
+    const finalScore = Number(scoreUpdate.rows[0].total_score);
+
+    await client.query('COMMIT');
+
+    return res.json({
+      success: true,
+      message: "بازخورد شما با موفقیت ثبت شد و ۲ امتیاز هدیه دریافت کردید.",
+      awardedPoints: REWARD_POINTS,
+      newTotalScore: finalScore
+    });
+
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[User Feedback API Error]', err);
+    return res.status(500).json({ error: "خطا در ثبت بازخورد و پرداخت پاداش در پایگاه داده." });
+  } finally {
+    client.release();
+  }
+});
+
+// 404 Fallback for API Routes
 app.use('/api', (req, res) => {
   res.status(404).json({ success: false, error: `مسیر مورد نظر یافت نشد: ${req.originalUrl}` });
 });

@@ -1468,4 +1468,139 @@ class BackendRepository(
             Result.Error("خطا در ارتباط با سرور: ${e.message}")
         }
     }
+
+    suspend fun fetchStoreProducts(): Result<List<com.example.model.StoreProduct>> = withContext(Dispatchers.IO) {
+        val url = "${prefs.serverUrl.trimEnd('/')}/api/store/products"
+        try {
+            val request = Request.Builder().url(url).get().build()
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (response.isSuccessful) {
+                    val json = JSONObject(body)
+                    val array = json.optJSONArray("products") ?: org.json.JSONArray()
+                    val list = mutableListOf<com.example.model.StoreProduct>()
+                    for (i in 0 until array.length()) {
+                        val item = array.getJSONObject(i)
+                        list.add(
+                            com.example.model.StoreProduct(
+                                id = item.optString("id"),
+                                title = item.optString("title"),
+                                description = item.optString("description"),
+                                productType = item.optString("productType"),
+                                unitsGranted = item.optInt("unitsGranted"),
+                                priceToman = item.optLong("priceToman"),
+                                myketSku = item.optString("myketSku"),
+                                badge = item.optString("badge"),
+                                isActive = item.optBoolean("isActive", true),
+                                isReadyInMyket = item.optBoolean("isReadyInMyket", false),
+                                sortOrder = item.optInt("sortOrder")
+                            )
+                        )
+                    }
+                    Result.Success(list)
+                } else {
+                    Result.Error("خطا در دریافت لیست محصولات فروشگاه")
+                }
+            }
+        } catch (e: Exception) {
+            Result.Error("خطای شبکه در دریافت محصولات: ${e.message}")
+        }
+    }
+
+    suspend fun fetchUserEntitlements(userId: String): Result<com.example.model.UserEntitlements> = withContext(Dispatchers.IO) {
+        val url = "${prefs.serverUrl.trimEnd('/')}/api/store/user-entitlements?userId=$userId"
+        try {
+            val request = Request.Builder()
+                .url(url)
+                .header("x-user-id", userId)
+                .get()
+                .build()
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (response.isSuccessful) {
+                    val json = JSONObject(body)
+                    val entObj = json.optJSONObject("entitlements")
+                    if (entObj != null) {
+                        Result.Success(
+                            com.example.model.UserEntitlements(
+                                instantUnlockCredits = entObj.optInt("instantUnlockCredits"),
+                                isVip = entObj.optBoolean("isVip"),
+                                totalPurchasedToman = entObj.optLong("totalPurchasedToman")
+                            )
+                        )
+                    } else {
+                        Result.Success(com.example.model.UserEntitlements())
+                    }
+                } else {
+                    Result.Error("خطا در دریافت سهمیه‌های کاربر")
+                }
+            }
+        } catch (e: Exception) {
+            Result.Error("خطای شبکه در دریافت سهمیه‌ها: ${e.message}")
+        }
+    }
+
+    suspend fun verifyStorePurchase(
+        userId: String,
+        productId: String,
+        purchaseToken: String,
+        orderId: String? = null
+    ): Result<JSONObject> = withContext(Dispatchers.IO) {
+        val url = "${prefs.serverUrl.trimEnd('/')}/api/store/verify-purchase"
+        val payload = JSONObject().apply {
+            put("userId", userId)
+            put("productId", productId)
+            put("purchaseToken", purchaseToken)
+            if (orderId != null) put("orderId", orderId)
+        }
+        try {
+            val request = Request.Builder()
+                .url(url)
+                .header("x-user-id", userId)
+                .header("Content-Type", "application/json")
+                .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+                .build()
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (response.isSuccessful) {
+                    val json = JSONObject(body)
+                    Result.Success(json)
+                } else {
+                    val errJson = try { JSONObject(body) } catch (e: Exception) { null }
+                    Result.Error(errJson?.optString("error") ?: "خطا در تایید خرید از فروشگاه")
+                }
+            }
+        } catch (e: Exception) {
+            Result.Error("خطای شبکه در تایید خرید فروشگاه: ${e.message}")
+        }
+    }
+
+    suspend fun submitFeedback(rating: Int, comment: String): Result<JSONObject> = withContext(Dispatchers.IO) {
+        val url = "${prefs.serverUrl.trimEnd('/')}/api/user/feedback"
+        val payload = JSONObject().apply {
+            put("rating", rating)
+            put("comment", comment)
+        }
+        try {
+            val request = Request.Builder()
+                .url(url)
+                .header("x-user-id", prefs.userId)
+                .header("x-auth-token", prefs.authToken)
+                .header("Content-Type", "application/json")
+                .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+                .build()
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (response.isSuccessful) {
+                    val json = JSONObject(body)
+                    Result.Success(json)
+                } else {
+                    val errJson = try { JSONObject(body) } catch (e: Exception) { null }
+                    Result.Error(errJson?.optString("error") ?: "خطا در ثبت بازخورد")
+                }
+            }
+        } catch (e: Exception) {
+            Result.Error("خطای شبکه در ثبت بازخورد: ${e.message}")
+        }
+    }
 }

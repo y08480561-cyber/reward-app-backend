@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -69,7 +70,7 @@ fun ProfileScreen(
     user: User,
     activeCompetition: com.example.model.CompetitionInfo? = null,
     onLogout: () -> Unit,
-    onNavigateToMembership: () -> Unit,
+    onNavigateToStore: () -> Unit,
     onNavigateToSupport: () -> Unit = {},
     onToggleNotifications: (Boolean) -> Unit
 ) {
@@ -175,14 +176,14 @@ fun ProfileScreen(
             }
         }
 
-        // Membership Management Banner Button
+        // Store & Upgrade Banner Button
         Button(
-            onClick = onNavigateToMembership,
+            onClick = onNavigateToStore,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(54.dp)
                 .shadow(4.dp, RoundedCornerShape(16.dp))
-                .testTag("btn_goto_membership"),
+                .testTag("btn_goto_store"),
             shape = RoundedCornerShape(16.dp),
             colors = ButtonDefaults.buttonColors(containerColor = GoldAccent)
         ) {
@@ -193,14 +194,14 @@ fun ProfileScreen(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        imageVector = Icons.Default.Star,
+                        imageVector = Icons.Default.Storefront,
                         contentDescription = null,
                         tint = NavyPrimary,
                         modifier = Modifier.size(22.dp)
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "پنل‌های عضویت و ارتقای ضریب امتیاز",
+                        text = "فروشگاه، ارتقای حساب و بازگشایی آنی",
                         color = NavyPrimary,
                         fontWeight = FontWeight.ExtraBold,
                         fontSize = 14.sp

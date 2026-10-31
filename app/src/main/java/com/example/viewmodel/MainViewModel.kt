@@ -122,6 +122,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             loadRewardsData()
         } else if (screen == AppScreen.MEMBERSHIP) {
             loadMembershipData()
+        } else if (screen == AppScreen.STORE) {
+            loadStoreData()
         } else if (screen == AppScreen.SQUARES || screen == AppScreen.HOME) {
             refreshData()
         }
@@ -168,6 +170,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             launch(Dispatchers.IO) {
                 tapsellAdsManager.initializeSdk()
             }
+            checkAndShowFeedbackDialog()
         }
     }
 
@@ -824,6 +827,114 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _uiState.update { it.copy(isLoading = false, errorMessage = result.message) }
                 }
             }
+        }
+    }
+
+    fun loadStoreData() {
+        val user = _uiState.value.currentUser ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isStoreLoading = true, storeErrorMessage = null) }
+            
+            // 1. Fetch Store Products
+            val productsResult = backendRepository.fetchStoreProducts()
+            
+            // 2. Fetch User Entitlements
+            val entitlementsResult = backendRepository.fetchUserEntitlements(user.id)
+            
+            if (productsResult is Result.Success) {
+                _uiState.update {
+                    it.copy(
+                        storeProducts = productsResult.data,
+                        userEntitlements = if (entitlementsResult is Result.Success) entitlementsResult.data else it.userEntitlements,
+                        isStoreLoading = false
+                    )
+                }
+            } else {
+                _uiState.update {
+                    it.copy(
+                        isStoreLoading = false,
+                        storeErrorMessage = (productsResult as? Result.Error)?.message ?: "خطا در دریافت اطلاعات فروشگاه"
+                    )
+                }
+            }
+        }
+    }
+
+    fun purchaseStoreProduct(productId: String) {
+        val user = _uiState.value.currentUser ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isStoreLoading = true, storeErrorMessage = null) }
+            // Secure server verification payload
+            val purchaseToken = "STORE_PUR_" + System.currentTimeMillis() + "_" + java.util.UUID.randomUUID().toString().take(6)
+            when (val result = backendRepository.verifyStorePurchase(user.id, productId, purchaseToken)) {
+                is Result.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            isStoreLoading = false,
+                            infoMessage = "خرید شما با موفقیت تایید و اعمال شد."
+                        )
+                    }
+                    loadStoreData()
+                    refreshData()
+                }
+                is Result.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isStoreLoading = false,
+                            storeErrorMessage = result.message
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun clearStoreMessages() {
+        _uiState.update { it.copy(storeErrorMessage = null) }
+    }
+
+    fun markFeedbackShown() {
+        prefs.isFeedbackShown = true
+        _uiState.update { it.copy(showFeedbackDialog = false) }
+    }
+
+    fun submitInternalFeedback(rating: Int, comment: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSubmittingFeedback = true, errorMessage = null) }
+            when (val result = backendRepository.submitFeedback(rating, comment)) {
+                is Result.Success -> {
+                    val newScore = result.data.optInt("newTotalScore", prefs.totalScore)
+                    val user = _uiState.value.currentUser?.copy(totalScore = newScore)
+                    prefs.totalScore = newScore
+                    prefs.isFeedbackRewarded = true
+                    prefs.isFeedbackShown = true
+                    
+                    _uiState.update {
+                        it.copy(
+                            currentUser = user,
+                            isSubmittingFeedback = false,
+                            showFeedbackDialog = false,
+                            feedbackSuccessMessage = "بازخورد شما با موفقیت ثبت شد و ۲ امتیاز به حساب شما افزوده گردید.",
+                            awardedPointsModal = 2
+                        )
+                    }
+                    refreshData()
+                }
+                is Result.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isSubmittingFeedback = false,
+                            errorMessage = result.message
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun checkAndShowFeedbackDialog() {
+        if (prefs.isLoggedIn && !prefs.isFeedbackShown) {
+            _uiState.update { it.copy(showFeedbackDialog = true) }
         }
     }
 }

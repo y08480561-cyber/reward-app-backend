@@ -285,8 +285,29 @@ data class RewardClaimRecord(
     val trackingNumber: String = "",
     val adminNotes: String = "",
     val createdAt: String = ""
+)/**
+ * Dynamic store package for instant square unlocking and VIP status
+ */
+data class StoreProduct(
+    val id: String,
+    val title: String,
+    val description: String,
+    val productType: String, // "SQUARE_UNLOCK" or "ACCOUNT_UPGRADE"
+    val unitsGranted: Int,
+    val priceToman: Long,
+    val myketSku: String,
+    val badge: String = "",
+    val isActive: Boolean = true,
+    val isReadyInMyket: Boolean = false,
+    val sortOrder: Int = 0
 )
 
-
-
+/**
+ * User persistent store assets (credits and VIP status)
+ */
+data class UserEntitlements(
+    val instantUnlockCredits: Int = 0,
+    val isVip: Boolean = false,
+    val totalPurchasedToman: Long = 0
+)
 

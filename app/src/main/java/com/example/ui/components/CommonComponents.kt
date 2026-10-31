@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -26,8 +27,12 @@ import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Launch
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.Storefront
+import androidx.compose.material.icons.filled.SupportAgent
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -36,9 +41,30 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -171,46 +197,226 @@ fun AppBottomNavigation(
     currentScreen: AppScreen,
     onScreenSelected: (AppScreen) -> Unit
 ) {
-    NavigationBar(
-        containerColor = CardSurface,
-        tonalElevation = 8.dp,
-        modifier = Modifier.border(1.dp, Color(0xFFE2E8F0))
-    ) {
-        val items = listOf(
-            Triple(AppScreen.SQUARES, "۱۰۰ مربع", Icons.Default.GridView),
-            Triple(AppScreen.LEADERBOARD, "رتبه‌بندی", Icons.Default.EmojiEvents),
-            Triple(AppScreen.PRIZES, "جوایز", Icons.Default.CardGiftcard),
-            Triple(AppScreen.PROFILE, "پروفایل", Icons.Default.Person)
-        )
+    val leftItems = listOf(
+        Triple(AppScreen.PROFILE, "پروفایل", Icons.Default.Person),
+        Triple(AppScreen.STORE, "فروشگاه", Icons.Default.Storefront)
+    )
+    val rightItems = listOf(
+        Triple(AppScreen.PRIZES, "جوایز", Icons.Default.CardGiftcard),
+        Triple(AppScreen.LEADERBOARD, "رتبه‌بندی", Icons.Default.EmojiEvents)
+    )
 
-        items.forEach { (screen, label, icon) ->
-            val selected = currentScreen == screen
-            NavigationBarItem(
-                selected = selected,
-                onClick = { onScreenSelected(screen) },
-                icon = {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = label,
-                        modifier = Modifier.size(24.dp)
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        visible = true
+    }
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 16.dp),
+            contentAlignment = Alignment.BottomCenter
+        ) {
+            // Protrusion background (the "bump" for the logo)
+            Surface(
+                modifier = Modifier
+                    .offset(y = (-18).dp)
+                    .size(80.dp),
+                shape = CircleShape,
+                color = Color.White.copy(alpha = 0.95f),
+                tonalElevation = 12.dp,
+                shadowElevation = 12.dp
+            ) {}
+
+            // Main Navigation Capsule
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(64.dp)
+                    .shadow(16.dp, RoundedCornerShape(32.dp)),
+                color = Color.White.copy(alpha = 0.95f),
+                shape = RoundedCornerShape(32.dp),
+                border = BorderStroke(
+                    1.dp,
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.White.copy(alpha = 0.8f),
+                            Color.White.copy(alpha = 0.2f)
+                        )
                     )
-                },
-                label = {
-                    Text(
-                        text = label,
-                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                        fontSize = 11.sp
-                    )
-                },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = NavyPrimary,
-                    selectedTextColor = NavyPrimary,
-                    indicatorColor = GoldLight,
-                    unselectedIconColor = Color(0xFF64748B),
-                    unselectedTextColor = Color(0xFF64748B)
-                ),
-                modifier = Modifier.testTag("nav_item_${screen.name.lowercase()}")
+                )
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Left items
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.SpaceAround,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        leftItems.forEach { (screen, label, icon) ->
+                            BottomNavItem(
+                                selected = currentScreen == screen,
+                                icon = icon,
+                                label = label,
+                                onClick = { onScreenSelected(screen) }
+                            )
+                        }
+                    }
+
+                    // Space for the central logo button
+                    Spacer(modifier = Modifier.width(76.dp))
+
+                    // Right items
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.SpaceAround,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        rightItems.forEach { (screen, label, icon) ->
+                            BottomNavItem(
+                                selected = currentScreen == screen,
+                                icon = icon,
+                                label = label,
+                                onClick = { onScreenSelected(screen) }
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Floating Central Logo Button (Now 100 Squares)
+            CentralLogoButton(
+                selected = currentScreen == AppScreen.SQUARES,
+                label = "۱۰۰ مربع",
+                icon = Icons.Default.GridView,
+                onClick = { onScreenSelected(AppScreen.SQUARES) }
             )
+        }
+    }
+}
+
+@Composable
+fun BottomNavItem(
+    selected: Boolean,
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit
+) {
+    val scale by animateFloatAsState(if (selected) 1.15f else 1.0f)
+    val interactionSource = remember { MutableInteractionSource() }
+
+    Column(
+        modifier = Modifier
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick
+            )
+            .padding(4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .graphicsLayer(scaleX = scale, scaleY = scale),
+            contentAlignment = Alignment.Center
+        ) {
+            if (selected) {
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .background(
+                            Brush.radialGradient(
+                                listOf(GoldLight.copy(alpha = 0.6f), Color.Transparent)
+                            ),
+                            CircleShape
+                        )
+                )
+            }
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = if (selected) NavyPrimary else Color(0xFF64748B),
+                modifier = Modifier.size(24.dp)
+            )
+        }
+        Text(
+            text = label,
+            fontSize = 10.sp,
+            fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.Medium,
+            color = if (selected) NavyPrimary else Color(0xFF64748B)
+        )
+    }
+}
+
+@Composable
+fun CentralLogoButton(
+    selected: Boolean,
+    label: String? = null,
+    icon: ImageVector,
+    onClick: () -> Unit
+) {
+    val scale by animateFloatAsState(if (selected) 1.15f else 1.0f)
+    val infiniteTransition = rememberInfiniteTransition()
+    val floatOffset by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = -4f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        )
+    )
+
+    Box(
+        modifier = Modifier
+            .offset(y = (-20).dp)
+            .size(72.dp)
+            .shadow(16.dp, CircleShape)
+            .background(
+                Brush.verticalGradient(
+                    listOf(NavyPrimary, Color(0xFF0F766E))
+                ),
+                CircleShape
+            )
+            .border(
+                width = 2.dp,
+                brush = Brush.linearGradient(listOf(GoldAccent, GoldLight)),
+                shape = CircleShape
+            )
+            .clickable(onClick = onClick)
+            .graphicsLayer(scaleX = scale, scaleY = scale),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+            modifier = Modifier.offset(y = if (!selected) floatOffset.dp else 0.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = if (selected) GoldAccent else Color.White,
+                modifier = Modifier.size(28.dp)
+            )
+            if (label != null) {
+                Text(
+                    text = label,
+                    color = if (selected) GoldAccent else Color.White,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
         }
     }
 }
@@ -361,6 +567,156 @@ fun RewardCelebrationModal(
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp
                     )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Dialog to ask for user feedback/review with reward points
+ */
+@Composable
+fun ExperienceFeedbackDialog(
+    isSubmitting: Boolean,
+    onDismiss: () -> Unit,
+    onSubmitInternal: (rating: Int, comment: String) -> Unit,
+    onOpenMyket: () -> Unit
+) {
+    var rating by remember { mutableStateOf(5) }
+    var comment by remember { mutableStateOf("") }
+    var isInternalView by remember { mutableStateOf(false) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = Color.White,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 20.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Header
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(GoldAccent.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (isInternalView) Icons.Default.SupportAgent else Icons.Default.Star,
+                        contentDescription = null,
+                        tint = GoldAccent,
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = if (isInternalView) "ثبت بازخورد مستقیم" else "تجربه شما برای ما مهم است!",
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 18.sp,
+                    color = NavyPrimary,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    text = if (isInternalView) 
+                        "با ارسال نظر صادقانه خود (مثبت یا منفی)، ما را در بهبود اپلیکیشن یاری کنید و ۲ امتیاز هدیه بگیرید."
+                        else "از اینکه همراه ما هستید خوشحالیم. لطفاً با ثبت امتیاز در مایکت یا ارسال بازخورد مستقیم، ما را حمایت کنید.",
+                    fontSize = 13.sp,
+                    color = Color(0xFF64748B),
+                    textAlign = TextAlign.Center,
+                    lineHeight = 22.sp
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                if (!isInternalView) {
+                    // Main View: Options
+                    Button(
+                        onClick = onOpenMyket,
+                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = NavyPrimary)
+                    ) {
+                        Icon(imageVector = Icons.Default.Launch, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("مشاهده در مایکت", fontWeight = FontWeight.Bold)
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedButton(
+                        onClick = { isInternalView = true },
+                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, NavyPrimary.copy(alpha = 0.3f))
+                    ) {
+                        Text("ثبت بازخورد و دریافت ۲ امتیاز", color = NavyPrimary, fontWeight = FontWeight.Bold)
+                    }
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    TextButton(onClick = onDismiss) {
+                        Text("بعداً نظر می‌دهم", color = Color(0xFF94A3B8), fontSize = 12.sp)
+                    }
+                } else {
+                    // Internal Feedback View: Form
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        repeat(5) { index ->
+                            val starIndex = index + 1
+                            val isSelected = starIndex <= rating
+                            Icon(
+                                imageVector = if (isSelected) Icons.Default.Star else Icons.Default.StarBorder,
+                                contentDescription = null,
+                                tint = if (isSelected) GoldAccent else Color(0xFFCBD5E1),
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clickable { rating = starIndex }
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    androidx.compose.material3.OutlinedTextField(
+                        value = comment,
+                        onValueChange = { comment = it },
+                        modifier = Modifier.fillMaxWidth().height(100.dp),
+                        placeholder = { Text("متن پیام شما (اختیاری)", fontSize = 13.sp) },
+                        shape = RoundedCornerShape(12.dp),
+                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp)
+                    )
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    if (isSubmitting) {
+                        androidx.compose.material3.CircularProgressIndicator(color = GoldAccent, modifier = Modifier.size(24.dp))
+                    } else {
+                        Button(
+                            onClick = { onSubmitInternal(rating, comment) },
+                            modifier = Modifier.fillMaxWidth().height(50.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen)
+                        ) {
+                            Text("ارسال و دریافت امتیاز", fontWeight = FontWeight.Bold)
+                        }
+                        
+                        TextButton(onClick = { isInternalView = false }) {
+                            Text("بازگشت", color = Color(0xFF94A3B8), fontSize = 12.sp)
+                        }
+                    }
                 }
             }
         }

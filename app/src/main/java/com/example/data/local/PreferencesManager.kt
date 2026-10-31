@@ -23,6 +23,9 @@ class PreferencesManager(context: Context) {
         private const val KEY_SUPABASE_URL = "supabase_url"
         private const val KEY_SUPABASE_ANON_KEY = "supabase_anon_key"
 
+        const val KEY_FEEDBACK_SHOWN = "feedback_dialog_shown"
+        const val KEY_FEEDBACK_REWARDED = "feedback_reward_claimed"
+
         // Real Tapsell Plus credentials provided by user
         const val DEFAULT_TAPSELL_KEY = "sgedhqdbofphgpajkrqtahjkedbkokdlqiesotcmfqcklbamjaaiddqsqnihdtmobfidcb"
         const val DEFAULT_REWARDED_ZONE = "6ad231b89140ba2215e772db"
@@ -104,6 +107,14 @@ class PreferencesManager(context: Context) {
     var useTestAds: Boolean
         get() = prefs.getBoolean(KEY_USE_TEST_ADS, false)
         set(value) = prefs.edit().putBoolean(KEY_USE_TEST_ADS, value).apply()
+
+    var isFeedbackShown: Boolean
+        get() = prefs.getBoolean(KEY_FEEDBACK_SHOWN, false)
+        set(value) = prefs.edit().putBoolean(KEY_FEEDBACK_SHOWN, value).apply()
+
+    var isFeedbackRewarded: Boolean
+        get() = prefs.getBoolean(KEY_FEEDBACK_REWARDED, false)
+        set(value) = prefs.edit().putBoolean(KEY_FEEDBACK_REWARDED, value).apply()
 
     fun saveUserSession(
         id: String,
