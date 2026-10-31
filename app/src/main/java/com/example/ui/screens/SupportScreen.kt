@@ -47,6 +47,7 @@ fun SupportScreen(
     messages: List<SupportMessage>,
     isLoading: Boolean,
     isSending: Boolean,
+    giftBannerConfig: com.example.model.RewardAppearanceConfig = com.example.model.RewardAppearanceConfig(),
     errorMessage: String?,
     successMessage: String?,
     onRefresh: () -> Unit,
@@ -54,6 +55,7 @@ fun SupportScreen(
     onCloseTicketDetail: () -> Unit,
     onCreateTicket: (String, String, String) -> Unit,
     onSendMessage: (String, String) -> Unit,
+    onSaveGiftBanner: (title: String, description: String, imageUrl: String, isActive: Boolean, termsText: String) -> Unit = { _, _, _, _, _ -> },
     onClearMessages: () -> Unit,
     onBackToHome: () -> Unit
 ) {
@@ -156,10 +158,12 @@ fun SupportScreen(
                     tickets = tickets,
                     isLoading = isLoading,
                     isSending = isSending,
+                    giftBannerConfig = giftBannerConfig,
                     errorMessage = errorMessage,
                     successMessage = successMessage,
                     onOpenTicket = onOpenTicket,
                     onCreateTicket = onCreateTicket,
+                    onSaveGiftBanner = onSaveGiftBanner,
                     onClearMessages = onClearMessages,
                     onRefresh = onRefresh
                 )
@@ -173,10 +177,12 @@ fun SupportTabsView(
     tickets: List<SupportTicket>,
     isLoading: Boolean,
     isSending: Boolean,
+    giftBannerConfig: com.example.model.RewardAppearanceConfig,
     errorMessage: String?,
     successMessage: String?,
     onOpenTicket: (String) -> Unit,
     onCreateTicket: (String, String, String) -> Unit,
+    onSaveGiftBanner: (title: String, description: String, imageUrl: String, isActive: Boolean, termsText: String) -> Unit,
     onClearMessages: () -> Unit,
     onRefresh: () -> Unit
 ) {
@@ -200,9 +206,9 @@ fun SupportTabsView(
                 onClick = { selectedTab = 0 },
                 text = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.ListAlt, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("درخواست‌های من (${tickets.size.toPersianDigits()})", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Icon(Icons.Default.ListAlt, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("تیکت‌ها (${tickets.size.toPersianDigits()})", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
                 }
             )
@@ -211,9 +217,20 @@ fun SupportTabsView(
                 onClick = { selectedTab = 1 },
                 text = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.AddComment, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("ثبت درخواست جدید", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        Icon(Icons.Default.AddComment, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("درخواست جدید", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                }
+            )
+            Tab(
+                selected = selectedTab == 2,
+                onClick = { selectedTab = 2 },
+                text = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.AdminPanelSettings, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("مدیریت بنر هدیه", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
                 }
             )
@@ -267,22 +284,32 @@ fun SupportTabsView(
         }
 
         // Tab Content
-        if (selectedTab == 0) {
-            TicketsListTab(
-                tickets = tickets,
-                isLoading = isLoading,
-                onOpenTicket = onOpenTicket,
-                onGoToNewTicket = { selectedTab = 1 },
-                onRefresh = onRefresh
-            )
-        } else {
-            NewTicketTab(
-                isSending = isSending,
-                onSubmit = { subject, category, message ->
-                    onCreateTicket(subject, category, message)
-                    selectedTab = 0
-                }
-            )
+        when (selectedTab) {
+            0 -> {
+                TicketsListTab(
+                    tickets = tickets,
+                    isLoading = isLoading,
+                    onOpenTicket = onOpenTicket,
+                    onGoToNewTicket = { selectedTab = 1 },
+                    onRefresh = onRefresh
+                )
+            }
+            1 -> {
+                NewTicketTab(
+                    isSending = isSending,
+                    onSubmit = { subject, category, message ->
+                        onCreateTicket(subject, category, message)
+                        selectedTab = 0
+                    }
+                )
+            }
+            2 -> {
+                GiftBannerAdminTab(
+                    giftBannerConfig = giftBannerConfig,
+                    isSaving = isLoading,
+                    onSave = onSaveGiftBanner
+                )
+            }
         }
     }
 }
@@ -897,5 +924,171 @@ private fun formatMessageTime(timestamp: Long): String {
         sdf.format(Date(timestamp)).toPersianDigits()
     } catch (e: Exception) {
         ""
+    }
+}
+
+@Composable
+fun GiftBannerAdminTab(
+    giftBannerConfig: com.example.model.RewardAppearanceConfig,
+    isSaving: Boolean,
+    onSave: (title: String, description: String, imageUrl: String, isActive: Boolean, termsText: String) -> Unit
+) {
+    var heroTitle by remember(giftBannerConfig) { mutableStateOf(giftBannerConfig.heroTitle) }
+    var heroSubtitle by remember(giftBannerConfig) { mutableStateOf(giftBannerConfig.heroSubtitle) }
+    var heroBannerUrl by remember(giftBannerConfig) { mutableStateOf(giftBannerConfig.heroBannerUrl) }
+    var termsText by remember(giftBannerConfig) { mutableStateOf(giftBannerConfig.termsText) }
+    var isActive by remember(giftBannerConfig) { mutableStateOf(giftBannerConfig.isActive) }
+
+    val scrollState = rememberScrollState()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(scrollState)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.AdminPanelSettings,
+                        contentDescription = null,
+                        tint = GoldAccent,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "مدیریت بنر هدیه (تنظیمات ویترین جوایز)",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = NavyPrimary
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = "اطلاعات وارد شده در این بخش مستقیماً در صفحه ویترین جوایز اپلیکیشن به عنوان بنر معرفی هدیه نمایش داده می‌شود.",
+                    fontSize = 11.sp,
+                    color = Color(0xFF64748B),
+                    lineHeight = 18.sp
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Title Input
+                OutlinedTextField(
+                    value = heroTitle,
+                    onValueChange = { heroTitle = it },
+                    label = { Text("عنوان هدیه") },
+                    placeholder = { Text("مثلاً: گوشی هوشمند سامسونگ Galaxy A55") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().testTag("input_banner_title"),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Subtitle Input
+                OutlinedTextField(
+                    value = heroSubtitle,
+                    onValueChange = { heroSubtitle = it },
+                    label = { Text("توضیحات هدیه") },
+                    placeholder = { Text("مثلاً: هدیه ویژه این دوره برای برندگان مسابقه ۱۰۰ مربع") },
+                    minLines = 2,
+                    maxLines = 4,
+                    modifier = Modifier.fillMaxWidth().testTag("input_banner_subtitle"),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Banner Image URL Input
+                OutlinedTextField(
+                    value = heroBannerUrl,
+                    onValueChange = { heroBannerUrl = it },
+                    label = { Text("لینک تصویر هدیه (URL)") },
+                    placeholder = { Text("https://example.com/image.jpg") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().testTag("input_banner_url"),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Terms Input
+                OutlinedTextField(
+                    value = termsText,
+                    onValueChange = { termsText = it },
+                    label = { Text("متن راهنما یا شرایط تکمیلی") },
+                    placeholder = { Text("این بنر صرفاً جهت اطلاع‌رسانی می‌باشد.") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().testTag("input_banner_terms"),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Active Toggle
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFF8FAFC), RoundedCornerShape(12.dp))
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "وضعیت نمایش بنر هدیه",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = NavyPrimary
+                        )
+                        Text(
+                            text = if (isActive) "بنر هدیه در اپلیکیشن فعال و قابل مشاهده است" else "بنر هدیه در حالت غیرفعال/در حال بروزرسانی قرار دارد",
+                            fontSize = 11.sp,
+                            color = if (isActive) Color(0xFF16A34A) else Color(0xFFDC2626)
+                        )
+                    }
+                    Switch(
+                        checked = isActive,
+                        onCheckedChange = { isActive = it },
+                        modifier = Modifier.testTag("switch_banner_active")
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // Save Button
+                Button(
+                    onClick = {
+                        onSave(heroTitle, heroSubtitle, heroBannerUrl, isActive, termsText)
+                    },
+                    enabled = !isSaving && heroTitle.trim().isNotBlank(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .testTag("btn_save_gift_banner"),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = NavyPrimary)
+                ) {
+                    if (isSaving) {
+                        CircularProgressIndicator(color = GoldAccent, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("در حال ذخیره‌سازی...")
+                    } else {
+                        Icon(Icons.Default.Save, contentDescription = null, tint = GoldAccent, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("ذخیره تغییرات بنر هدیه", fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                }
+            }
+        }
     }
 }

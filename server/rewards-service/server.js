@@ -448,12 +448,17 @@ rewardsRouter.patch('/admin/claims/:id', requireAdminAuth, async (req, res) => {
   }
 });
 
-rewardsRouter.post('/admin/appearance', requireAdminAuth, async (req, res) => {
+const saveAppearanceHandler = async (req, res) => {
   try {
-    const { hero_title, hero_subtitle, hero_banner_url, primary_color, active_sections, terms_text } = req.body;
-    const activeSecStr = active_sections 
-      ? (typeof active_sections === 'object' ? JSON.stringify(active_sections) : active_sections) 
-      : JSON.stringify({ featured: true, categories: true, history: true, banners: true });
+    const { hero_title, hero_subtitle, hero_banner_url, primary_color, active_sections, is_active, terms_text } = req.body;
+    
+    let activeSecObj = active_sections;
+    if (!activeSecObj) {
+      activeSecObj = { isActive: is_active !== false };
+    } else if (typeof activeSecObj === 'string') {
+      try { activeSecObj = JSON.parse(activeSecObj); } catch(e) { activeSecObj = { isActive: is_active !== false }; }
+    }
+    const activeSecStr = JSON.stringify(activeSecObj);
 
     if (pool) {
       const result = await pool.query(`
@@ -461,7 +466,7 @@ rewardsRouter.post('/admin/appearance', requireAdminAuth, async (req, res) => {
         VALUES ('default', $1, $2, $3, $4, $5, $6, NOW())
         ON CONFLICT (id) DO UPDATE SET hero_title = EXCLUDED.hero_title, hero_subtitle = EXCLUDED.hero_subtitle, hero_banner_url = EXCLUDED.hero_banner_url, primary_color = EXCLUDED.primary_color, active_sections = EXCLUDED.active_sections, terms_text = EXCLUDED.terms_text, updated_at = NOW()
         RETURNING *
-      `, [hero_title, hero_subtitle, hero_banner_url, primary_color, activeSecStr, terms_text]);
+      `, [hero_title || 'ویترین هدیه و پاداش ویژه', hero_subtitle || '', hero_banner_url || '', primary_color || '#10B981', activeSecStr, terms_text || '']);
       return res.json({ success: true, appearance: result.rows[0] });
     }
 
@@ -469,18 +474,21 @@ rewardsRouter.post('/admin/appearance', requireAdminAuth, async (req, res) => {
       ...memoryDb.appearance,
       hero_title: hero_title || memoryDb.appearance.hero_title,
       hero_subtitle: hero_subtitle || memoryDb.appearance.hero_subtitle,
-      hero_banner_url: hero_banner_url || memoryDb.appearance.hero_banner_url,
+      hero_banner_url: hero_banner_url !== undefined ? hero_banner_url : memoryDb.appearance.hero_banner_url,
       primary_color: primary_color || memoryDb.appearance.primary_color,
-      active_sections: typeof activeSecStr === 'string' ? JSON.parse(activeSecStr) : activeSecStr,
-      terms_text: terms_text || memoryDb.appearance.terms_text
+      active_sections: activeSecObj,
+      terms_text: terms_text !== undefined ? terms_text : memoryDb.appearance.terms_text
     };
 
     return res.json({ success: true, appearance: memoryDb.appearance });
   } catch (err) {
-    console.error('[Rewards Admin Error] POST /admin/appearance failed:', err.message);
-    return res.status(500).json({ success: false, message: 'خطا در ذخیره ظاهر' });
+    console.error('[Rewards Admin Error] Save appearance failed:', err.message);
+    return res.status(500).json({ success: false, message: 'خطا در ذخیره ظاهر و بنر هدیه' });
   }
-});
+};
+
+rewardsRouter.post('/admin/appearance', saveAppearanceHandler);
+rewardsRouter.post('/appearance', saveAppearanceHandler);
 
 function setPool(newPool) {
   pool = newPool;

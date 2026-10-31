@@ -1229,13 +1229,18 @@ class BackendRepository(
                 if (response.isSuccessful) {
                     val json = JSONObject(body)
                     val obj = json.optJSONObject("appearance") ?: JSONObject()
+                    val activeSecObj = obj.optJSONObject("active_sections")
+                    val isActive = activeSecObj?.optBoolean("isActive", true)
+                        ?: obj.optBoolean("is_active", true)
+
                     val config = com.example.model.RewardAppearanceConfig(
                         id = obj.optString("id", "default"),
-                        heroTitle = obj.optString("hero_title", "ویترین جوایز و پاداش‌های ارزشمند"),
-                        heroSubtitle = obj.optString("hero_subtitle", "امتیازهای کسب‌شده خود را به کارت شارژ، بسته‌های اینترنت و جوایز نقدی تبدیل کنید"),
+                        heroTitle = obj.optString("hero_title", "ویترین هدیه و پاداش ویژه"),
+                        heroSubtitle = obj.optString("hero_subtitle", "هدیه اختصاصی این دوره برای کاربران فعال مسابقه رقابت کن جایزه ببر"),
                         heroBannerUrl = obj.optString("hero_banner_url", ""),
                         primaryColor = obj.optString("primary_color", "#10B981"),
-                        termsText = obj.optString("terms_text", "درخواست‌های دریافت جایزه ظرف ۲۴ الی ۷۲ ساعت کاری پردازش و ارسال می‌شوند.")
+                        termsText = obj.optString("terms_text", "این بنر صرفاً جهت معرفی هدیه ویژه دوره جاری بوده و نیازی به ثبت درخواست ندارد."),
+                        isActive = isActive
                     )
                     Result.Success(config)
                 } else {
@@ -1244,6 +1249,57 @@ class BackendRepository(
             }
         } catch (e: Exception) {
             Result.Success(com.example.model.RewardAppearanceConfig())
+        }
+    }
+
+    suspend fun updateRewardAppearance(
+        heroTitle: String,
+        heroSubtitle: String,
+        heroBannerUrl: String,
+        isActive: Boolean,
+        termsText: String = ""
+    ): Result<com.example.model.RewardAppearanceConfig> = withContext(Dispatchers.IO) {
+        val url = "$baseApiUrl/rewards/admin/appearance"
+        val payload = JSONObject().apply {
+            put("hero_title", heroTitle.trim())
+            put("hero_subtitle", heroSubtitle.trim())
+            put("hero_banner_url", heroBannerUrl.trim())
+            put("active_sections", JSONObject().put("isActive", isActive))
+            put("is_active", isActive)
+            put("terms_text", termsText.trim())
+        }
+
+        try {
+            val request = Request.Builder()
+                .url(url)
+                .header("Content-Type", "application/json")
+                .header("x-admin-key", "ReqabatAdmin2026")
+                .header("Authorization", "Bearer ReqabatAdmin2026")
+                .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (response.isSuccessful) {
+                    val json = JSONObject(body)
+                    val obj = json.optJSONObject("appearance") ?: JSONObject()
+                    val config = com.example.model.RewardAppearanceConfig(
+                        id = obj.optString("id", "default"),
+                        heroTitle = obj.optString("hero_title", heroTitle),
+                        heroSubtitle = obj.optString("hero_subtitle", heroSubtitle),
+                        heroBannerUrl = obj.optString("hero_banner_url", heroBannerUrl),
+                        primaryColor = obj.optString("primary_color", "#10B981"),
+                        termsText = obj.optString("terms_text", termsText),
+                        isActive = isActive
+                    )
+                    Result.Success(config)
+                } else {
+                    val err = try { JSONObject(body).optString("message") } catch (e: Exception) { null }
+                    Result.Error(err ?: "خطا در بروزرسانی بنر هدیه (کد ${response.code})")
+                }
+            }
+        } catch (e: Exception) {
+            Result.Error("خطا در ارتباط با سرور: ${e.message}")
         }
     }
 

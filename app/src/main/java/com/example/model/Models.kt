@@ -260,11 +260,12 @@ data class RewardCategoryItem(
  */
 data class RewardAppearanceConfig(
     val id: String = "default",
-    val heroTitle: String = "ویترین جوایز و پاداش‌های ارزشمند",
-    val heroSubtitle: String = "امتیازهای کسب‌شده خود را به کارت شارژ، بسته‌های اینترنت و جوایز نقدی تبدیل کنید",
+    val heroTitle: String = "ویترین هدیه و پاداش ویژه",
+    val heroSubtitle: String = "هدیه اختصاصی این دوره برای کاربران فعال مسابقه رقابت کن جایزه ببر",
     val heroBannerUrl: String = "",
     val primaryColor: String = "#10B981",
-    val termsText: String = "درخواست‌های دریافت جایزه ظرف ۲۴ الی ۷۲ ساعت کاری پردازش و ارسال می‌شوند."
+    val termsText: String = "این بنر صرفاً جهت معرفی هدیه ویژه دوره جاری بوده و نیازی به ثبت درخواست ندارد.",
+    val isActive: Boolean = true
 )
 
 /**

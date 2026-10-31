@@ -276,6 +276,40 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun updateGiftBanner(
+        title: String,
+        description: String,
+        imageUrl: String,
+        isActive: Boolean,
+        termsText: String = "",
+        onSuccess: () -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSupportLoading = true, supportErrorMessage = null, supportSuccessMessage = null) }
+            when (val res = backendRepository.updateRewardAppearance(title, description, imageUrl, isActive, termsText)) {
+                is Result.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            rewardAppearance = res.data,
+                            isSupportLoading = false,
+                            supportSuccessMessage = "تغییرات بنر هدیه با موفقیت در سرور و دیتابیس ذخیره شد."
+                        )
+                    }
+                    loadRewardsData()
+                    onSuccess()
+                }
+                is Result.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isSupportLoading = false,
+                            supportErrorMessage = res.message
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     fun clearRewardsMessages() {
         _uiState.update { it.copy(rewardsErrorMessage = null, claimSuccessMessage = null) }
     }
