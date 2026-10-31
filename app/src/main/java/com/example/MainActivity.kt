@@ -161,7 +161,6 @@ class MainActivity : ComponentActivity() {
                                             messages = uiState.activeTicketMessages,
                                             isLoading = uiState.isSupportLoading,
                                             isSending = uiState.isSendingTicketMessage,
-                                            giftBannerConfig = uiState.rewardAppearance,
                                             errorMessage = uiState.supportErrorMessage,
                                             successMessage = uiState.supportSuccessMessage,
                                             onRefresh = { viewModel.loadUserTickets() },
@@ -172,9 +171,6 @@ class MainActivity : ComponentActivity() {
                                             },
                                             onSendMessage = { ticketId, text ->
                                                 viewModel.sendTicketMessage(ticketId, text)
-                                            },
-                                            onSaveGiftBanner = { title, desc, url, active, terms ->
-                                                viewModel.updateGiftBanner(title, desc, url, active, terms)
                                             },
                                             onClearMessages = { viewModel.clearSupportMessages() },
                                             onBackToHome = { viewModel.navigateTo(AppScreen.PROFILE) }

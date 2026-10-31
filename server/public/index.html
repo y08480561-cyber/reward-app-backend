@@ -1158,10 +1158,60 @@
         <!-- SECTION: ویترین و مدیریت جوایز (Rewards Management) -->
         <!-- ============================================================== -->
         <section id="section-rewards" class="admin-section">
+          <!-- Card 1: Gift Banner Management -->
+          <div class="card p-4 shadow mb-4" style="border: 1px solid var(--gold-primary); background-color: #12253B;">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+              <div>
+                <h4 class="gold-text mb-1"><i class="bi bi-gift-fill me-2"></i> مدیریت بنر هدیه (ویترین جوایز)</h4>
+                <p class="text-secondary small mb-0">تنظیم عنوان، توضیحات، آدرس تصویر بنر و فعال/غیرفعال بودن هدیه ویژه در اپلیکیشن</p>
+              </div>
+              <button class="btn btn-outline-info btn-sm" onclick="loadRewardAppearance()"><i class="bi bi-arrow-clockwise me-1"></i> خواندن مجدد اطلاعات</button>
+            </div>
+
+            <form onsubmit="saveRewardAppearance(event)">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label text-secondary small fw-bold">عنوان بنر هدیه (Hero Title):</label>
+                  <input type="text" id="rewAppHeroTitle" class="form-control form-control-dark" placeholder="مثال: هدیه ویژه مسابقه این هفته" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label text-secondary small fw-bold">رنگ تم اصلی (Primary Accent Color):</label>
+                  <input type="color" id="rewAppColor" class="form-control form-control-color w-100 bg-dark border-secondary" style="height: 38px;" value="#10B981">
+                </div>
+                <div class="col-12">
+                  <label class="form-label text-secondary small fw-bold">زیرعنوان و توضیحات بنر هدیه:</label>
+                  <input type="text" id="rewAppHeroSubtitle" class="form-control form-control-dark" placeholder="توضیحات کوتاه هدیه ویژه...">
+                </div>
+                <div class="col-12">
+                  <label class="form-label text-secondary small fw-bold">آدرس تصویر بنر هدیه (Banner Image URL):</label>
+                  <input type="url" id="rewAppBannerUrl" class="form-control form-control-dark" placeholder="https://example.com/banner.jpg">
+                </div>
+                <div class="col-12">
+                  <label class="form-label text-secondary small fw-bold">متن راهنما و شرایط دریافت هدیه:</label>
+                  <textarea id="rewAppTermsText" rows="3" class="form-control form-control-dark" placeholder="شرح قوانین یا توضیحات تکمیلی..."></textarea>
+                </div>
+                <div class="col-12">
+                  <div class="form-check form-switch mt-2">
+                    <input class="form-check-input" type="checkbox" id="rewAppIsActive" checked>
+                    <label class="form-check-label text-white fw-bold small me-2" for="rewAppIsActive">
+                      بنر هدیه در اپلیکیشن فعال و قابل نمایش باشد
+                    </label>
+                  </div>
+                </div>
+                <div class="col-12 mt-3">
+                  <button type="submit" class="btn btn-gold px-4 fw-bold">
+                    <i class="bi bi-check-circle-fill me-1"></i> ذخیره تغییرات بنر هدیه در دیتابیس
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          <!-- Card 2: Rewards List -->
           <div class="card p-4 shadow mb-4" style="border: 1px solid var(--border-color); background-color: #12253B;">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
               <div>
-                <h4 class="gold-text mb-1"><i class="bi bi-gift-fill me-2"></i> مدیریت ویترین جوایز و پاداش‌ها</h4>
+                <h4 class="gold-text mb-1"><i class="bi bi-list-stars me-2"></i> فهرست جوایز تعریفی</h4>
                 <p class="text-secondary small mb-0">تعریف جوایز، تعیین امتیاز لازم، موجودی انبار، تصویر و دسته‌بندی جوایز</p>
               </div>
               <div class="d-flex gap-2">
@@ -1872,6 +1922,7 @@
         loadStorePurchases();
       } else if (sectionId === 'rewards') {
         loadRewardsData();
+        loadRewardAppearance();
       } else if (sectionId === 'rewards_appearance') {
         loadRewardAppearance();
       } else if (sectionId === 'reward_claims') {
@@ -3392,11 +3443,13 @@
         const data = await res.json();
         if (data.success && data.appearance) {
           const app = data.appearance;
-          document.getElementById('rewAppHeroTitle').value = app.hero_title || '';
-          document.getElementById('rewAppColor').value = app.primary_color || '#10B981';
-          document.getElementById('rewAppHeroSubtitle').value = app.hero_subtitle || '';
-          document.getElementById('rewAppBannerUrl').value = app.hero_banner_url || '';
-          document.getElementById('rewAppTermsText').value = app.terms_text || '';
+          if (document.getElementById('rewAppHeroTitle')) document.getElementById('rewAppHeroTitle').value = app.hero_title || '';
+          if (document.getElementById('rewAppColor')) document.getElementById('rewAppColor').value = app.primary_color || '#10B981';
+          if (document.getElementById('rewAppHeroSubtitle')) document.getElementById('rewAppHeroSubtitle').value = app.hero_subtitle || '';
+          if (document.getElementById('rewAppBannerUrl')) document.getElementById('rewAppBannerUrl').value = app.hero_banner_url || '';
+          if (document.getElementById('rewAppTermsText')) document.getElementById('rewAppTermsText').value = app.terms_text || '';
+          const isActive = (app.is_active !== false && app.active_sections?.isActive !== false);
+          if (document.getElementById('rewAppIsActive')) document.getElementById('rewAppIsActive').checked = isActive;
         }
       } catch (err) {
         console.error('Error loading appearance:', err);
@@ -3405,22 +3458,31 @@
 
     async function saveRewardAppearance(event) {
       event.preventDefault();
-      const hero_title = document.getElementById('rewAppHeroTitle').value.trim();
-      const primary_color = document.getElementById('rewAppColor').value;
-      const hero_subtitle = document.getElementById('rewAppHeroSubtitle').value.trim();
-      const hero_banner_url = document.getElementById('rewAppBannerUrl').value.trim();
-      const terms_text = document.getElementById('rewAppTermsText').value.trim();
+      const hero_title = document.getElementById('rewAppHeroTitle')?.value.trim() || '';
+      const primary_color = document.getElementById('rewAppColor')?.value || '#10B981';
+      const hero_subtitle = document.getElementById('rewAppHeroSubtitle')?.value.trim() || '';
+      const hero_banner_url = document.getElementById('rewAppBannerUrl')?.value.trim() || '';
+      const terms_text = document.getElementById('rewAppTermsText')?.value.trim() || '';
+      const is_active = document.getElementById('rewAppIsActive')?.checked ?? true;
 
       const key = getAdminKey();
       try {
         const res = await fetch('/api/rewards/admin/appearance', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-admin-key': key },
-          body: JSON.stringify({ hero_title, primary_color, hero_subtitle, hero_banner_url, terms_text })
+          body: JSON.stringify({
+            hero_title,
+            primary_color,
+            hero_subtitle,
+            hero_banner_url,
+            terms_text,
+            is_active,
+            active_sections: { isActive: is_active }
+          })
         });
         const data = await res.json();
         if (data.success) {
-          alert('تنظیمات ظاهری ویترین جوایز با موفقیت ذخیره گردید.');
+          alert('اطلاعات بنر هدیه با موفقیت در دیتابیس ذخیره گردید.');
         } else {
           alert('خطا: ' + (data.message || 'ثبت نا موفق بود'));
         }

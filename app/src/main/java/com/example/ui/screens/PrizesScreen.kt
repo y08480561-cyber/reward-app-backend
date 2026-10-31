@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -27,6 +28,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.example.model.RewardAppearanceConfig
 import com.example.ui.theme.*
 import com.example.viewmodel.MainUiState
 import com.example.viewmodel.MainViewModel
@@ -186,6 +188,16 @@ fun PrizesScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 val banner = uiState.rewardAppearance
+
+                // Admin Gift Banner Editor card
+                if (uiState.currentUser?.isAdmin == true) {
+                    AdminGiftBannerEditCard(
+                        appearance = banner,
+                        onSave = { title, desc, url, active, terms ->
+                            viewModel.updateGiftBanner(title, desc, url, active, terms)
+                        }
+                    )
+                }
 
                 // Main Single Gift Banner Card
                 SingleGiftBannerCard(
@@ -394,6 +406,162 @@ fun SingleGiftBannerCard(
                                 lineHeight = 18.sp
                             )
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AdminGiftBannerEditCard(
+    appearance: RewardAppearanceConfig,
+    onSave: (String, String, String, Boolean, String) -> Unit
+) {
+    var title by remember(appearance.heroTitle) { mutableStateOf(appearance.heroTitle) }
+    var subtitle by remember(appearance.heroSubtitle) { mutableStateOf(appearance.heroSubtitle) }
+    var bannerUrl by remember(appearance.heroBannerUrl) { mutableStateOf(appearance.heroBannerUrl) }
+    var terms by remember(appearance.termsText) { mutableStateOf(appearance.termsText) }
+    var isActive by remember(appearance.isActive) { mutableStateOf(appearance.isActive) }
+    var isExpanded by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(4.dp, RoundedCornerShape(16.dp))
+            .border(1.dp, GoldAccent, RoundedCornerShape(16.dp))
+            .testTag("admin_banner_edit_card"),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = NavySecondary)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { isExpanded = !isExpanded },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = null,
+                        tint = GoldAccent,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "ویرایش بنر هدیه (پنل مدیریت)",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = GoldLight
+                    )
+                }
+                Icon(
+                    imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    tint = GoldAccent
+                )
+            }
+
+            AnimatedVisibility(visible = isExpanded) {
+                Column(
+                    modifier = Modifier.padding(top = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedTextField(
+                        value = title,
+                        onValueChange = { title = it },
+                        label = { Text("عنوان بنر هدیه") },
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = androidx.compose.ui.text.TextStyle(color = Color.White),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = GoldAccent,
+                            unfocusedBorderColor = Color.Gray,
+                            focusedLabelColor = GoldAccent,
+                            unfocusedLabelColor = Color.LightGray
+                        )
+                    )
+
+                    OutlinedTextField(
+                        value = subtitle,
+                        onValueChange = { subtitle = it },
+                        label = { Text("توضیحات کوتاه هدیه") },
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = androidx.compose.ui.text.TextStyle(color = Color.White),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = GoldAccent,
+                            unfocusedBorderColor = Color.Gray,
+                            focusedLabelColor = GoldAccent,
+                            unfocusedLabelColor = Color.LightGray
+                        )
+                    )
+
+                    OutlinedTextField(
+                        value = bannerUrl,
+                        onValueChange = { bannerUrl = it },
+                        label = { Text("آدرس تصویر بنر (URL)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = androidx.compose.ui.text.TextStyle(color = Color.White),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = GoldAccent,
+                            unfocusedBorderColor = Color.Gray,
+                            focusedLabelColor = GoldAccent,
+                            unfocusedLabelColor = Color.LightGray
+                        )
+                    )
+
+                    OutlinedTextField(
+                        value = terms,
+                        onValueChange = { terms = it },
+                        label = { Text("متن راهنما و قوانین دریافت") },
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = androidx.compose.ui.text.TextStyle(color = Color.White),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = GoldAccent,
+                            unfocusedBorderColor = Color.Gray,
+                            focusedLabelColor = GoldAccent,
+                            unfocusedLabelColor = Color.LightGray
+                        )
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "وضعیت بنر هدیه (فعال/غیرفعال):",
+                            fontSize = 12.sp,
+                            color = Color.White
+                        )
+                        Switch(
+                            checked = isActive,
+                            onCheckedChange = { isActive = it },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = NavyPrimary,
+                                checkedTrackColor = GoldAccent
+                            )
+                        )
+                    }
+
+                    Button(
+                        onClick = { onSave(title, subtitle, bannerUrl, isActive, terms) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = GoldAccent)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Save,
+                            contentDescription = null,
+                            tint = NavyPrimary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "ذخیره بنر هدیه در دیتابیس",
+                            fontWeight = FontWeight.Bold,
+                            color = NavyPrimary
+                        )
                     }
                 }
             }

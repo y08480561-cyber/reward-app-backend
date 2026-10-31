@@ -18,6 +18,9 @@ data class User(
     val fullName: String
         get() = "$firstName $lastName".trim()
 
+    val isAdmin: Boolean
+        get() = panelType.equals("admin", ignoreCase = true)
+
     val maskedName: String
         get() {
             val familyMasked = if (lastName.length > 2) {

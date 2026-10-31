@@ -47,7 +47,6 @@ fun SupportScreen(
     messages: List<SupportMessage>,
     isLoading: Boolean,
     isSending: Boolean,
-    giftBannerConfig: com.example.model.RewardAppearanceConfig = com.example.model.RewardAppearanceConfig(),
     errorMessage: String?,
     successMessage: String?,
     onRefresh: () -> Unit,
@@ -55,7 +54,6 @@ fun SupportScreen(
     onCloseTicketDetail: () -> Unit,
     onCreateTicket: (String, String, String) -> Unit,
     onSendMessage: (String, String) -> Unit,
-    onSaveGiftBanner: (title: String, description: String, imageUrl: String, isActive: Boolean, termsText: String) -> Unit = { _, _, _, _, _ -> },
     onClearMessages: () -> Unit,
     onBackToHome: () -> Unit
 ) {
@@ -158,12 +156,10 @@ fun SupportScreen(
                     tickets = tickets,
                     isLoading = isLoading,
                     isSending = isSending,
-                    giftBannerConfig = giftBannerConfig,
                     errorMessage = errorMessage,
                     successMessage = successMessage,
                     onOpenTicket = onOpenTicket,
                     onCreateTicket = onCreateTicket,
-                    onSaveGiftBanner = onSaveGiftBanner,
                     onClearMessages = onClearMessages,
                     onRefresh = onRefresh
                 )
@@ -177,12 +173,10 @@ fun SupportTabsView(
     tickets: List<SupportTicket>,
     isLoading: Boolean,
     isSending: Boolean,
-    giftBannerConfig: com.example.model.RewardAppearanceConfig,
     errorMessage: String?,
     successMessage: String?,
     onOpenTicket: (String) -> Unit,
     onCreateTicket: (String, String, String) -> Unit,
-    onSaveGiftBanner: (title: String, description: String, imageUrl: String, isActive: Boolean, termsText: String) -> Unit,
     onClearMessages: () -> Unit,
     onRefresh: () -> Unit
 ) {
@@ -208,7 +202,7 @@ fun SupportTabsView(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.ListAlt, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("تیکت‌ها (${tickets.size.toPersianDigits()})", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text("درخواست‌های من (${tickets.size.toPersianDigits()})", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
                 }
             )
@@ -219,18 +213,7 @@ fun SupportTabsView(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.AddComment, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("درخواست جدید", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    }
-                }
-            )
-            Tab(
-                selected = selectedTab == 2,
-                onClick = { selectedTab = 2 },
-                text = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.AdminPanelSettings, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("مدیریت بنر هدیه", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text("ثبت درخواست جدید", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
                 }
             )
@@ -284,32 +267,22 @@ fun SupportTabsView(
         }
 
         // Tab Content
-        when (selectedTab) {
-            0 -> {
-                TicketsListTab(
-                    tickets = tickets,
-                    isLoading = isLoading,
-                    onOpenTicket = onOpenTicket,
-                    onGoToNewTicket = { selectedTab = 1 },
-                    onRefresh = onRefresh
-                )
-            }
-            1 -> {
-                NewTicketTab(
-                    isSending = isSending,
-                    onSubmit = { subject, category, message ->
-                        onCreateTicket(subject, category, message)
-                        selectedTab = 0
-                    }
-                )
-            }
-            2 -> {
-                GiftBannerAdminTab(
-                    giftBannerConfig = giftBannerConfig,
-                    isSaving = isLoading,
-                    onSave = onSaveGiftBanner
-                )
-            }
+        if (selectedTab == 0) {
+            TicketsListTab(
+                tickets = tickets,
+                isLoading = isLoading,
+                onOpenTicket = onOpenTicket,
+                onGoToNewTicket = { selectedTab = 1 },
+                onRefresh = onRefresh
+            )
+        } else {
+            NewTicketTab(
+                isSending = isSending,
+                onSubmit = { subject, category, message ->
+                    onCreateTicket(subject, category, message)
+                    selectedTab = 0
+                }
+            )
         }
     }
 }
