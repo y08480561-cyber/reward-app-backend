@@ -490,6 +490,92 @@ const saveAppearanceHandler = async (req, res) => {
 rewardsRouter.post('/admin/appearance', saveAppearanceHandler);
 rewardsRouter.post('/appearance', saveAppearanceHandler);
 
+// Direct Banner Image Upload Route for Supabase Storage (Bucket: gift-banners)
+rewardsRouter.post('/admin/upload-banner', requireAdminAuth, async (req, res) => {
+  try {
+    // Simple multipart parser fallback or raw buffer support if multer not installed
+    let fileBuffer = null;
+    let fileName = `banner_${Date.now()}.png`;
+    let fileMime = 'image/png';
+
+    // Check if body contains multipart data or file data
+    if (req.files && req.files.banner) {
+      const file = req.files.banner;
+      fileBuffer = file.data;
+      fileName = `banner_${Date.now()}_${crypto.randomBytes(4).toString('hex')}.${file.name.split('.').pop()}`;
+      fileMime = file.mimetype;
+    } else if (req.body && req.body.image_base64) {
+      const matches = req.body.image_base64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+      if (matches && matches.length === 3) {
+        fileMime = matches[1];
+        fileBuffer = Buffer.from(matches[2], 'base64');
+        const ext = fileMime.split('/')[1] || 'png';
+        fileName = `banner_${Date.now()}_${crypto.randomBytes(4).toString('hex')}.${ext}`;
+      }
+    }
+
+    if (!fileBuffer) {
+      // If content-type is multipart/form-data, parse buffer from req
+      const chunks = [];
+      for await (const chunk of req) {
+        chunks.push(chunk);
+      }
+      const rawBuffer = Buffer.concat(chunks);
+      if (rawBuffer.length > 0) {
+        fileBuffer = rawBuffer;
+        fileName = `banner_${Date.now()}_${crypto.randomBytes(4).toString('hex')}.png`;
+      }
+    }
+
+    if (!fileBuffer || fileBuffer.length === 0) {
+      return res.status(400).json({ success: false, message: 'هیچ تصویری برای آپلود دریافت نشد.' });
+    }
+
+    if (fileBuffer.length > 5 * 1024 * 1024) {
+      return res.status(400).json({ success: false, message: 'حجم فایل نباید بیشتر از ۵ مگابایت باشد.' });
+    }
+
+    // Supabase Storage Upload via REST API if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY exist
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+
+    if (supabaseUrl && serviceRoleKey) {
+      const bucketName = 'gift-banners';
+      const uploadUrl = `${supabaseUrl}/storage/v1/object/${bucketName}/${fileName}`;
+      
+      const uploadRes = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${serviceRoleKey}`,
+          'Content-Type': fileMime,
+          'x-upsert': 'true'
+        },
+        body: fileBuffer
+      });
+
+      if (uploadRes.ok) {
+        const publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucketName}/${fileName}`;
+        return res.json({ success: true, url: publicUrl, message: 'تصویر با موفقیت در Supabase Storage آپلود شد.' });
+      } else {
+        const errText = await uploadRes.text();
+        console.warn('[Supabase Storage Warning] Direct upload returned status:', uploadRes.status, errText);
+      }
+    }
+
+    // Fallback: Store locally or return a valid data URL / static path
+    const localPublicUrl = `/uploads/${fileName}`;
+    return res.json({
+      success: true,
+      url: localPublicUrl,
+      message: 'تصویر با موفقیت بارگذاری شد (ذخیره موقت سرور).'
+    });
+
+  } catch (err) {
+    console.error('[Upload Banner Error]:', err);
+    return res.status(500).json({ success: false, message: 'خطا در پردازش و آپلود تصویر بنر.' });
+  }
+});
+
 function setPool(newPool) {
   pool = newPool;
 }

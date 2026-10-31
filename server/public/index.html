@@ -1183,8 +1183,47 @@
                   <input type="text" id="rewAppHeroSubtitle" class="form-control form-control-dark" placeholder="توضیحات کوتاه هدیه ویژه...">
                 </div>
                 <div class="col-12">
-                  <label class="form-label text-secondary small fw-bold">آدرس تصویر بنر هدیه (Banner Image URL):</label>
-                  <input type="url" id="rewAppBannerUrl" class="form-control form-control-dark" placeholder="https://example.com/banner.jpg">
+                  <label class="form-label text-secondary small fw-bold">تصویر بنر هدیه (بارگذاری مستقیم یا لینک):</label>
+                  <div class="d-flex flex-column gap-3 p-3 rounded-3" style="background: rgba(15, 23, 42, 0.6); border: 1px dashed var(--border-color);">
+                    <!-- Hidden file input -->
+                    <input type="file" id="rewAppImageFile" accept="image/jpeg,image/png,image/webp" class="d-none" onchange="handleBannerImageSelect(event)">
+                    
+                    <!-- Preview Box -->
+                    <div id="rewAppPreviewContainer" class="position-relative rounded-3 overflow-hidden d-none" style="width: 100%; height: 160px; background: #0b1329; border: 1px solid var(--border-color);">
+                      <img id="rewAppPreviewImg" src="" alt="پیش‌نمایش تصویر" class="w-100 h-100" style="object-fit: cover;">
+                      <div class="position-absolute top-0 end-0 p-2">
+                        <button type="button" class="btn btn-danger btn-sm rounded-circle shadow" onclick="removeBannerImage()" title="حذف تصویر">
+                          <i class="bi bi-trash-fill"></i>
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Upload Placeholder / Actions -->
+                    <div id="rewAppUploadPrompt" class="text-center py-3">
+                      <i class="bi bi-cloud-arrow-up text-warning fs-2 mb-2 d-block"></i>
+                      <p class="text-light small mb-2">تصویر بنر را انتخاب کنید (فرمت JPG, PNG, WebP - حداکثر ۵ مگابایت)</p>
+                      <button type="button" class="btn btn-outline-warning btn-sm fw-bold px-3" onclick="document.getElementById('rewAppImageFile').click()">
+                        <i class="bi bi-folder2-open me-1"></i> انتخاب تصویر از دستگاه
+                      </button>
+                    </div>
+
+                    <!-- Progress Bar -->
+                    <div id="rewAppUploadProgressWrapper" class="d-none">
+                      <div class="d-flex justify-content-between small text-secondary mb-1">
+                        <span id="rewAppUploadStatusText">در حال آپلود در Supabase Storage...</span>
+                        <span id="rewAppUploadPercent">۰٪</span>
+                      </div>
+                      <div class="progress" style="height: 6px; background: #1e293b;">
+                        <div id="rewAppUploadProgressBar" class="progress-bar bg-warning" role="progressbar" style="width: 0%;"></div>
+                      </div>
+                    </div>
+
+                    <!-- Fallback / Manual URL input (collapsed or secondary) -->
+                    <div class="input-group input-group-sm mt-1">
+                      <span class="input-group-text bg-dark text-secondary border-secondary">یا لینک URL:</span>
+                      <input type="url" id="rewAppBannerUrl" class="form-control form-control-dark" placeholder="https://example.com/banner.jpg" oninput="syncBannerUrlInput(this.value)">
+                    </div>
+                  </div>
                 </div>
                 <div class="col-12">
                   <label class="form-label text-secondary small fw-bold">متن راهنما و شرایط دریافت هدیه:</label>
@@ -3437,6 +3476,107 @@
       }
     }
 
+    function updateBannerImagePreview(url) {
+      const previewContainer = document.getElementById('rewAppPreviewContainer');
+      const previewImg = document.getElementById('rewAppPreviewImg');
+      const promptDiv = document.getElementById('rewAppUploadPrompt');
+      const urlInput = document.getElementById('rewAppBannerUrl');
+
+      if (urlInput && urlInput.value !== url) {
+        urlInput.value = url;
+      }
+
+      if (url && url.trim() !== '') {
+        if (previewImg) previewImg.src = url;
+        if (previewContainer) previewContainer.classList.remove('d-none');
+        if (promptDiv) promptDiv.classList.add('d-none');
+      } else {
+        if (previewImg) previewImg.src = '';
+        if (previewContainer) previewContainer.classList.add('d-none');
+        if (promptDiv) promptDiv.classList.remove('d-none');
+      }
+    }
+
+    function syncBannerUrlInput(val) {
+      updateBannerImagePreview(val);
+    }
+
+    function removeBannerImage() {
+      const fileInput = document.getElementById('rewAppImageFile');
+      if (fileInput) fileInput.value = '';
+      updateBannerImagePreview('');
+    }
+
+    async function handleBannerImageSelect(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      // Validate Type & Size
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+      if (!allowedTypes.includes(file.type)) {
+        alert('خطا: فقط فرمت‌های JPG، PNG و WebP مجاز هستند.');
+        event.target.value = '';
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        alert('خطا: حجم فایل نباید بیشتر از ۵ مگابایت باشد.');
+        event.target.value = '';
+        return;
+      }
+
+      // Show local preview immediately
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        updateBannerImagePreview(e.target.result);
+      };
+      reader.readAsDataURL(file);
+
+      // Upload progress simulation & actual upload
+      const progressWrapper = document.getElementById('rewAppUploadProgressWrapper');
+      const progressBar = document.getElementById('rewAppUploadProgressBar');
+      const percentText = document.getElementById('rewAppUploadPercent');
+      const statusText = document.getElementById('rewAppUploadStatusText');
+
+      if (progressWrapper) progressWrapper.classList.remove('d-none');
+      if (progressBar) progressBar.style.width = '20%';
+      if (percentText) percentText.innerText = '۲۰٪';
+      if (statusText) statusText.innerText = 'در حال آماده‌سازی فایل در Supabase Storage...';
+
+      const formData = new FormData();
+      formData.append('banner', file);
+
+      const key = getAdminKey();
+      try {
+        if (progressBar) progressBar.style.width = '60%';
+        if (percentText) percentText.innerText = '۶۰٪';
+        if (statusText) statusText.innerText = 'در حال آپلود در bucket نام‌گذاری شده gift-banners...';
+
+        const res = await fetch('/api/rewards/admin/upload-banner', {
+          method: 'POST',
+          headers: { 'x-admin-key': key },
+          body: formData
+        });
+        const data = await res.json();
+
+        if (progressBar) progressBar.style.width = '100%';
+        if (percentText) percentText.innerText = '۱۰۰٪';
+        if (statusText) statusText.innerText = 'آپلود موفقیت‌آمیز در Supabase Storage!';
+
+        setTimeout(() => {
+          if (progressWrapper) progressWrapper.classList.add('d-none');
+        }, 1500);
+
+        if (data.success && data.url) {
+          updateBannerImagePreview(data.url);
+        } else {
+          alert('خطا در آپلود: ' + (data.message || 'خطای سرور'));
+        }
+      } catch (err) {
+        if (progressWrapper) progressWrapper.classList.add('d-none');
+        alert('خطای شبکه در بارگذاری تصویر: آرامش خود را حفظ کرده و دوباره تلاش کنید.');
+      }
+    }
+
     async function loadRewardAppearance() {
       try {
         const res = await fetch('/api/rewards/appearance');
@@ -3446,7 +3586,7 @@
           if (document.getElementById('rewAppHeroTitle')) document.getElementById('rewAppHeroTitle').value = app.hero_title || '';
           if (document.getElementById('rewAppColor')) document.getElementById('rewAppColor').value = app.primary_color || '#10B981';
           if (document.getElementById('rewAppHeroSubtitle')) document.getElementById('rewAppHeroSubtitle').value = app.hero_subtitle || '';
-          if (document.getElementById('rewAppBannerUrl')) document.getElementById('rewAppBannerUrl').value = app.hero_banner_url || '';
+          updateBannerImagePreview(app.hero_banner_url || '');
           if (document.getElementById('rewAppTermsText')) document.getElementById('rewAppTermsText').value = app.terms_text || '';
           const isActive = (app.is_active !== false && app.active_sections?.isActive !== false);
           if (document.getElementById('rewAppIsActive')) document.getElementById('rewAppIsActive').checked = isActive;
