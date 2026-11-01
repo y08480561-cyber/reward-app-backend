@@ -490,50 +490,30 @@ const saveAppearanceHandler = async (req, res) => {
 rewardsRouter.post('/admin/appearance', saveAppearanceHandler);
 rewardsRouter.post('/appearance', saveAppearanceHandler);
 
-// Direct Banner Image Upload Route for Supabase Storage (Bucket: gift-banners)
-rewardsRouter.post('/admin/upload-banner', requireAdminAuth, async (req, res) => {
+const multer = require('multer');
+const upload = multer({
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('فقط فرمت‌های JPG، PNG و WebP مجاز هستند.'));
+    }
+  }
+});
+
+// Direct Banner Image Upload Route for Supabase Storage (Bucket: gift-banners) using Multer
+rewardsRouter.post('/admin/upload-banner', requireAdminAuth, upload.single('banner'), async (req, res) => {
   try {
-    // Simple multipart parser fallback or raw buffer support if multer not installed
-    let fileBuffer = null;
-    let fileName = `banner_${Date.now()}.png`;
-    let fileMime = 'image/png';
-
-    // Check if body contains multipart data or file data
-    if (req.files && req.files.banner) {
-      const file = req.files.banner;
-      fileBuffer = file.data;
-      fileName = `banner_${Date.now()}_${crypto.randomBytes(4).toString('hex')}.${file.name.split('.').pop()}`;
-      fileMime = file.mimetype;
-    } else if (req.body && req.body.image_base64) {
-      const matches = req.body.image_base64.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-      if (matches && matches.length === 3) {
-        fileMime = matches[1];
-        fileBuffer = Buffer.from(matches[2], 'base64');
-        const ext = fileMime.split('/')[1] || 'png';
-        fileName = `banner_${Date.now()}_${crypto.randomBytes(4).toString('hex')}.${ext}`;
-      }
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'هیچ تصویری با نام فیلد banner ارسال نشده است.' });
     }
 
-    if (!fileBuffer) {
-      // If content-type is multipart/form-data, parse buffer from req
-      const chunks = [];
-      for await (const chunk of req) {
-        chunks.push(chunk);
-      }
-      const rawBuffer = Buffer.concat(chunks);
-      if (rawBuffer.length > 0) {
-        fileBuffer = rawBuffer;
-        fileName = `banner_${Date.now()}_${crypto.randomBytes(4).toString('hex')}.png`;
-      }
-    }
-
-    if (!fileBuffer || fileBuffer.length === 0) {
-      return res.status(400).json({ success: false, message: 'هیچ تصویری برای آپلود دریافت نشد.' });
-    }
-
-    if (fileBuffer.length > 5 * 1024 * 1024) {
-      return res.status(400).json({ success: false, message: 'حجم فایل نباید بیشتر از ۵ مگابایت باشد.' });
-    }
+    const fileBuffer = req.file.buffer;
+    const fileMime = req.file.mimetype;
+    const ext = req.file.originalname.split('.').pop() || 'png';
+    const fileName = `banner_${Date.now()}_${crypto.randomBytes(4).toString('hex')}.${ext}`;
 
     // Supabase Storage Upload via REST API if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY exist
     const supabaseUrl = process.env.SUPABASE_URL;
@@ -558,7 +538,7 @@ rewardsRouter.post('/admin/upload-banner', requireAdminAuth, async (req, res) =>
         return res.json({ success: true, url: publicUrl, message: 'تصویر با موفقیت در Supabase Storage آپلود شد.' });
       } else {
         const errText = await uploadRes.text();
-        console.warn('[Supabase Storage Warning] Direct upload returned status:', uploadRes.status, errText);
+        console.warn('[Supabase Storage Warning] Upload returned status:', uploadRes.status, errText);
       }
     }
 
@@ -567,12 +547,12 @@ rewardsRouter.post('/admin/upload-banner', requireAdminAuth, async (req, res) =>
     return res.json({
       success: true,
       url: localPublicUrl,
-      message: 'تصویر با موفقیت بارگذاری شد (ذخیره موقت سرور).'
+      message: 'تصویر با موفقیت بارگذاری شد.'
     });
 
   } catch (err) {
     console.error('[Upload Banner Error]:', err);
-    return res.status(500).json({ success: false, message: 'خطا در پردازش و آپلود تصویر بنر.' });
+    return res.status(500).json({ success: false, message: err.message || 'خطا در پردازش و آپلود تصویر بنر.' });
   }
 });
 

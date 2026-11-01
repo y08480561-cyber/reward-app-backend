@@ -3480,23 +3480,17 @@
       const promptDiv = document.getElementById('rewAppUploadPrompt');
       const urlInput = document.getElementById('rewAppBannerUrl');
 
-      if (urlInput && urlInput.value !== url) {
-        urlInput.value = url;
-      }
-
       if (url && url.trim() !== '') {
+        if (urlInput) urlInput.value = url;
         if (previewImg) previewImg.src = url;
         if (previewContainer) previewContainer.classList.remove('d-none');
         if (promptDiv) promptDiv.classList.add('d-none');
       } else {
+        if (urlInput) urlInput.value = '';
         if (previewImg) previewImg.src = '';
         if (previewContainer) previewContainer.classList.add('d-none');
         if (promptDiv) promptDiv.classList.remove('d-none');
       }
-    }
-
-    function syncBannerUrlInput(val) {
-      updateBannerImagePreview(val);
     }
 
     function removeBannerImage() {
