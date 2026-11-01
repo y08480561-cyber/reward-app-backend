@@ -139,7 +139,7 @@ fun ProfileScreen(
                             )
                         ) {
                             Text(
-                                text = if (user.panelType == "gold") "👑 طلایی" else "🥈 نقره‌ای",
+                                text = if (user.panelType == "gold") "👑 طلایی (۶X)" else "🥈 نقره‌ای (۳X)",
                                 color = if (user.panelType == "gold") NavyPrimary else Color(0xFF475569),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.ExtraBold,

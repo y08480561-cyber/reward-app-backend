@@ -1093,8 +1093,8 @@
           <div class="card p-4 shadow mb-4" style="border: 1px solid #FFB703; background-color: #12253B;">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
               <div>
-                <h4 class="gold-text fw-bold mb-1"><i class="bi bi-shop me-2"></i> مدیریت قیمت‌های فروشگاه (۵ بسته اصلی)</h4>
-                <p class="text-secondary small mb-0">امکان تغییر قیمت ۵ بسته ثابت (دو بسته مربع و سه سطح ارتقای پنل). نام، تعداد و مشخصات ثابت هستند.</p>
+                <h4 class="gold-text fw-bold mb-1"><i class="bi bi-shop me-2"></i> مدیریت قیمت‌های فروشگاه (۴ بسته اصلی)</h4>
+                <p class="text-secondary small mb-0">امکان تغییر قیمت ۴ بسته ثابت (دو بسته مربع و دو سطح ارتقای نقره‌ای و طلایی). نام، تعداد، ضرایب و مشخصات ثابت هستند.</p>
               </div>
               <div class="d-flex gap-2">
                 <button class="btn btn-outline-warning btn-sm" onclick="loadStoreProducts()"><i class="bi bi-arrow-clockwise me-1"></i> بروزرسانی</button>
@@ -3106,12 +3106,17 @@
 
         tbody.innerHTML = cachedStoreProducts.map(p => {
           const typeLabel = p.product_type === 'ACCOUNT_UPGRADE' 
-            ? '<span class="badge bg-warning text-dark"><i class="bi bi-star-fill me-1"></i> ارتقای حساب (VIP)</span>' 
+            ? '<span class="badge bg-warning text-dark"><i class="bi bi-star-fill me-1"></i> ارتقای سطح حساب</span>' 
             : '<span class="badge bg-primary"><i class="bi bi-grid-fill me-1"></i> بازگشایی مربع</span>';
           
-          const unitsLabel = p.product_type === 'ACCOUNT_UPGRADE'
-            ? 'اشتراک VIP کامل'
-            : `<strong class="text-warning">${Number(p.units_granted).toLocaleString('fa-IR')}</strong> مربع`;
+          let unitsLabel = '';
+          if (p.id === 'pkg_upgrade_silver') {
+            unitsLabel = '<span class="badge bg-info text-dark">ضریب ۳ برابری (۳X)</span>';
+          } else if (p.id === 'pkg_upgrade_gold') {
+            unitsLabel = '<span class="badge bg-warning text-dark">ضریب ۶ برابری (۶X)</span>';
+          } else {
+            unitsLabel = `<strong class="text-warning">${Number(p.units_granted).toLocaleString('fa-IR')}</strong> مربع`;
+          }
 
           const priceFormatted = Number(p.price_toman).toLocaleString('fa-IR') + ' تومان';
 
@@ -3138,10 +3143,7 @@
               <td>${myketStatus}</td>
               <td>${activeBadge}</td>
               <td>
-                <div class="btn-group btn-group-sm">
-                  <button class="btn btn-outline-warning" onclick="openEditProductModal('${p.id}')" title="ویرایش"><i class="bi bi-pencil-fill"></i></button>
-                  <button class="btn btn-outline-danger" onclick="deleteStoreProduct('${p.id}')" title="حذف"><i class="bi bi-trash-fill"></i></button>
-                </div>
+                <button class="btn btn-warning btn-sm" onclick="openEditProductModal('${p.id}')" title="ویرایش قیمت"><i class="bi bi-pencil-fill me-1"></i> ویرایش قیمت</button>
               </td>
             </tr>
           `;

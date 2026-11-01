@@ -312,6 +312,8 @@ data class StoreProduct(
 data class UserEntitlements(
     val instantUnlockCredits: Int = 0,
     val isVip: Boolean = false,
-    val totalPurchasedToman: Long = 0
+    val totalPurchasedToman: Long = 0,
+    val accountTier: String = "NORMAL",
+    val multiplier: Int = 1
 )
 

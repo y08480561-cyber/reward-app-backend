@@ -162,11 +162,21 @@ fun StoreHeader(entitlements: UserEntitlements) {
                     value = "${entitlements.instantUnlockCredits.toPersianDigits()} مربع",
                     modifier = Modifier.weight(1f)
                 )
+                val statusText = when (entitlements.accountTier.uppercase()) {
+                    "GOLD" -> "👑 طلایی (۶X)"
+                    "SILVER" -> "🥈 نقره‌ای (۳X)"
+                    else -> "عادی (۱X)"
+                }
+                val statusColor = when (entitlements.accountTier.uppercase()) {
+                    "GOLD" -> GoldAccent
+                    "SILVER" -> Color(0xFF0284C7)
+                    else -> Color(0xFF94A3B8)
+                }
                 EntitlementBadge(
                     icon = Icons.Default.Verified,
-                    label = "وضعیت حساب",
-                    value = if (entitlements.isVip) "حساب VIP" else "عادی",
-                    accentColor = if (entitlements.isVip) GoldAccent else Color(0xFF94A3B8),
+                    label = "سطح و ضریب امتیاز",
+                    value = statusText,
+                    accentColor = statusColor,
                     modifier = Modifier.weight(1f)
                 )
             }

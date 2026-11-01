@@ -426,6 +426,11 @@ async function initDatabaseTables() {
     // 19. Schema updates for users and purchases
     `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS instant_unlock_credits INTEGER NOT NULL DEFAULT 0;`,
     `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS is_vip BOOLEAN NOT NULL DEFAULT false;`,
+    `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS account_tier TEXT NOT NULL DEFAULT 'NORMAL';`,
+    `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS panel_type TEXT NOT NULL DEFAULT 'free';`,
+    `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS multiplier INTEGER NOT NULL DEFAULT 1;`,
+    `ALTER TABLE public.user_entitlements ADD COLUMN IF NOT EXISTS account_tier TEXT NOT NULL DEFAULT 'NORMAL';`,
+    `ALTER TABLE public.user_entitlements ADD COLUMN IF NOT EXISTS multiplier INTEGER NOT NULL DEFAULT 1;`,
     `ALTER TABLE public.purchases ADD COLUMN IF NOT EXISTS myket_order_id TEXT;`,
     `ALTER TABLE public.purchases ADD COLUMN IF NOT EXISTS units_granted INTEGER DEFAULT 0;`,
     `ALTER TABLE public.purchases ADD COLUMN IF NOT EXISTS error_message TEXT;`,
@@ -541,73 +546,60 @@ async function initDatabaseTables() {
     console.warn('[PostgreSQL Init Announcement Warning]', err.message);
   }
 
-  // Ensure the 5 canonical store products exist
+  // Ensure the 4 canonical store products exist
   try {
     const canonicalProducts = [
       {
         id: 'pkg_squares_50',
-        title: 'بسته بازگشایی ۵۰ مربع',
-        description: 'بازگشایی سریع و آنی ۵۰ مربع مسابقه همراه با ثبت کامل ۵۰ امتیاز در جدول رتبه‌بندی.',
+        title: 'بازگشایی ۵۰ مربع',
+        description: 'بازگشایی آنی ۵۰ مربع مسابقه بدون نیاز به تماشای تبلیغات، همراه با ثبت مستقیم امتیازات در جدول رده‌بندی.',
         product_type: 'SQUARE_UNLOCK',
         units_granted: 50,
-        price_toman: 99000,
+        price_toman: 55000,
         myket_sku: 'reqabat_unlock_50',
-        badge: 'پرطرفدار',
+        badge: 'محبوب',
         is_active: true,
         is_ready_in_myket: false,
         sort_order: 1
       },
       {
         id: 'pkg_squares_100',
-        title: 'بسته بازگشایی ۱۰۰ مربع',
-        description: 'تکمیل کامل و آنی ۱۰۰ مربع مسابقه با ثبت ۱۰۰ امتیاز مستقیم و صعود فوری به صدر جدول برندگان.',
+        title: 'بازگشایی ۱۰۰ مربع',
+        description: 'تکمیل سریع ۱۰۰ مربع کامل روزانه با یک لمس و دریافت کامل امتیازات روز برای صعود به صدر جدول برندگان.',
         product_type: 'SQUARE_UNLOCK',
         units_granted: 100,
-        price_toman: 179000,
+        price_toman: 100000,
         myket_sku: 'reqabat_unlock_100',
-        badge: 'ویژه',
+        badge: 'به‌صرفه',
         is_active: true,
         is_ready_in_myket: false,
         sort_order: 2
       },
       {
-        id: 'pkg_upgrade_level_1',
-        title: 'ارتقای پنل سطح ۱',
-        description: 'فعال‌سازی امکانات پایه ویژه، افزایش امتیاز ضریب پاداش و دسترسی به گزارش‌های پیشرفته.',
+        id: 'pkg_upgrade_silver',
+        title: 'ارتقای نقره‌ای',
+        description: 'ارتقای سطح به نقره‌ای (Silver): امتیاز هر مربع از ۱ به ۳ امتیاز افزایش می‌یابد (ضریب ۳ برابری).',
         product_type: 'ACCOUNT_UPGRADE',
-        units_granted: 1,
-        price_toman: 129000,
-        myket_sku: 'reqabat_upgrade_lvl1',
-        badge: 'سطح ۱',
+        units_granted: 3,
+        price_toman: 70000,
+        myket_sku: 'reqabat_upgrade_silver',
+        badge: 'نقره‌ای (۳X)',
         is_active: true,
         is_ready_in_myket: false,
         sort_order: 3
       },
       {
-        id: 'pkg_upgrade_level_2',
-        title: 'ارتقای پنل سطح ۲',
-        description: 'عضویت طلایی سطح ۲: ضریب امتیاز ۲ برابری در مسابقات دوره‌ای و پشتیبانی اختصاصی.',
+        id: 'pkg_upgrade_gold',
+        title: 'ارتقای طلایی',
+        description: 'بالاترین سطح عضویت طلایی (Gold): امتیاز هر مربع به ۶ امتیاز افزایش می‌یابد (ضریب ۶ برابری ویژه).',
         product_type: 'ACCOUNT_UPGRADE',
-        units_granted: 2,
-        price_toman: 249000,
-        myket_sku: 'reqabat_upgrade_lvl2',
-        badge: 'سطح ۲',
+        units_granted: 6,
+        price_toman: 120000,
+        myket_sku: 'reqabat_upgrade_gold',
+        badge: 'طلایی (۶X)',
         is_active: true,
         is_ready_in_myket: false,
         sort_order: 4
-      },
-      {
-        id: 'pkg_upgrade_level_3',
-        title: 'ارتقای پنل سطح ۳',
-        description: 'بالاترین سطح دسترسی VIP: ضریب امتیاز ۳ برابری، اولویت کامل در قرعه‌کشی و هدیه ویژه نقدی.',
-        product_type: 'ACCOUNT_UPGRADE',
-        units_granted: 3,
-        price_toman: 449000,
-        myket_sku: 'reqabat_upgrade_lvl3',
-        badge: 'سطح ۳ VIP',
-        is_active: true,
-        is_ready_in_myket: false,
-        sort_order: 5
       }
     ];
 
@@ -629,11 +621,11 @@ async function initDatabaseTables() {
       );
     }
 
-    // Safely deactivate any legacy products outside the 5 fixed canonical packages
+    // Safely deactivate any legacy products outside the 4 fixed canonical packages (preserving purchases/orders intact)
     await pool.query(
-      `UPDATE public.store_products SET is_active = false WHERE id NOT IN ('pkg_squares_50', 'pkg_squares_100', 'pkg_upgrade_level_1', 'pkg_upgrade_level_2', 'pkg_upgrade_level_3')`
+      `UPDATE public.store_products SET is_active = false WHERE id NOT IN ('pkg_squares_50', 'pkg_squares_100', 'pkg_upgrade_silver', 'pkg_upgrade_gold')`
     );
-    console.log('[PostgreSQL] 5 canonical store packages ensured.');
+    console.log('[PostgreSQL] 4 canonical store packages ensured.');
   } catch (err) {
     console.warn('[PostgreSQL Store Products Seed Warning]', err.message);
   }
@@ -964,6 +956,55 @@ function getIranMidnightBounds(nowMs = Date.now()) {
   const startTime = todayTehran.getTime() - offsetMs;
   const endTime = tomorrowTehran.getTime() - offsetMs;
   return { startTime, endTime };
+}
+
+// Helper: Determine verified active account tier and score multiplier for user
+// Rules:
+// - NORMAL (default): 1 point per completed square
+// - SILVER: 3 points per completed square
+// - GOLD: 6 points per completed square
+// Persisted in DB (users / user_entitlements), survives logout & re-install
+async function getUserActiveTierAndMultiplier(clientOrPool, userId) {
+  if (!clientOrPool || !userId) return { tier: 'NORMAL', multiplier: 1 };
+  try {
+    const res = await clientOrPool.query(
+      `SELECT 
+         COALESCE(u.account_tier, e.account_tier, 'NORMAL') AS account_tier,
+         COALESCE(u.multiplier, e.multiplier, 1) AS multiplier,
+         COALESCE(u.panel_type, 'free') AS panel_type
+       FROM public.users u
+       LEFT JOIN public.user_entitlements e ON u.id = e.user_id
+       WHERE u.id = $1 LIMIT 1`,
+      [userId]
+    );
+
+    let tier = 'NORMAL';
+    if (res.rows.length > 0) {
+      const rawTier = String(res.rows[0].account_tier || '').toUpperCase();
+      const rawPanel = String(res.rows[0].panel_type || '').toLowerCase();
+      if (rawTier === 'GOLD' || rawTier === 'VIP' || rawPanel === 'gold' || rawPanel === 'vip') {
+        tier = 'GOLD';
+      } else if (rawTier === 'SILVER' || rawPanel === 'silver') {
+        tier = 'SILVER';
+      } else {
+        tier = 'NORMAL';
+      }
+    }
+
+    let multiplier = 1;
+    if (tier === 'GOLD') {
+      multiplier = 6;
+    } else if (tier === 'SILVER') {
+      multiplier = 3;
+    } else {
+      multiplier = 1;
+    }
+
+    return { tier, multiplier };
+  } catch (err) {
+    console.warn('[getUserActiveTierAndMultiplier Warning]', err.message);
+    return { tier: 'NORMAL', multiplier: 1 };
+  }
 }
 
 // Helper: Ensure cycle resetting at midnight Iran time (12 AM Tehran time) in PostgreSQL
@@ -1383,19 +1424,14 @@ app.get('/api/panels/me', ensureDatabaseReady, async (req, res) => {
     if (!userId) return res.status(401).json({ error: "شناسه کاربر نامعتبر است." });
     const cycle = await getOrCreateActiveCycle(userId);
 
-    const memRes = await pool.query(
-      `SELECT panel_type, multiplier, purchased_at FROM public.user_memberships WHERE user_id = $1 AND cycle_id = $2 LIMIT 1`,
-      [userId, cycle.cycleId]
-    );
+    const { tier, multiplier } = await getUserActiveTierAndMultiplier(pool, userId);
 
-    let membership = { panelType: "free", multiplier: 1, purchasedAt: null };
-    if (memRes.rows.length > 0) {
-      membership = {
-        panelType: memRes.rows[0].panel_type,
-        multiplier: Number(memRes.rows[0].multiplier),
-        purchasedAt: new Date(memRes.rows[0].purchased_at).getTime()
-      };
-    }
+    const membership = {
+      panelType: tier.toLowerCase(),
+      multiplier: multiplier,
+      accountTier: tier,
+      purchasedAt: null
+    };
     return res.json({ success: true, cycle, membership });
   } catch (err) {
     console.error('[API Panels Me Error]', err);
@@ -1404,6 +1440,7 @@ app.get('/api/panels/me', ensureDatabaseReady, async (req, res) => {
 });
 
 app.post('/api/purchases/verify', ensureDatabaseReady, async (req, res) => {
+  const client = await pool.connect();
   try {
     const userId = req.headers['x-user-id'] || req.body.userId;
     const { productId, purchaseToken, orderId } = req.body;
@@ -1412,50 +1449,93 @@ app.post('/api/purchases/verify', ensureDatabaseReady, async (req, res) => {
       return res.status(400).json({ error: "شناسه کاربر یا محصول نامعتبر است." });
     }
 
-    const cycle = await getOrCreateActiveCycle(userId);
-    let panelType = "free";
+    if (purchaseToken) {
+      const tokenCheck = await client.query(
+        `SELECT purchase_id FROM public.purchases WHERE purchase_token = $1 LIMIT 1`,
+        [purchaseToken]
+      );
+      if (tokenCheck.rows.length > 0) {
+        return res.status(409).json({ error: "این توکن خرید قبلاً ثبت شده است (جلوگیری از ثبت تکراری)." });
+      }
+    }
+
+    const currentTierInfo = await getUserActiveTierAndMultiplier(client, userId);
+    let newTier = 'NORMAL';
     let multiplier = 1;
     let amount = 0;
 
-    if (productId === "silver_panel") {
-      panelType = "silver";
-      multiplier = 2;
-      amount = 55000;
-    } else if (productId === "gold_panel" || productId === "gold_upgrade") {
-      panelType = "gold";
-      multiplier = 4;
-      amount = 105000;
+    if (productId === "pkg_upgrade_silver" || productId === "silver_panel") {
+      if (currentTierInfo.tier === 'GOLD') {
+        newTier = 'GOLD';
+        multiplier = 6;
+      } else {
+        newTier = 'SILVER';
+        multiplier = 3;
+      }
+      amount = 70000;
+    } else if (productId === "pkg_upgrade_gold" || productId === "gold_panel" || productId === "gold_upgrade") {
+      newTier = 'GOLD';
+      multiplier = 6;
+      amount = 120000;
     } else {
-      return res.status(400).json({ error: "شناسه محصول پرداخت نامعتبر است." });
+      return res.status(400).json({ error: "شناسه محصول نامعتبر است." });
     }
 
+    const cycle = await getOrCreateActiveCycle(userId);
     const purchaseId = orderId || ("PUR_" + crypto.randomBytes(8).toString('hex'));
 
-    await pool.query(
+    await client.query('BEGIN');
+
+    await client.query(
       `INSERT INTO public.purchases (purchase_id, user_id, product_id, amount, status, purchase_token, created_at)
        VALUES ($1, $2, $3, $4, 'SUCCESS', $5, NOW())
        ON CONFLICT (purchase_id) DO NOTHING`,
       [purchaseId, userId, productId, amount, purchaseToken || null]
     );
 
-    await pool.query(
+    await client.query(
+      `INSERT INTO public.user_entitlements (user_id, instant_unlock_credits, is_vip, account_tier, multiplier, total_purchased_toman, updated_at)
+       VALUES ($1, 0, $2, $3, $4, $5, NOW())
+       ON CONFLICT (user_id) 
+       DO UPDATE SET 
+         is_vip = $2,
+         account_tier = $3,
+         multiplier = $4,
+         total_purchased_toman = public.user_entitlements.total_purchased_toman + $5,
+         updated_at = NOW()`,
+      [userId, newTier === 'GOLD', newTier, multiplier, amount]
+    );
+
+    await client.query(
+      `UPDATE public.users 
+       SET account_tier = $1, panel_type = $2, multiplier = $3, is_vip = $4, updated_at = NOW() 
+       WHERE id = $5`,
+      [newTier, newTier.toLowerCase(), multiplier, newTier === 'GOLD', userId]
+    );
+
+    await client.query(
       `INSERT INTO public.user_memberships (user_id, cycle_id, panel_type, multiplier, purchased_at)
        VALUES ($1, $2, $3, $4, NOW())
        ON CONFLICT (user_id, cycle_id) 
        DO UPDATE SET panel_type = $3, multiplier = $4, purchased_at = NOW()`,
-      [userId, cycle.cycleId, panelType, multiplier]
+      [userId, cycle.cycleId, newTier.toLowerCase(), multiplier]
     );
 
-    console.log(`[Panel Purchase] User ${userId} successfully upgraded to panel ${panelType} (Multiplier: ${multiplier}x) for cycle ${cycle.cycleId}`);
+    await client.query('COMMIT');
+
+    console.log(`[Panel Purchase] User ${userId} upgraded to ${newTier} (Multiplier: ${multiplier}x)`);
 
     return res.json({
       success: true,
-      message: "خرید پنل با موفقیت ثبت و فعال شد.",
-      membership: { panelType, multiplier, cycleId: cycle.cycleId }
+      message: `ارتقای سطح به ${newTier === 'GOLD' ? 'طلایی (ضریب ۶X)' : 'نقره‌ای (ضریب ۳X)'} با موفقیت ثبت و فعال شد.`,
+      membership: { panelType: newTier.toLowerCase(), accountTier: newTier, multiplier, cycleId: cycle.cycleId }
     });
   } catch (err) {
+    await client.query('ROLLBACK');
     console.error('[Verify Purchase Error]', err);
     return res.status(500).json({ error: "خطا در تایید خرید و فعال‌سازی پنل." });
+  } finally {
+    client.release();
   }
 });
 
@@ -1528,11 +1608,15 @@ app.get('/api/store/user-entitlements', ensureDatabaseReady, async (req, res) =>
       }
     }
 
+    const { tier, multiplier } = await getUserActiveTierAndMultiplier(pool, userId);
+
     return res.json({
       success: true,
       entitlements: {
         instantUnlockCredits: credits,
-        isVip: isVip,
+        isVip: tier === 'GOLD',
+        accountTier: tier,
+        multiplier: multiplier,
         totalPurchasedToman: totalPurchased
       }
     });
@@ -1603,8 +1687,8 @@ app.post('/api/store/verify-purchase', ensureDatabaseReady, async (req, res) => 
 
     if (product.product_type === 'SQUARE_UNLOCK') {
       const entUpdate = await client.query(
-        `INSERT INTO public.user_entitlements (user_id, instant_unlock_credits, is_vip, total_purchased_toman, updated_at)
-         VALUES ($1, $2, false, $3, NOW())
+        `INSERT INTO public.user_entitlements (user_id, instant_unlock_credits, is_vip, account_tier, multiplier, total_purchased_toman, updated_at)
+         VALUES ($1, $2, false, 'NORMAL', 1, $3, NOW())
          ON CONFLICT (user_id) 
          DO UPDATE SET 
            instant_unlock_credits = public.user_entitlements.instant_unlock_credits + $2,
@@ -1621,32 +1705,54 @@ app.post('/api/store/verify-purchase', ensureDatabaseReady, async (req, res) => 
         [updatedCredits, userId]
       );
     } else if (product.product_type === 'ACCOUNT_UPGRADE') {
+      const currentTierInfo = await getUserActiveTierAndMultiplier(client, userId);
+      let newTier = 'NORMAL';
+      let newMultiplier = 1;
+
+      if (productId === 'pkg_upgrade_gold' || productId === 'gold_panel' || productId === 'gold_upgrade') {
+        newTier = 'GOLD';
+        newMultiplier = 6;
+      } else if (productId === 'pkg_upgrade_silver' || productId === 'silver_panel') {
+        if (currentTierInfo.tier === 'GOLD') {
+          // Rule 4: User is already GOLD, purchasing SILVER will NOT downgrade them!
+          newTier = 'GOLD';
+          newMultiplier = 6;
+        } else {
+          newTier = 'SILVER';
+          newMultiplier = 3;
+        }
+      }
+
       const entUpdate = await client.query(
-        `INSERT INTO public.user_entitlements (user_id, instant_unlock_credits, is_vip, total_purchased_toman, updated_at)
-         VALUES ($1, 0, true, $2, NOW())
+        `INSERT INTO public.user_entitlements (user_id, instant_unlock_credits, is_vip, account_tier, multiplier, total_purchased_toman, updated_at)
+         VALUES ($1, 0, $2, $3, $4, $5, NOW())
          ON CONFLICT (user_id) 
          DO UPDATE SET 
-           is_vip = true,
-           total_purchased_toman = public.user_entitlements.total_purchased_toman + $2,
+           is_vip = $2,
+           account_tier = $3,
+           multiplier = $4,
+           total_purchased_toman = public.user_entitlements.total_purchased_toman + $5,
            updated_at = NOW()
-         RETURNING instant_unlock_credits, is_vip`,
-        [userId, amountToman]
+         RETURNING instant_unlock_credits, is_vip, account_tier, multiplier`,
+        [userId, newTier === 'GOLD', newTier, newMultiplier, amountToman]
       );
       updatedCredits = Number(entUpdate.rows[0].instant_unlock_credits);
-      isVip = true;
+      isVip = (newTier === 'GOLD');
 
       await client.query(
-        `UPDATE public.users SET is_vip = true, panel_type = 'vip', multiplier = 2, updated_at = NOW() WHERE id = $1`,
-        [userId]
+        `UPDATE public.users 
+         SET account_tier = $1, panel_type = $2, multiplier = $3, is_vip = $4, updated_at = NOW() 
+         WHERE id = $5`,
+        [newTier, newTier.toLowerCase(), newMultiplier, isVip, userId]
       );
 
       const cycle = await getOrCreateActiveCycle(userId);
       await client.query(
         `INSERT INTO public.user_memberships (user_id, cycle_id, panel_type, multiplier, purchased_at)
-         VALUES ($1, $2, 'gold', 2, NOW())
+         VALUES ($1, $2, $3, $4, NOW())
          ON CONFLICT (user_id, cycle_id)
-         DO UPDATE SET panel_type = 'gold', multiplier = 2, purchased_at = NOW()`,
-        [userId, cycle.cycleId]
+         DO UPDATE SET panel_type = $3, multiplier = $4, purchased_at = NOW()`,
+        [userId, cycle.cycleId, newTier.toLowerCase(), newMultiplier]
       );
     }
 
@@ -1723,12 +1829,9 @@ app.post('/api/squares/instant-unlock', ensureDatabaseReady, async (req, res) =>
       return res.status(409).json({ error: "این مربع قبلاً در این دوره ۲۴ ساعته باز و تکمیل شده است." });
     }
 
-    // Multiplier from membership (or VIP)
-    const memRes = await client.query(
-      `SELECT multiplier FROM public.user_memberships WHERE user_id = $1 AND cycle_id = $2 LIMIT 1`,
-      [userId, cycle.cycleId]
-    );
-    const awardedPoints = memRes.rows.length > 0 ? Number(memRes.rows[0].multiplier) : 1;
+    // Multiplier from verified active account tier (NORMAL=1, SILVER=3, GOLD=6)
+    const { tier: activeTier, multiplier: verifiedMultiplier } = await getUserActiveTierAndMultiplier(client, userId);
+    const awardedPoints = verifiedMultiplier;
 
     await client.query('BEGIN');
 
@@ -1828,9 +1931,9 @@ app.post('/api/admin/store/products', requireAdminAuth, ensureDatabaseReady, asy
   try {
     const { id, price_toman } = req.body;
 
-    const allowedIds = ['pkg_squares_50', 'pkg_squares_100', 'pkg_upgrade_level_1', 'pkg_upgrade_level_2', 'pkg_upgrade_level_3'];
+    const allowedIds = ['pkg_squares_50', 'pkg_squares_100', 'pkg_upgrade_silver', 'pkg_upgrade_gold'];
     if (!id || !allowedIds.includes(id)) {
-      return res.status(400).json({ error: "فقط ویرایش ۵ بسته ثابت فروشگاه مجاز است و افزودن یا تغییر شناسه بسته پذیرفته نیست." });
+      return res.status(400).json({ error: "فقط ویرایش قیمت ۴ بسته ثابت فروشگاه مجاز است و افزودن یا تغییر شناسه بسته پذیرفته نیست." });
     }
 
     if (price_toman === undefined || isNaN(Number(price_toman)) || Number(price_toman) < 0) {
@@ -1852,7 +1955,7 @@ app.post('/api/admin/store/products', requireAdminAuth, ensureDatabaseReady, asy
 });
 
 app.delete('/api/admin/store/products/:id', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
-  return res.status(400).json({ error: "حذف ۵ بسته ثابت فروشگاه مجاز نیست. این بسته‌ها ساختار اصلی فروشگاه هستند." });
+  return res.status(400).json({ error: "حذف ۴ بسته ثابت فروشگاه مجاز نیست. این بسته‌ها ساختار اصلی فروشگاه هستند." });
 });
 
 app.get('/api/admin/store/purchases', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
@@ -1911,12 +2014,9 @@ app.post('/api/ads/complete', ensureDatabaseReady, async (req, res) => {
       return res.status(400).json({ error: "دوره ۲۴ ساعته منقضی شده است. جدول به‌روزرسانی شد." });
     }
 
-    // Get user's active membership multiplier for this cycle (1, 2, or 4)
-    const memRes = await client.query(
-      `SELECT multiplier FROM public.user_memberships WHERE user_id = $1 AND cycle_id = $2 LIMIT 1`,
-      [userId, cycle.cycleId]
-    );
-    const awardedMultiplier = memRes.rows.length > 0 ? Number(memRes.rows[0].multiplier) : 1;
+    // Multiplier from verified active account tier (NORMAL=1, SILVER=3, GOLD=6)
+    const { tier: activeTier, multiplier: verifiedMultiplier } = await getUserActiveTierAndMultiplier(client, userId);
+    const awardedMultiplier = verifiedMultiplier;
 
     // 1. Anti-Replay Token (Reward Nonce) Check
     if (rewardNonce) {

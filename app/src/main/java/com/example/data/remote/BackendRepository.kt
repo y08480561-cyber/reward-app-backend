@@ -1581,7 +1581,9 @@ class BackendRepository(
                             com.example.model.UserEntitlements(
                                 instantUnlockCredits = entObj.optInt("instantUnlockCredits"),
                                 isVip = entObj.optBoolean("isVip"),
-                                totalPurchasedToman = entObj.optLong("totalPurchasedToman")
+                                totalPurchasedToman = entObj.optLong("totalPurchasedToman"),
+                                accountTier = entObj.optString("accountTier", if (entObj.optBoolean("isVip")) "GOLD" else "NORMAL"),
+                                multiplier = entObj.optInt("multiplier", if (entObj.optBoolean("isVip")) 6 else 1)
                             )
                         )
                     } else {

@@ -188,7 +188,7 @@ fun MembershipScreen(
         PanelCard(
             title = "پنل پایه (عادی)",
             priceStr = "رایگان",
-            multiplierStr = "ضریب ۱ برابری امتیاز",
+            multiplierStr = "ضریب ۱ برابری (۱ امتیاز به ازای هر مربع)",
             description = "پیش‌فرض برای همه کاربران جدید. هر مربع تکمیل‌شده معادل ۱ امتیاز ثبت می‌شود.",
             isCurrent = currentPanelType == "free",
             buttonText = "پنل فعلی شما",
@@ -199,35 +199,34 @@ fun MembershipScreen(
 
         // 2. Silver Panel
         PanelCard(
-            title = "پنل نقره‌ای",
-            priceStr = "۵۵,۰۰۰ تومان",
-            multiplierStr = "ضریب ۲ برابری امتیاز",
-            description = "دو برابر شدن امتیاز تمامی مربع‌های تکمیل‌شده در دوره جاری مسابقه.",
+            title = "ارتقای نقره‌ای",
+            priceStr = "۷۰,۰۰۰ تومان",
+            multiplierStr = "ضریب ۳ برابری امتیاز (۳ امتیاز به ازای هر مربع)",
+            description = "سه برابر شدن امتیاز تمامی مربع‌های تکمیل‌شده بعد از فعال شدن ارتقا.",
             isCurrent = currentPanelType == "silver",
-            buttonText = if (currentPanelType == "silver") "پنل فعال شما" else "خرید پنل نقره‌ای",
+            buttonText = if (currentPanelType == "silver") "سطح نقره‌ای فعال شما" else "خرید ارتقای نقره‌ای (۷۰,۰۰۰ تومان)",
             buttonEnabled = currentPanelType != "silver" && currentPanelType != "gold",
             accentColor = Color(0xFF0284C7),
-            onAction = { onPurchase("silver_panel") }
+            onAction = { onPurchase("pkg_upgrade_silver") }
         )
 
         // 3. Gold Panel / Upgrade
         val goldButtonText = when (currentPanelType) {
-            "gold" -> "پنل طلایی فعال"
-            "silver" -> "ارتقا به طلایی (۱۰۵,۰۰۰ تومان)"
-            else -> "خرید پنل طلایی (۱۰۵,۰۰۰ تومان)"
+            "gold" -> "سطح طلایی فعال شما"
+            "silver" -> "ارتقا به طلایی (۱۲۰,۰۰۰ تومان)"
+            else -> "خرید ارتقای طلایی (۱۲۰,۰۰۰ تومان)"
         }
         PanelCard(
-            title = "پنل طلایی",
-            priceStr = "۱۰۵,۰۰۰ تومان",
-            multiplierStr = "ضریب ۴ برابری امتیاز",
-            description = "چهار برابر شدن امتیاز هر مربع (۴ امتیاز به ازای هر مربع). امکان ارتقای مستقیم از نقره‌ای با حفظ امتیازات قبلی.",
+            title = "ارتقای طلایی",
+            priceStr = "۱۲۰,۰۰۰ تومان",
+            multiplierStr = "ضریب ۶ برابری امتیاز (۶ امتیاز به ازای هر مربع)",
+            description = "شش برابر شدن امتیاز هر مربع (۶ امتیاز به ازای هر مربع). بالاترین سطح رقابت با حفظ همیشگی سطح.",
             isCurrent = currentPanelType == "gold",
             buttonText = goldButtonText,
             buttonEnabled = currentPanelType != "gold",
             accentColor = GoldAccent,
             onAction = {
-                val productId = if (currentPanelType == "silver") "gold_upgrade" else "gold_panel"
-                onPurchase(productId)
+                onPurchase("pkg_upgrade_gold")
             }
         )
 
