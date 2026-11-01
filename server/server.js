@@ -541,89 +541,99 @@ async function initDatabaseTables() {
     console.warn('[PostgreSQL Init Announcement Warning]', err.message);
   }
 
-  // Ensure default store products exist
+  // Ensure the 5 canonical store products exist
   try {
-    const prodCheck = await pool.query(`SELECT id FROM public.store_products LIMIT 1`);
-    if (prodCheck.rows.length === 0) {
-      const defaultProducts = [
-        {
-          id: 'pkg_squares_50',
-          title: 'بسته بازگشایی ۵۰ مربع',
-          description: 'بازگشایی سریع و آنی ۵۰ مربع مسابقه همراه با ثبت کامل ۵۰ امتیاز در جدول رتبه‌بندی.',
-          product_type: 'SQUARE_UNLOCK',
-          units_granted: 50,
-          price_toman: 99000,
-          myket_sku: 'reqabat_unlock_50',
-          badge: 'پرطرفدار',
-          is_active: true,
-          is_ready_in_myket: false,
-          sort_order: 1
-        },
-        {
-          id: 'pkg_squares_100',
-          title: 'بسته بازگشایی ۱۰۰ مربع',
-          description: 'تکمیل کامل و آنی ۱۰۰ مربع مسابقه با ثبت ۱۰۰ امتیاز مستقیم و صعود فوری به صدر جدول برندگان.',
-          product_type: 'SQUARE_UNLOCK',
-          units_granted: 100,
-          price_toman: 179000,
-          myket_sku: 'reqabat_unlock_100',
-          badge: 'ویژه',
-          is_active: true,
-          is_ready_in_myket: false,
-          sort_order: 2
-        },
-        {
-          id: 'pkg_upgrade_level_1',
-          title: 'ارتقای پنل سطح ۱',
-          description: 'فعال‌سازی امکانات پایه ویژه، افزایش امتیاز ضریب پاداش و دسترسی به گزارش‌های پیشرفته.',
-          product_type: 'ACCOUNT_UPGRADE',
-          units_granted: 1,
-          price_toman: 129000,
-          myket_sku: 'reqabat_upgrade_lvl1',
-          badge: 'سطح ۱',
-          is_active: true,
-          is_ready_in_myket: false,
-          sort_order: 3
-        },
-        {
-          id: 'pkg_upgrade_level_2',
-          title: 'ارتقای پنل سطح ۲',
-          description: 'عضویت طلایی سطح ۲: ضریب امتیاز ۲ برابری در مسابقات دوره‌ای و پشتیبانی اختصاصی.',
-          product_type: 'ACCOUNT_UPGRADE',
-          units_granted: 2,
-          price_toman: 249000,
-          myket_sku: 'reqabat_upgrade_lvl2',
-          badge: 'سطح ۲',
-          is_active: true,
-          is_ready_in_myket: false,
-          sort_order: 4
-        },
-        {
-          id: 'pkg_upgrade_level_3',
-          title: 'ارتقای پنل سطح ۳',
-          description: 'بالاترین سطح دسترسی VIP: ضریب امتیاز ۳ برابری، اولویت کامل در قرعه‌کشی و هدیه ویژه نقدی.',
-          product_type: 'ACCOUNT_UPGRADE',
-          units_granted: 3,
-          price_toman: 449000,
-          myket_sku: 'reqabat_upgrade_lvl3',
-          badge: 'سطح ۳ VIP',
-          is_active: true,
-          is_ready_in_myket: false,
-          sort_order: 5
-        }
-      ];
-
-      for (const p of defaultProducts) {
-        await pool.query(
-          `INSERT INTO public.store_products 
-            (id, title, description, product_type, units_granted, price_toman, myket_sku, badge, is_active, is_ready_in_myket, sort_order, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
-           ON CONFLICT (id) DO NOTHING`,
-          [p.id, p.title, p.description, p.product_type, p.units_granted, p.price_toman, p.myket_sku, p.badge, p.is_active, p.is_ready_in_myket, p.sort_order]
-        );
+    const canonicalProducts = [
+      {
+        id: 'pkg_squares_50',
+        title: 'بسته بازگشایی ۵۰ مربع',
+        description: 'بازگشایی سریع و آنی ۵۰ مربع مسابقه همراه با ثبت کامل ۵۰ امتیاز در جدول رتبه‌بندی.',
+        product_type: 'SQUARE_UNLOCK',
+        units_granted: 50,
+        price_toman: 99000,
+        myket_sku: 'reqabat_unlock_50',
+        badge: 'پرطرفدار',
+        is_active: true,
+        is_ready_in_myket: false,
+        sort_order: 1
+      },
+      {
+        id: 'pkg_squares_100',
+        title: 'بسته بازگشایی ۱۰۰ مربع',
+        description: 'تکمیل کامل و آنی ۱۰۰ مربع مسابقه با ثبت ۱۰۰ امتیاز مستقیم و صعود فوری به صدر جدول برندگان.',
+        product_type: 'SQUARE_UNLOCK',
+        units_granted: 100,
+        price_toman: 179000,
+        myket_sku: 'reqabat_unlock_100',
+        badge: 'ویژه',
+        is_active: true,
+        is_ready_in_myket: false,
+        sort_order: 2
+      },
+      {
+        id: 'pkg_upgrade_level_1',
+        title: 'ارتقای پنل سطح ۱',
+        description: 'فعال‌سازی امکانات پایه ویژه، افزایش امتیاز ضریب پاداش و دسترسی به گزارش‌های پیشرفته.',
+        product_type: 'ACCOUNT_UPGRADE',
+        units_granted: 1,
+        price_toman: 129000,
+        myket_sku: 'reqabat_upgrade_lvl1',
+        badge: 'سطح ۱',
+        is_active: true,
+        is_ready_in_myket: false,
+        sort_order: 3
+      },
+      {
+        id: 'pkg_upgrade_level_2',
+        title: 'ارتقای پنل سطح ۲',
+        description: 'عضویت طلایی سطح ۲: ضریب امتیاز ۲ برابری در مسابقات دوره‌ای و پشتیبانی اختصاصی.',
+        product_type: 'ACCOUNT_UPGRADE',
+        units_granted: 2,
+        price_toman: 249000,
+        myket_sku: 'reqabat_upgrade_lvl2',
+        badge: 'سطح ۲',
+        is_active: true,
+        is_ready_in_myket: false,
+        sort_order: 4
+      },
+      {
+        id: 'pkg_upgrade_level_3',
+        title: 'ارتقای پنل سطح ۳',
+        description: 'بالاترین سطح دسترسی VIP: ضریب امتیاز ۳ برابری، اولویت کامل در قرعه‌کشی و هدیه ویژه نقدی.',
+        product_type: 'ACCOUNT_UPGRADE',
+        units_granted: 3,
+        price_toman: 449000,
+        myket_sku: 'reqabat_upgrade_lvl3',
+        badge: 'سطح ۳ VIP',
+        is_active: true,
+        is_ready_in_myket: false,
+        sort_order: 5
       }
-      console.log('[PostgreSQL] Initial 4 store packages seeded successfully.');
+    ];
+
+    for (const p of canonicalProducts) {
+      await pool.query(
+        `INSERT INTO public.store_products 
+          (id, title, description, product_type, units_granted, price_toman, myket_sku, badge, is_active, is_ready_in_myket, sort_order, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
+         ON CONFLICT (id) DO UPDATE SET
+           title = EXCLUDED.title,
+           description = EXCLUDED.description,
+           product_type = EXCLUDED.product_type,
+           units_granted = EXCLUDED.units_granted,
+           myket_sku = EXCLUDED.myket_sku,
+           badge = EXCLUDED.badge,
+           sort_order = EXCLUDED.sort_order,
+           is_active = true`,
+        [p.id, p.title, p.description, p.product_type, p.units_granted, p.price_toman, p.myket_sku, p.badge, p.is_active, p.is_ready_in_myket, p.sort_order]
+      );
     }
+
+    // Safely deactivate any legacy products outside the 5 fixed canonical packages
+    await pool.query(
+      `UPDATE public.store_products SET is_active = false WHERE id NOT IN ('pkg_squares_50', 'pkg_squares_100', 'pkg_upgrade_level_1', 'pkg_upgrade_level_2', 'pkg_upgrade_level_3')`
+    );
+    console.log('[PostgreSQL] 5 canonical store packages ensured.');
   } catch (err) {
     console.warn('[PostgreSQL Store Products Seed Warning]', err.message);
   }
@@ -1816,50 +1826,33 @@ app.get('/api/admin/store/products', requireAdminAuth, ensureDatabaseReady, asyn
 
 app.post('/api/admin/store/products', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
   try {
-    const { id, title, description, product_type, units_granted, price_toman, myket_sku, badge, is_active, is_ready_in_myket, sort_order } = req.body;
+    const { id, price_toman } = req.body;
 
-    if (!title || price_toman === undefined || !myket_sku) {
-      return res.status(400).json({ error: "عنوان بسته، قیمت و شناسه مایکت الزامی هستند." });
+    const allowedIds = ['pkg_squares_50', 'pkg_squares_100', 'pkg_upgrade_level_1', 'pkg_upgrade_level_2', 'pkg_upgrade_level_3'];
+    if (!id || !allowedIds.includes(id)) {
+      return res.status(400).json({ error: "فقط ویرایش ۵ بسته ثابت فروشگاه مجاز است و افزودن یا تغییر شناسه بسته پذیرفته نیست." });
     }
 
-    const prodId = id || ("pkg_" + crypto.randomBytes(4).toString('hex'));
+    if (price_toman === undefined || isNaN(Number(price_toman)) || Number(price_toman) < 0) {
+      return res.status(400).json({ error: "قیمت وارد شده نامعتبر است." });
+    }
 
     await pool.query(
-      `INSERT INTO public.store_products 
-        (id, title, description, product_type, units_granted, price_toman, myket_sku, badge, is_active, is_ready_in_myket, sort_order, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
-       ON CONFLICT (id) 
-       DO UPDATE SET 
-         title = $2,
-         description = $3,
-         product_type = $4,
-         units_granted = $5,
-         price_toman = $6,
-         myket_sku = $7,
-         badge = $8,
-         is_active = $9,
-         is_ready_in_myket = $10,
-         sort_order = $11,
-         updated_at = NOW()`,
-      [prodId, title, description || '', product_type || 'SQUARE_UNLOCK', Number(units_granted || 0), Number(price_toman || 0), myket_sku, badge || '', is_active !== false, Boolean(is_ready_in_myket), Number(sort_order || 0)]
+      `UPDATE public.store_products 
+       SET price_toman = $1, updated_at = NOW()
+       WHERE id = $2`,
+      [Number(price_toman), id]
     );
 
-    return res.json({ success: true, message: "اطلاعات محصول فروشگاه با موفقیت ذخیره شد." });
+    return res.json({ success: true, message: "قیمت بسته با موفقیت به‌روزرسانی شد." });
   } catch (err) {
     console.error('[Admin Save Store Product Error]', err);
-    return res.status(500).json({ error: "خطا در ذخیره تغییرات محصول فروشگاه." });
+    return res.status(500).json({ error: "خطا در ذخیره تغییرات قیمت محصول فروشگاه." });
   }
 });
 
 app.delete('/api/admin/store/products/:id', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
-  try {
-    const { id } = req.params;
-    await pool.query(`DELETE FROM public.store_products WHERE id = $1`, [id]);
-    return res.json({ success: true, message: "بسته با موفقیت حذف گردید." });
-  } catch (err) {
-    console.error('[Admin Delete Store Product Error]', err);
-    return res.status(500).json({ error: "خطا در حذف بسته از فروشگاه." });
-  }
+  return res.status(400).json({ error: "حذف ۵ بسته ثابت فروشگاه مجاز نیست. این بسته‌ها ساختار اصلی فروشگاه هستند." });
 });
 
 app.get('/api/admin/store/purchases', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
