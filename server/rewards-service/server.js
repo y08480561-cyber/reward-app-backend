@@ -532,8 +532,8 @@ const saveAppearanceHandler = async (req, res) => {
   }
 };
 
-rewardsRouter.post('/admin/appearance', saveAppearanceHandler);
-rewardsRouter.post('/appearance', saveAppearanceHandler);
+rewardsRouter.post('/admin/appearance', requireAdminAuth, saveAppearanceHandler);
+rewardsRouter.post('/appearance', requireAdminAuth, saveAppearanceHandler);
 
 const multer = require('multer');
 const upload = multer({

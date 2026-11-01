@@ -220,7 +220,8 @@ fun AppBottomNavigation(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 16.dp),
+                .navigationBarsPadding()
+                .padding(horizontal = 8.dp, vertical = 8.dp),
             contentAlignment = Alignment.BottomCenter
         ) {
             // Protrusion background (the "bump" for the logo)
@@ -267,7 +268,8 @@ fun AppBottomNavigation(
                                 selected = currentScreen == screen,
                                 icon = icon,
                                 label = label,
-                                onClick = { onScreenSelected(screen) }
+                                onClick = { onScreenSelected(screen) },
+                                modifier = Modifier.testTag("btn_nav_${screen.name.lowercase()}")
                             )
                         }
                     }
@@ -286,7 +288,8 @@ fun AppBottomNavigation(
                                 selected = currentScreen == screen,
                                 icon = icon,
                                 label = label,
-                                onClick = { onScreenSelected(screen) }
+                                onClick = { onScreenSelected(screen) },
+                                modifier = Modifier.testTag("btn_nav_${screen.name.lowercase()}")
                             )
                         }
                     }
@@ -298,7 +301,8 @@ fun AppBottomNavigation(
                 selected = currentScreen == AppScreen.SQUARES,
                 label = "۱۰۰ مربع",
                 icon = Icons.Default.GridView,
-                onClick = { onScreenSelected(AppScreen.SQUARES) }
+                onClick = { onScreenSelected(AppScreen.SQUARES) },
+                modifier = Modifier.testTag("btn_nav_squares")
             )
         }
     }
@@ -309,13 +313,14 @@ fun BottomNavItem(
     selected: Boolean,
     icon: ImageVector,
     label: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val scale by animateFloatAsState(if (selected) 1.15f else 1.0f)
     val interactionSource = remember { MutableInteractionSource() }
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
@@ -364,7 +369,8 @@ fun CentralLogoButton(
     selected: Boolean,
     label: String? = null,
     icon: ImageVector,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val scale by animateFloatAsState(if (selected) 1.15f else 1.0f)
     val infiniteTransition = rememberInfiniteTransition()
@@ -378,7 +384,7 @@ fun CentralLogoButton(
     )
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .offset(y = (-20).dp)
             .size(72.dp)
             .shadow(16.dp, CircleShape)

@@ -197,7 +197,7 @@ fun SquaresScreen(
         // 100 Squares Professional Grid
         LazyVerticalGrid(
             columns = GridCells.Fixed(5),
-            contentPadding = PaddingValues(12.dp),
+            contentPadding = PaddingValues(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 100.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier

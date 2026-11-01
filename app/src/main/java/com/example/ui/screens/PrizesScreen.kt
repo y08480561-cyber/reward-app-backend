@@ -250,7 +250,7 @@ fun PrizesScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(80.dp)) // Padding for bottom nav bar
+                Spacer(modifier = Modifier.height(100.dp)) // Padding for bottom nav bar
             }
         }
     }

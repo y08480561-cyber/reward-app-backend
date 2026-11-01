@@ -340,6 +340,8 @@ fun ProfileScreen(
             Spacer(modifier = Modifier.width(8.dp))
             Text("خروج از حساب کاربری", fontWeight = FontWeight.Bold, fontSize = 13.sp)
         }
+
+        Spacer(modifier = Modifier.height(100.dp))
     }
 
     if (showLogoutDialog) {

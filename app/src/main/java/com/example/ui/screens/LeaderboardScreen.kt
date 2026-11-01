@@ -297,6 +297,7 @@ fun LeaderboardScreen(
             AndroidView(
                 modifier = Modifier
                     .fillMaxSize()
+                    .padding(bottom = 80.dp)
                     .testTag("webview_leaderboard"),
                 factory = { ctx ->
                     WebView(ctx).apply {

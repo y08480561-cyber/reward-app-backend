@@ -345,9 +345,8 @@ fun TicketsListTab(
     }
 
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 100.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         items(tickets, key = { it.id }) { ticket ->
@@ -610,6 +609,8 @@ fun NewTicketTab(
                 }
             }
         }
+
+        Spacer(modifier = Modifier.height(100.dp))
     }
 }
 
