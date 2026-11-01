@@ -266,10 +266,12 @@ fun SingleGiftBannerCard(
 ) {
     val context = LocalContext.current
     val imageModel: Any = remember(heroBannerUrl) {
-        if (heroBannerUrl.isNotBlank() && (heroBannerUrl.startsWith("http://") || heroBannerUrl.startsWith("https://"))) {
-            heroBannerUrl
-        } else {
-            R.drawable.banner_rewards_20gb
+        val trimmed = heroBannerUrl.trim()
+        when {
+            trimmed.startsWith("http://") || trimmed.startsWith("https://") -> trimmed
+            trimmed.startsWith("/") -> "https://reward-app-backend-a9ze.onrender.com$trimmed"
+            trimmed.isNotBlank() -> "https://reward-app-backend-a9ze.onrender.com/$trimmed"
+            else -> R.drawable.banner_rewards_20gb
         }
     }
 

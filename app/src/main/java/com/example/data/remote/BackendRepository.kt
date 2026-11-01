@@ -1233,13 +1233,27 @@ class BackendRepository(
                     val isActive = activeSecObj?.optBoolean("isActive", true)
                         ?: obj.optBoolean("is_active", true)
 
+                    val rawUrl = obj.optString("hero_banner_url", "")
+                    val resolvedUrl = when {
+                        rawUrl.isBlank() -> ""
+                        rawUrl.startsWith("http://") || rawUrl.startsWith("https://") -> rawUrl
+                        rawUrl.startsWith("/") -> {
+                            val base = baseApiUrl.substringBeforeLast("/api")
+                            "$base$rawUrl"
+                        }
+                        else -> {
+                            val base = baseApiUrl.substringBeforeLast("/api")
+                            "$base/$rawUrl"
+                        }
+                    }
+
                     val config = com.example.model.RewardAppearanceConfig(
                         id = obj.optString("id", "default"),
-                        heroTitle = obj.optString("hero_title", "ویترین هدیه و پاداش ویژه"),
-                        heroSubtitle = obj.optString("hero_subtitle", "هدیه اختصاصی این دوره برای کاربران فعال مسابقه رقابت کن جایزه ببر"),
-                        heroBannerUrl = obj.optString("hero_banner_url", ""),
+                        heroTitle = obj.optString("hero_title", "اینترنت ۲۰ گیگ برنده شو!"),
+                        heroSubtitle = obj.optString("hero_subtitle", "هدیه ویژه دوره جاری مسابقه رقابت کن، جایزه ببر"),
+                        heroBannerUrl = resolvedUrl,
                         primaryColor = obj.optString("primary_color", "#10B981"),
-                        termsText = obj.optString("terms_text", "این بنر صرفاً جهت معرفی هدیه ویژه دوره جاری بوده و نیازی به ثبت درخواست ندارد."),
+                        termsText = obj.optString("terms_text", "این بخش صرفاً برای معرفی هدیه است و نیازی به خرید یا ثبت درخواست ندارد."),
                         isActive = isActive
                     )
                     Result.Success(config)

@@ -2,7 +2,25 @@ const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
+
+const APPEARANCE_FILE = path.join(__dirname, '../public/uploads/appearance.json');
+function loadPersistedAppearance() {
+  try {
+    if (fs.existsSync(APPEARANCE_FILE)) {
+      const content = fs.readFileSync(APPEARANCE_FILE, 'utf8');
+      const data = JSON.parse(content);
+      if (data && (data.hero_title || data.hero_banner_url)) {
+        return data;
+      }
+    }
+  } catch (e) {
+    console.warn('[Appearance Load Warning]', e.message);
+  }
+  return null;
+}
 
 const rewardsRouter = express.Router();
 rewardsRouter.use(cors());
@@ -47,6 +65,11 @@ const memoryDb = {
   ],
   claims: []
 };
+
+const savedInitialApp = loadPersistedAppearance();
+if (savedInitialApp) {
+  memoryDb.appearance = { ...memoryDb.appearance, ...savedInitialApp };
+}
 
 function requireAdminAuth(req, res, next) {
   const adminKey = req.headers['x-admin-key'] || req.query.admin_key || req.query.adminKey || req.query.key || (req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/i, '').trim() : '');
@@ -119,8 +142,16 @@ rewardsRouter.get('/categories', async (req, res) => {
 rewardsRouter.get('/appearance', async (req, res) => {
   try {
     if (pool) {
-      const result = await pool.query('SELECT * FROM public.reward_appearance WHERE id = $1', ['default']);
-      if (result.rows.length > 0) return res.json({ success: true, appearance: result.rows[0] });
+      try {
+        const result = await pool.query('SELECT * FROM public.reward_appearance WHERE id = $1', ['default']);
+        if (result.rows.length > 0) return res.json({ success: true, appearance: result.rows[0] });
+      } catch (dbErr) {
+        console.warn('[Rewards DB Warning] SELECT reward_appearance failed, falling back:', dbErr.message);
+      }
+    }
+    const persisted = loadPersistedAppearance();
+    if (persisted) {
+      memoryDb.appearance = { ...memoryDb.appearance, ...persisted };
     }
     return res.json({ success: true, appearance: memoryDb.appearance });
   } catch (err) {
@@ -460,25 +491,39 @@ const saveAppearanceHandler = async (req, res) => {
     }
     const activeSecStr = JSON.stringify(activeSecObj);
 
-    if (pool) {
-      const result = await pool.query(`
-        INSERT INTO public.reward_appearance (id, hero_title, hero_subtitle, hero_banner_url, primary_color, active_sections, terms_text, updated_at)
-        VALUES ('default', $1, $2, $3, $4, $5, $6, NOW())
-        ON CONFLICT (id) DO UPDATE SET hero_title = EXCLUDED.hero_title, hero_subtitle = EXCLUDED.hero_subtitle, hero_banner_url = EXCLUDED.hero_banner_url, primary_color = EXCLUDED.primary_color, active_sections = EXCLUDED.active_sections, terms_text = EXCLUDED.terms_text, updated_at = NOW()
-        RETURNING *
-      `, [hero_title || 'ویترین هدیه و پاداش ویژه', hero_subtitle || '', hero_banner_url || '', primary_color || '#10B981', activeSecStr, terms_text || '']);
-      return res.json({ success: true, appearance: result.rows[0] });
-    }
-
+    // Update in-memory state
     memoryDb.appearance = {
       ...memoryDb.appearance,
-      hero_title: hero_title || memoryDb.appearance.hero_title,
-      hero_subtitle: hero_subtitle || memoryDb.appearance.hero_subtitle,
+      hero_title: hero_title !== undefined ? hero_title : memoryDb.appearance.hero_title,
+      hero_subtitle: hero_subtitle !== undefined ? hero_subtitle : memoryDb.appearance.hero_subtitle,
       hero_banner_url: hero_banner_url !== undefined ? hero_banner_url : memoryDb.appearance.hero_banner_url,
       primary_color: primary_color || memoryDb.appearance.primary_color,
       active_sections: activeSecObj,
       terms_text: terms_text !== undefined ? terms_text : memoryDb.appearance.terms_text
     };
+
+    // Always persist to local storage file for durability across restarts
+    try {
+      const uploadsDir = path.join(__dirname, '../public/uploads');
+      if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+      fs.writeFileSync(APPEARANCE_FILE, JSON.stringify(memoryDb.appearance, null, 2), 'utf8');
+    } catch (saveErr) {
+      console.warn('[Appearance Local File Save Warning]', saveErr.message);
+    }
+
+    if (pool) {
+      try {
+        const result = await pool.query(`
+          INSERT INTO public.reward_appearance (id, hero_title, hero_subtitle, hero_banner_url, primary_color, active_sections, terms_text, updated_at)
+          VALUES ('default', $1, $2, $3, $4, $5, $6, NOW())
+          ON CONFLICT (id) DO UPDATE SET hero_title = EXCLUDED.hero_title, hero_subtitle = EXCLUDED.hero_subtitle, hero_banner_url = EXCLUDED.hero_banner_url, primary_color = EXCLUDED.primary_color, active_sections = EXCLUDED.active_sections, terms_text = EXCLUDED.terms_text, updated_at = NOW()
+          RETURNING *
+        `, [memoryDb.appearance.hero_title, memoryDb.appearance.hero_subtitle, memoryDb.appearance.hero_banner_url, memoryDb.appearance.primary_color, activeSecStr, memoryDb.appearance.terms_text]);
+        return res.json({ success: true, appearance: result.rows[0] });
+      } catch (dbErr) {
+        console.warn('[Rewards DB Warning] Save to PostgreSQL failed, persisted locally:', dbErr.message);
+      }
+    }
 
     return res.json({ success: true, appearance: memoryDb.appearance });
   } catch (err) {
@@ -503,7 +548,7 @@ const upload = multer({
   }
 });
 
-// Direct Banner Image Upload Route for Supabase Storage (Bucket: gift-banners) using Multer
+// Direct Banner Image Upload Route for Supabase Storage & Local Server with Multer
 rewardsRouter.post('/admin/upload-banner', requireAdminAuth, upload.single('banner'), async (req, res) => {
   try {
     if (!req.file) {
@@ -512,42 +557,53 @@ rewardsRouter.post('/admin/upload-banner', requireAdminAuth, upload.single('bann
 
     const fileBuffer = req.file.buffer;
     const fileMime = req.file.mimetype;
-    const ext = req.file.originalname.split('.').pop() || 'png';
+    const ext = req.file.originalname.split('.').pop() || 'jpg';
     const fileName = `banner_${Date.now()}_${crypto.randomBytes(4).toString('hex')}.${ext}`;
 
-    // Supabase Storage Upload via REST API if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY exist
+    // Ensure uploads directory exists and physically write file to disk
+    const uploadsDir = path.join(__dirname, '../public/uploads');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+    const localFilePath = path.join(uploadsDir, fileName);
+    fs.writeFileSync(localFilePath, fileBuffer);
+    const localPublicUrl = `/uploads/${fileName}`;
+
+    // Also try Supabase Storage Upload via REST API if configured
     const supabaseUrl = process.env.SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
 
     if (supabaseUrl && serviceRoleKey) {
-      const bucketName = 'gift-banners';
-      const uploadUrl = `${supabaseUrl}/storage/v1/object/${bucketName}/${fileName}`;
-      
-      const uploadRes = await fetch(uploadUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${serviceRoleKey}`,
-          'Content-Type': fileMime,
-          'x-upsert': 'true'
-        },
-        body: fileBuffer
-      });
+      try {
+        const bucketName = 'gift-banners';
+        const uploadUrl = `${supabaseUrl}/storage/v1/object/${bucketName}/${fileName}`;
+        
+        const uploadRes = await fetch(uploadUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${serviceRoleKey}`,
+            'Content-Type': fileMime,
+            'x-upsert': 'true'
+          },
+          body: fileBuffer
+        });
 
-      if (uploadRes.ok) {
-        const publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucketName}/${fileName}`;
-        return res.json({ success: true, url: publicUrl, message: 'تصویر با موفقیت در Supabase Storage آپلود شد.' });
-      } else {
-        const errText = await uploadRes.text();
-        console.warn('[Supabase Storage Warning] Upload returned status:', uploadRes.status, errText);
+        if (uploadRes.ok) {
+          const publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucketName}/${fileName}`;
+          return res.json({ success: true, url: publicUrl, message: 'تصویر با موفقیت در فضای ابری و سرور آپلود شد.' });
+        } else {
+          const errText = await uploadRes.text();
+          console.warn('[Supabase Storage Warning] Upload returned status:', uploadRes.status, errText);
+        }
+      } catch (supErr) {
+        console.warn('[Supabase Storage Warning] Error communicating with Supabase:', supErr.message);
       }
     }
 
-    // Fallback: Store locally or return a valid data URL / static path
-    const localPublicUrl = `/uploads/${fileName}`;
     return res.json({
       success: true,
       url: localPublicUrl,
-      message: 'تصویر با موفقیت بارگذاری شد.'
+      message: 'تصویر با موفقیت در فضای ذخیره‌سازی سرور بارگذاری گردید.'
     });
 
   } catch (err) {

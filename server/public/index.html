@@ -1156,90 +1156,22 @@
         <!-- SECTION: ویترین و مدیریت جوایز (Rewards Management) -->
         <!-- ============================================================== -->
         <section id="section-rewards" class="admin-section">
-          <!-- Card 1: Gift Banner Management -->
-          <div class="card p-4 shadow mb-4" style="border: 1px solid var(--gold-primary); background-color: #12253B;">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-              <div>
-                <h4 class="gold-text mb-1"><i class="bi bi-gift-fill me-2"></i> مدیریت بنر هدیه (ویترین جوایز)</h4>
-                <p class="text-secondary small mb-0">تنظیم عنوان، توضیحات، آدرس تصویر بنر و فعال/غیرفعال بودن هدیه ویژه در اپلیکیشن</p>
+          <!-- Card 1: Gift Banner Quick Overview -->
+          <div class="card p-3 shadow mb-4" style="border: 1px solid var(--border-color); background-color: #12253B;">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+              <div class="d-flex align-items-center gap-3">
+                <div class="p-2 rounded bg-dark border border-secondary text-warning fs-3">
+                  <i class="bi bi-gift-fill"></i>
+                </div>
+                <div>
+                  <h5 class="gold-text mb-1">تنظیمات و بارگذاری بنر هدیه جوایز</h5>
+                  <p class="text-secondary small mb-0">برای بارگذاری تصویر بنر جدید از کامپیوتر یا تغییر عنوان و توضیحات، به بخش تنظیمات ظاهر مراجعه کنید.</p>
+                </div>
               </div>
-              <button class="btn btn-outline-info btn-sm" onclick="loadRewardAppearance()"><i class="bi bi-arrow-clockwise me-1"></i> خواندن مجدد اطلاعات</button>
+              <button class="btn btn-gold btn-sm fw-bold px-3 py-2" onclick="navigateTo('rewards_appearance')">
+                <i class="bi bi-palette-fill me-1"></i> ورود به بخش بارگذاری و تنظیمات بنر
+              </button>
             </div>
-
-            <form onsubmit="saveRewardAppearance(event)">
-              <div class="row g-3">
-                <div class="col-md-6">
-                  <label class="form-label text-secondary small fw-bold">عنوان بنر هدیه (Hero Title):</label>
-                  <input type="text" id="rewAppHeroTitle" class="form-control form-control-dark" placeholder="مثال: هدیه ویژه مسابقه این هفته" required>
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label text-secondary small fw-bold">رنگ تم اصلی (Primary Accent Color):</label>
-                  <input type="color" id="rewAppColor" class="form-control form-control-color w-100 bg-dark border-secondary" style="height: 38px;" value="#10B981">
-                </div>
-                <div class="col-12">
-                  <label class="form-label text-secondary small fw-bold">زیرعنوان و توضیحات بنر هدیه:</label>
-                  <input type="text" id="rewAppHeroSubtitle" class="form-control form-control-dark" placeholder="توضیحات کوتاه هدیه ویژه...">
-                </div>
-                <div class="col-12">
-                  <label class="form-label text-secondary small fw-bold">تصویر بنر هدیه (بارگذاری مستقیم از دستگاه):</label>
-                  <div class="d-flex flex-column gap-3 p-3 rounded-3" style="background: rgba(15, 23, 42, 0.6); border: 1px dashed var(--border-color);">
-                    <!-- Hidden file input & stored image url -->
-                    <input type="file" id="rewAppImageFile" accept="image/jpeg,image/png,image/webp" class="d-none" onchange="handleBannerImageSelect(event)">
-                    <input type="hidden" id="rewAppBannerUrl" value="">
-                    
-                    <!-- Preview Box -->
-                    <div id="rewAppPreviewContainer" class="position-relative rounded-3 overflow-hidden d-none" style="width: 100%; height: 160px; background: #0b1329; border: 1px solid var(--border-color);">
-                      <img id="rewAppPreviewImg" src="" alt="پیش‌نمایش تصویر" class="w-100 h-100" style="object-fit: cover;">
-                      <div class="position-absolute top-0 end-0 p-2 d-flex gap-2">
-                        <button type="button" class="btn btn-warning btn-sm rounded-pill shadow px-3 fw-bold" onclick="document.getElementById('rewAppImageFile').click()" title="تغییر تصویر">
-                          <i class="bi bi-arrow-repeat me-1"></i> تغییر تصویر
-                        </button>
-                        <button type="button" class="btn btn-danger btn-sm rounded-circle shadow" onclick="removeBannerImage()" title="حذف تصویر">
-                          <i class="bi bi-trash-fill"></i>
-                        </button>
-                      </div>
-                    </div>
-
-                    <!-- Upload Placeholder / Actions -->
-                    <div id="rewAppUploadPrompt" class="text-center py-3">
-                      <i class="bi bi-cloud-arrow-up text-warning fs-2 mb-2 d-block"></i>
-                      <p class="text-light small mb-2">تصویر بنر را انتخاب کنید (فرمت JPG, PNG, WebP - حداکثر ۵ مگابایت)</p>
-                      <button type="button" class="btn btn-outline-warning btn-sm fw-bold px-3" onclick="document.getElementById('rewAppImageFile').click()">
-                        <i class="bi bi-folder2-open me-1"></i> انتخاب تصویر از دستگاه
-                      </button>
-                    </div>
-
-                    <!-- Progress Bar -->
-                    <div id="rewAppUploadProgressWrapper" class="d-none">
-                      <div class="d-flex justify-content-between small text-secondary mb-1">
-                        <span id="rewAppUploadStatusText">در حال آپلود در Supabase Storage...</span>
-                        <span id="rewAppUploadPercent">۰٪</span>
-                      </div>
-                      <div class="progress" style="height: 6px; background: #1e293b;">
-                        <div id="rewAppUploadProgressBar" class="progress-bar bg-warning" role="progressbar" style="width: 0%;"></div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div class="col-12">
-                  <label class="form-label text-secondary small fw-bold">متن راهنما و شرایط دریافت هدیه:</label>
-                  <textarea id="rewAppTermsText" rows="3" class="form-control form-control-dark" placeholder="شرح قوانین یا توضیحات تکمیلی..."></textarea>
-                </div>
-                <div class="col-12">
-                  <div class="form-check form-switch mt-2">
-                    <input class="form-check-input" type="checkbox" id="rewAppIsActive" checked>
-                    <label class="form-check-label text-white fw-bold small me-2" for="rewAppIsActive">
-                      بنر هدیه در اپلیکیشن فعال و قابل نمایش باشد
-                    </label>
-                  </div>
-                </div>
-                <div class="col-12 mt-3">
-                  <button type="submit" class="btn btn-gold px-4 fw-bold">
-                    <i class="bi bi-check-circle-fill me-1"></i> ذخیره تغییرات بنر هدیه در دیتابیس
-                  </button>
-                </div>
-              </div>
-            </form>
           </div>
 
           <!-- Card 2: Rewards List -->
@@ -1280,35 +1212,85 @@
         <!-- SECTION: تنظیمات ظاهر ویترین جوایز (Rewards Appearance) -->
         <!-- ============================================================== -->
         <section id="section-rewards_appearance" class="admin-section">
-          <div class="card p-4 shadow" style="border: 1px solid var(--border-color); background-color: #12253B;">
-            <h4 class="text-info fw-bold mb-3"><i class="bi bi-palette-fill me-2"></i> تنظیمات ظاهری و بنرهای ویترین جوایز</h4>
-            <p class="text-secondary small mb-4">ویرایش داینامیک عنوان هدر، توضیحات، آدرس بنر تبلیغاتی، رنگ اصلی و قوانین بدون انتشار مجدد اپلیکیشن</p>
+          <div class="card p-4 shadow" style="border: 1px solid var(--gold-primary); background-color: #12253B;">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+              <div>
+                <h4 class="gold-text mb-1"><i class="bi bi-gift-fill me-2"></i> مدیریت بنر هدیه و ظاهر بخش جوایز</h4>
+                <p class="text-secondary small mb-0">بارگذاری مستقیم تصویر بنر از کامپیوتر، تنظیم عنوان، زیرعنوان، رنگ تم و وضعیت فعال‌بودن بنر در اپلیکیشن</p>
+              </div>
+              <button class="btn btn-outline-info btn-sm" onclick="loadRewardAppearance()"><i class="bi bi-arrow-clockwise me-1"></i> خواندن مجدد اطلاعات</button>
+            </div>
 
             <form onsubmit="saveRewardAppearance(event)">
               <div class="row g-3">
                 <div class="col-md-6">
-                  <label class="form-label text-secondary small fw-bold">عنوان بنر هدر (Hero Title):</label>
-                  <input type="text" id="rewAppHeroTitle" class="form-control form-control-dark" required>
+                  <label class="form-label text-secondary small fw-bold">عنوان بنر هدیه (Hero Title):</label>
+                  <input type="text" id="rewAppHeroTitle" class="form-control form-control-dark" placeholder="مثال: اینترنت ۲۰ گیگ برنده شو!" required>
                 </div>
                 <div class="col-md-6">
                   <label class="form-label text-secondary small fw-bold">رنگ تم اصلی (Primary Accent Color):</label>
-                  <input type="color" id="rewAppColor" class="form-control form-control-color w-100 bg-dark border-secondary" style="height: 38px;">
+                  <input type="color" id="rewAppColor" class="form-control form-control-color w-100 bg-dark border-secondary" style="height: 38px;" value="#10B981">
                 </div>
                 <div class="col-12">
-                  <label class="form-label text-secondary small fw-bold">زیرعنوان و توضیحات بنر هدر:</label>
-                  <input type="text" id="rewAppHeroSubtitle" class="form-control form-control-dark">
+                  <label class="form-label text-secondary small fw-bold">زیرعنوان و توضیحات بنر هدیه:</label>
+                  <input type="text" id="rewAppHeroSubtitle" class="form-control form-control-dark" placeholder="توضیحات کوتاه هدیه ویژه...">
                 </div>
                 <div class="col-12">
-                  <label class="form-label text-secondary small fw-bold">آدرس تصویر بنر هدر (Banner Image URL):</label>
-                  <input type="url" id="rewAppBannerUrl" class="form-control form-control-dark" placeholder="https://example.com/banner.jpg">
+                  <label class="form-label text-secondary small fw-bold">تصویر بنر هدیه (بارگذاری مستقیم از کامپیوتر):</label>
+                  <div class="d-flex flex-column gap-3 p-3 rounded-3" style="background: rgba(15, 23, 42, 0.6); border: 1px dashed var(--border-color);">
+                    <!-- Hidden file input & stored image url -->
+                    <input type="file" id="rewAppImageFile" accept="image/jpeg,image/png,image/webp" class="d-none" onchange="handleBannerImageSelect(event)">
+                    <input type="hidden" id="rewAppBannerUrl" value="">
+                    
+                    <!-- Preview Box with exact 3:2 aspect ratio -->
+                    <div id="rewAppPreviewContainer" class="position-relative rounded-3 overflow-hidden d-none mx-auto" style="width: 100%; max-width: 520px; aspect-ratio: 3/2; background: #0b1329; border: 1.5px solid var(--gold-primary);">
+                      <img id="rewAppPreviewImg" src="" alt="پیش‌نمایش بنر هدیه" class="w-100 h-100" style="object-fit: cover;">
+                      <div class="position-absolute top-0 end-0 p-2 d-flex gap-2">
+                        <button type="button" class="btn btn-warning btn-sm rounded-pill shadow px-3 fw-bold" onclick="document.getElementById('rewAppImageFile').click()" title="تغییر تصویر">
+                          <i class="bi bi-arrow-repeat me-1"></i> تغییر تصویر
+                        </button>
+                        <button type="button" class="btn btn-danger btn-sm rounded-circle shadow" onclick="removeBannerImage()" title="حذف تصویر">
+                          <i class="bi bi-trash-fill"></i>
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- Upload Placeholder / Actions -->
+                    <div id="rewAppUploadPrompt" class="text-center py-4">
+                      <i class="bi bi-cloud-arrow-up text-warning fs-1 mb-2 d-block"></i>
+                      <p class="text-light small mb-2">تصویر بنر هدیه را انتخاب کنید (نسبت ۳:۲ - فرمت JPG, PNG, WebP - حداکثر ۵ مگابایت)</p>
+                      <button type="button" class="btn btn-warning fw-bold px-4 py-2" onclick="document.getElementById('rewAppImageFile').click()">
+                        <i class="bi bi-folder2-open me-2"></i> انتخاب و بارگذاری تصویر از کامپیوتر
+                      </button>
+                    </div>
+
+                    <!-- Progress Bar -->
+                    <div id="rewAppUploadProgressWrapper" class="d-none">
+                      <div class="d-flex justify-content-between small text-secondary mb-1">
+                        <span id="rewAppUploadStatusText">در حال ارسال و ذخیره تصویر در سرور...</span>
+                        <span id="rewAppUploadPercent">۰٪</span>
+                      </div>
+                      <div class="progress" style="height: 6px; background: #1e293b;">
+                        <div id="rewAppUploadProgressBar" class="progress-bar bg-warning" role="progressbar" style="width: 0%;"></div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 <div class="col-12">
-                  <label class="form-label text-secondary small fw-bold">متن قوانین و شرایط تحویل جوایز:</label>
-                  <textarea id="rewAppTermsText" rows="3" class="form-control form-control-dark"></textarea>
+                  <label class="form-label text-secondary small fw-bold">متن راهنما و شرایط دریافت هدیه:</label>
+                  <textarea id="rewAppTermsText" rows="3" class="form-control form-control-dark" placeholder="شرح قوانین یا توضیحات تکمیلی..."></textarea>
                 </div>
-                <div class="col-12 mt-4">
+                <div class="col-12">
+                  <div class="form-check form-switch mt-2">
+                    <input class="form-check-input" type="checkbox" id="rewAppIsActive" checked>
+                    <label class="form-check-label text-white fw-bold small me-2" for="rewAppIsActive">
+                      بنر هدیه در اپلیکیشن فعال و قابل نمایش باشد
+                    </label>
+                  </div>
+                </div>
+                <div class="col-12 mt-3">
                   <button type="submit" class="btn btn-gold px-4 fw-bold">
-                    <i class="bi bi-check-circle-fill me-1"></i> ذخیره و اعمال تغییرات ظاهر ویترین
+                    <i class="bi bi-check-circle-fill me-1"></i> ذخیره و اعمال تغییرات ظاهر ویترین در دیتابیس
                   </button>
                 </div>
               </div>
@@ -3540,6 +3522,31 @@
 
         if (data.success && data.url) {
           updateBannerImagePreview(data.url);
+          // Auto save appearance immediately to make the uploaded banner active
+          try {
+            const hero_title = document.getElementById('rewAppHeroTitle')?.value.trim() || 'اینترنت ۲۰ گیگ برنده شو!';
+            const primary_color = document.getElementById('rewAppColor')?.value || '#10B981';
+            const hero_subtitle = document.getElementById('rewAppHeroSubtitle')?.value.trim() || 'هدیه ویژه دوره جاری مسابقه رقابت کن، جایزه ببر';
+            const terms_text = document.getElementById('rewAppTermsText')?.value.trim() || '';
+            const is_active = document.getElementById('rewAppIsActive')?.checked ?? true;
+
+            await fetch('/api/rewards/admin/appearance', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-admin-key': key },
+              body: JSON.stringify({
+                hero_title,
+                primary_color,
+                hero_subtitle,
+                hero_banner_url: data.url,
+                terms_text,
+                is_active,
+                active_sections: { isActive: is_active }
+              })
+            });
+            alert('تصویر بنر با موفقیت در سرور بارگذاری شد و به‌عنوان بنر فعال جایگزین گردید.');
+          } catch (saveErr) {
+            console.warn('Auto-save appearance notice:', saveErr);
+          }
         } else {
           alert('خطا در آپلود: ' + (data.message || 'خطای سرور'));
         }
