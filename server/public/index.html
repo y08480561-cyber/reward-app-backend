@@ -1093,12 +1093,11 @@
           <div class="card p-4 shadow mb-4" style="border: 1px solid #FFB703; background-color: #12253B;">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
               <div>
-                <h4 class="gold-text fw-bold mb-1"><i class="bi bi-shop me-2"></i> بسته‌های بازگشایی مربع‌ها و ارتقای حساب</h4>
-                <p class="text-secondary small mb-0">تعیین قیمت‌ها، تعداد مربع‌های بازگشایی و وضعیت فعال‌سازی در مایکت به صورت زنده</p>
+                <h4 class="gold-text fw-bold mb-1"><i class="bi bi-shop me-2"></i> مدیریت قیمت‌های فروشگاه (۵ بسته اصلی)</h4>
+                <p class="text-secondary small mb-0">امکان تغییر قیمت ۵ بسته ثابت (دو بسته مربع و سه سطح ارتقای پنل). نام، تعداد و مشخصات ثابت هستند.</p>
               </div>
               <div class="d-flex gap-2">
                 <button class="btn btn-outline-warning btn-sm" onclick="loadStoreProducts()"><i class="bi bi-arrow-clockwise me-1"></i> بروزرسانی</button>
-                <button class="btn btn-warning btn-sm fw-bold" onclick="openAddProductModal()"><i class="bi bi-plus-circle-fill me-1"></i> افزودن بسته جدید</button>
               </div>
             </div>
 
@@ -1108,16 +1107,15 @@
                   <tr class="small text-secondary">
                     <th>عنوان بسته</th>
                     <th>نوع محصول</th>
-                    <th>سهمیه اعطایی</th>
-                    <th>قیمت (تومان)</th>
+                    <th>محتوا / سهمیه</th>
+                    <th>قیمت (تومان) - قابل ویرایش</th>
                     <th>شناسه مایکت (SKU)</th>
-                    <th>وضعیت مایکت</th>
-                    <th>نمایش در برنامه</th>
-                    <th>عملیات</th>
+                    <th>وضعیت نمایش</th>
+                    <th>عملیات ویرایش قیمت</th>
                   </tr>
                 </thead>
                 <tbody id="storeProductsTbody">
-                  <tr><td colspan="8" class="text-center text-secondary py-4"><span class="spinner-border spinner-border-sm me-2"></span> در حال بارگذاری بسته‌ها...</td></tr>
+                  <tr><td colspan="7" class="text-center text-secondary py-4"><span class="spinner-border spinner-border-sm me-2"></span> در حال بارگذاری بسته‌ها...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -1723,54 +1721,51 @@
             
             <div class="row g-3">
               <div class="col-md-8">
-                <label class="form-label text-secondary small fw-bold">عنوان بسته (نمایش در اپلیکیشن):</label>
-                <input type="text" id="storeProdTitle" class="form-control form-control-dark" placeholder="مثلاً: بسته بازگشایی ۱۰ مربع" required>
+                <label class="form-label text-secondary small fw-bold">عنوان بسته (ثابت):</label>
+                <input type="text" id="storeProdTitle" class="form-control form-control-dark bg-secondary text-white" readonly>
+                <div class="form-text text-warning small">نام و مشخصات بسته ثابت است و قابل تغییر نیست.</div>
               </div>
               <div class="col-md-4">
                 <label class="form-label text-secondary small fw-bold">برچسب اختصاصی (Badge):</label>
-                <input type="text" id="storeProdBadge" class="form-control form-control-dark" placeholder="مثلاً: محبوب‌ترین، سریع، ویژه">
+                <input type="text" id="storeProdBadge" class="form-control form-control-dark" placeholder="مثلاً: پرطرفدار، ویژه">
               </div>
 
               <div class="col-12">
                 <label class="form-label text-secondary small fw-bold">توضیحات و مزایای بسته:</label>
-                <textarea id="storeProdDesc" rows="2" class="form-control form-control-dark" placeholder="توضیحاتی که زیر کارت بسته در اپلیکیشن نشان داده می‌شود..." required></textarea>
+                <textarea id="storeProdDesc" rows="2" class="form-control form-control-dark" placeholder="توضیحات..."></textarea>
               </div>
 
               <div class="col-md-4">
-                <label class="form-label text-secondary small fw-bold">نوع محصول:</label>
-                <select id="storeProdType" class="form-select form-control-dark" onchange="toggleStoreUnitsLabel()">
-                  <option value="SQUARE_UNLOCK">بازگشایی مربع مسابقه</option>
-                  <option value="ACCOUNT_UPGRADE">ارتقای حساب کاربری (VIP)</option>
-                </select>
+                <label class="form-label text-secondary small fw-bold">نوع محصول (ثابت):</label>
+                <input type="text" id="storeProdTypeDisplay" class="form-control form-control-dark bg-secondary text-white" readonly>
+                <input type="hidden" id="storeProdType" value="SQUARE_UNLOCK">
               </div>
               <div class="col-md-4">
-                <label class="form-label text-secondary small fw-bold" id="storeUnitsLabel">تعداد مربع‌های اعطایی:</label>
-                <input type="number" id="storeProdUnits" class="form-control form-control-dark" min="1" value="10" required>
+                <label class="form-label text-secondary small fw-bold" id="storeUnitsLabel">مقدار / تعداد مربع (ثابت):</label>
+                <input type="number" id="storeProdUnits" class="form-control form-control-dark bg-secondary text-white" readonly>
               </div>
               <div class="col-md-4">
-                <label class="form-label text-secondary small fw-bold">قیمت به تومان:</label>
-                <input type="number" id="storeProdPrice" class="form-control form-control-dark" min="0" step="1000" placeholder="مثلاً: 29000" required>
+                <label class="form-label text-secondary small fw-bold text-warning">قیمت جدید به تومان (قابل ویرایش):</label>
+                <input type="number" id="storeProdPrice" class="form-control form-control-dark border-warning text-warning fw-bold" min="0" step="1000" placeholder="مثلاً: 99000" required>
               </div>
 
               <div class="col-md-6">
-                <label class="form-label text-secondary small fw-bold">شناسه محصول در کنسول مایکت (SKU):</label>
-                <input type="text" id="storeProdSku" class="form-control form-control-dark font-monospace" placeholder="reqabat_unlock_10" required>
-                <div class="form-text text-secondary small">این شناسه دقیقاً باید با شناسه ایجاد شده در پنل توسعه‌دهندگان مایکت یکسان باشد.</div>
+                <label class="form-label text-secondary small fw-bold">شناسه مایکت SKU (ثابت):</label>
+                <input type="text" id="storeProdSku" class="form-control form-control-dark font-monospace bg-secondary text-white" readonly>
               </div>
               <div class="col-md-6">
-                <label class="form-label text-secondary small fw-bold">ترتیب نمایش در فروشگاه:</label>
+                <label class="form-label text-secondary small fw-bold">ترتیب نمایش:</label>
                 <input type="number" id="storeProdSort" class="form-control form-control-dark" min="1" value="1">
               </div>
 
               <div class="col-12 mt-3">
                 <div class="form-check form-switch mb-2">
                   <input class="form-check-input" type="checkbox" id="storeProdIsActive" checked>
-                  <label class="form-check-label text-white fw-bold" for="storeProdIsActive">نمایش و فعال بودن در فروشگاه اپلیکیشن</label>
+                  <label class="form-check-label text-white fw-bold" for="storeProdIsActive">نمایش فعال در فروشگاه اپلیکیشن</label>
                 </div>
                 <div class="form-check form-switch">
                   <input class="form-check-input" type="checkbox" id="storeProdIsReadyInMyket">
                   <label class="form-check-label text-info fw-bold" for="storeProdIsReadyInMyket">محصول در کنسول مایکت تایید شده و آماده فروش است</label>
-                  <div class="form-text text-secondary small">اگر این گزینه خاموش باشد، برنامه به کاربران وضعیت «در حال آماده‌سازی در مایکت» را نشان می‌دهد و از خطای پرداخت جلوگیری می‌شود.</div>
                 </div>
               </div>
             </div>
@@ -3215,24 +3210,7 @@
     }
 
     function openAddProductModal() {
-      document.getElementById('storeProdId').value = '';
-      document.getElementById('storeProdTitle').value = '';
-      document.getElementById('storeProdDesc').value = '';
-      document.getElementById('storeProdType').value = 'SQUARE_UNLOCK';
-      document.getElementById('storeProdUnits').value = 10;
-      document.getElementById('storeProdPrice').value = '';
-      document.getElementById('storeProdSku').value = '';
-      document.getElementById('storeProdBadge').value = '';
-      document.getElementById('storeProdSort').value = cachedStoreProducts.length + 1;
-      document.getElementById('storeProdIsActive').checked = true;
-      document.getElementById('storeProdIsReadyInMyket').checked = false;
-      toggleStoreUnitsLabel();
-
-      document.getElementById('storeProductModalLabel').innerHTML = '<i class="bi bi-plus-circle-fill me-2"></i> افزودن بسته جدید به فروشگاه';
-      if (!bootstrapStoreModal) {
-        bootstrapStoreModal = new bootstrap.Modal(document.getElementById('storeProductModal'));
-      }
-      bootstrapStoreModal.show();
+      alert('امکان افزودن بسته جدید وجود ندارد. فروشگاه شامل ۲ بسته ثابت بازگشایی مربع و ۳ بسته ثابت ارتقای پنل است. فقط می‌توانید قیمت آن‌ها را ویرایش کنید.');
     }
 
     function openEditProductModal(id) {
@@ -3243,6 +3221,7 @@
       document.getElementById('storeProdTitle').value = prod.title || '';
       document.getElementById('storeProdDesc').value = prod.description || '';
       document.getElementById('storeProdType').value = prod.product_type || 'SQUARE_UNLOCK';
+      document.getElementById('storeProdTypeDisplay').value = (prod.product_type === 'ACCOUNT_UPGRADE' ? 'ارتقای حساب کاربری (VIP)' : 'بازگشایی مربع مسابقه');
       document.getElementById('storeProdUnits').value = prod.units_granted || 10;
       document.getElementById('storeProdPrice').value = prod.price_toman || 0;
       document.getElementById('storeProdSku').value = prod.myket_sku || '';
@@ -3250,9 +3229,8 @@
       document.getElementById('storeProdSort').value = prod.sort_order || 1;
       document.getElementById('storeProdIsActive').checked = Boolean(prod.is_active);
       document.getElementById('storeProdIsReadyInMyket').checked = Boolean(prod.is_ready_in_myket);
-      toggleStoreUnitsLabel();
 
-      document.getElementById('storeProductModalLabel').innerHTML = '<i class="bi bi-pencil-square me-2"></i> ویرایش اطلاعات بسته فروشگاه';
+      document.getElementById('storeProductModalLabel').innerHTML = '<i class="bi bi-pencil-square me-2"></i> ویرایش قیمت بسته فروشگاه';
       if (!bootstrapStoreModal) {
         bootstrapStoreModal = new bootstrap.Modal(document.getElementById('storeProductModal'));
       }
