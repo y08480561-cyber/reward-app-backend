@@ -658,7 +658,7 @@ async function initDatabaseTables() {
     if (appCheck.rows.length === 0) {
       await pool.query(
         `INSERT INTO public.reward_appearance (id, hero_title, hero_subtitle, hero_banner_url, primary_color)
-         VALUES ('default', 'ویترین جوایز و پاداش‌های ارزشمند', 'امتیازهای کسب‌شده خود در مسابقات را به کارت شارژ، بسته‌های اینترنت و جوایز نقدی تبدیل کنید', '', '#10B981')
+         VALUES ('default', 'اینترنت ۲۰ گیگ برنده شو!', 'هدیه ویژه دوره جاری مسابقه رقابت کن، جایزه ببر', '/uploads/banner_gift_20gb.jpg', '#10B981')
          ON CONFLICT DO NOTHING`
       );
       console.log('[PostgreSQL] Initial reward appearance seeded.');

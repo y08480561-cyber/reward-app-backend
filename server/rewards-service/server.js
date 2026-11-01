@@ -32,12 +32,12 @@ const memoryDb = {
   ],
   appearance: {
     id: 'default',
-    hero_title: 'ویترین جوایز و پاداش‌های ارزشمند',
-    hero_subtitle: 'امتیازهای کسب‌شده خود در مسابقات را به کارت شارژ، بسته‌های اینترنت و جوایز نقدی تبدیل کنید',
-    hero_banner_url: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?w=800&q=80',
+    hero_title: 'اینترنت ۲۰ گیگ برنده شو!',
+    hero_subtitle: 'هدیه ویژه دوره جاری مسابقه رقابت کن، جایزه ببر',
+    hero_banner_url: '/uploads/banner_gift_20gb.jpg',
     primary_color: '#10B981',
     active_sections: { featured: true, categories: true, history: true, banners: true },
-    terms_text: 'درخواست‌های دریافت جایزه پس از بررسی توسط تیم پشتیبانی ظرف ۲۴ الی ۷۲ ساعت کاری پردازش و ارسال خواهند شد.'
+    terms_text: 'این بخش صرفاً برای معرفی هدیه است و نیازی به خرید یا ثبت درخواست ندارد.'
   },
   rewards: [
     { id: 'rew_irancell_10k', title: 'کارت شارژ ۱۰ هزار تومانی ایرانسل', description: 'کد شارژ مستقیم ۱۰,۰۰۰ تومانی برای سیم‌کارت‌های اعتباری ایرانسل ارسال از طریق پیامک.', category_id: 'cat_recharge', cost_points: 100, stock_quantity: 50, image_url: 'https://images.unsplash.com/photo-1556742049-0a67568d0d9f?w=600&q=80', is_featured: true, is_active: true, sort_order: 1 },

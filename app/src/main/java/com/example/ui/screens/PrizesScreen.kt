@@ -28,6 +28,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import coil.request.ImageRequest
+import com.example.R
 import com.example.model.RewardAppearanceConfig
 import com.example.ui.theme.*
 import com.example.viewmodel.MainUiState
@@ -201,8 +203,8 @@ fun PrizesScreen(
 
                 // Main Single Gift Banner Card
                 SingleGiftBannerCard(
-                    heroTitle = banner.heroTitle.ifBlank { "هدیه ویژه مسابقه رقابت کن، جایزه ببر" },
-                    heroSubtitle = banner.heroSubtitle.ifBlank { "هدیه ارزشمند این دوره برای برندگان و شرکت‌کنندگان فعال مسابقه" },
+                    heroTitle = banner.heroTitle.ifBlank { "اینترنت ۲۰ گیگ برنده شو!" },
+                    heroSubtitle = banner.heroSubtitle.ifBlank { "هدیه ویژه دوره جاری مسابقه برای نفرات برتر و شرکت‌کنندگان فعال" },
                     heroBannerUrl = banner.heroBannerUrl,
                     termsText = banner.termsText.ifBlank { "این بخش صرفاً برای معرفی هدیه است و نیازی به خرید یا ثبت درخواست ندارد." },
                     isActive = banner.isActive
@@ -212,6 +214,7 @@ fun PrizesScreen(
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .widthIn(max = 680.dp)
                         .shadow(2.dp, RoundedCornerShape(16.dp)),
                     shape = RoundedCornerShape(16.dp),
                     color = NavySecondary,
@@ -261,14 +264,24 @@ fun SingleGiftBannerCard(
     termsText: String,
     isActive: Boolean
 ) {
+    val context = LocalContext.current
+    val imageModel: Any = remember(heroBannerUrl) {
+        if (heroBannerUrl.isNotBlank() && (heroBannerUrl.startsWith("http://") || heroBannerUrl.startsWith("https://"))) {
+            heroBannerUrl
+        } else {
+            R.drawable.banner_rewards_20gb
+        }
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(8.dp, RoundedCornerShape(20.dp))
+            .widthIn(max = 680.dp)
+            .shadow(10.dp, RoundedCornerShape(20.dp))
             .border(
                 width = 1.5.dp,
-                brush = Brush.verticalGradient(
-                    listOf(GoldAccent, Color(0xFF00B4D8).copy(alpha = 0.6f))
+                brush = Brush.linearGradient(
+                    listOf(GoldAccent, GoldLight, Color(0xFF00B4D8).copy(alpha = 0.6f), GoldAccent)
                 ),
                 shape = RoundedCornerShape(20.dp)
             )
@@ -281,7 +294,8 @@ fun SingleGiftBannerCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(220.dp)
+                    .aspectRatio(1536f / 1024f)
+                    .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
                     .background(
                         brush = Brush.verticalGradient(
                             listOf(Color(0xFF0F172A), NavyPrimary)
@@ -289,59 +303,34 @@ fun SingleGiftBannerCard(
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                if (heroBannerUrl.isNotBlank()) {
-                    AsyncImage(
-                        model = heroBannerUrl,
-                        contentDescription = heroTitle,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    // Fallback Beautiful Default State
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                        modifier = Modifier.padding(16.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(72.dp)
-                                .clip(CircleShape)
-                                .background(GoldAccent.copy(alpha = 0.15f))
-                                .border(1.dp, GoldAccent, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.EmojiEvents,
-                                contentDescription = null,
-                                tint = GoldAccent,
-                                modifier = Modifier.size(42.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = "🎁 ویترین هدیه مسابقه",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = GoldLight
-                        )
-                    }
-                }
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(imageModel)
+                        .crossfade(true)
+                        .placeholder(R.drawable.banner_rewards_20gb)
+                        .error(R.drawable.banner_rewards_20gb)
+                        .fallback(R.drawable.banner_rewards_20gb)
+                        .build(),
+                    contentDescription = heroTitle,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.FillWidth
+                )
 
-                // Top Badge Overlay
+                // Top Badge Overlay - aligned to TopEnd so it never obscures centered/right-side text
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .align(Alignment.TopCenter)
+                        .align(Alignment.TopEnd)
                         .padding(12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.End
                 ) {
                     Surface(
                         color = if (isActive) GoldAccent else Color.Gray,
-                        shape = RoundedCornerShape(10.dp)
+                        shape = RoundedCornerShape(10.dp),
+                        shadowElevation = 4.dp
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
@@ -361,6 +350,24 @@ fun SingleGiftBannerCard(
                     }
                 }
             }
+
+            // Subtle gold divider between banner graphic and description
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(
+                                Color.Transparent,
+                                GoldAccent.copy(alpha = 0.6f),
+                                GoldLight,
+                                GoldAccent.copy(alpha = 0.6f),
+                                Color.Transparent
+                            )
+                        )
+                    )
+            )
 
             // --- Banner Content Section ---
             Column(modifier = Modifier.padding(20.dp)) {
@@ -428,6 +435,7 @@ fun AdminGiftBannerEditCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .widthIn(max = 680.dp)
             .shadow(4.dp, RoundedCornerShape(16.dp))
             .border(1.dp, GoldAccent, RoundedCornerShape(16.dp))
             .testTag("admin_banner_edit_card"),
