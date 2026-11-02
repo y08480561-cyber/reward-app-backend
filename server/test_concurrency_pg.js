@@ -8,6 +8,16 @@ require('dotenv').config();
 async function runRealEndpointConcurrencyTest() {
   console.log("=== Production Endpoint (/api/user/feedback) PostgreSQL Concurrency Test ===");
 
+  // Scoped variables declared prior to try block for safe access in finally and cleanup
+  let sharedTestPool = null;
+  let pool = null;
+  let testUserId = null;
+  let testPhoneNumber = null;
+  let testAuthToken = null;
+  let serverInstance = null;
+  let testPassed = false;
+  let cleanupErrorOccurred = false;
+
   // 2. Strict Safety Guard: Require explicit, valid TEST_DATABASE_URL to protect production database
   const testDbUrl = process.env.TEST_DATABASE_URL;
   const prodDbUrl = process.env.DATABASE_URL;
@@ -36,7 +46,7 @@ async function runRealEndpointConcurrencyTest() {
   const app = appModule.app || appModule;
 
   const isLocalhost = testDbUrl.includes('localhost') || testDbUrl.includes('127.0.0.1');
-  const sharedTestPool = new Pool({
+  sharedTestPool = new Pool({
     connectionString: testDbUrl,
     ssl: isLocalhost ? false : { rejectUnauthorized: false },
     max: 20,
@@ -47,24 +57,26 @@ async function runRealEndpointConcurrencyTest() {
   if (typeof appModule.setTestPool === 'function') {
     appModule.setTestPool(sharedTestPool);
   } else {
-    throw new Error('appModule.setTestPool is not available in server.js module');
+    console.error("\n❌ TEST INJECTION ERROR: appModule.setTestPool is missing from server.js.");
+    process.exitCode = 1;
+    return;
   }
 
-  const pool = appModule.getPool();
-  if (!pool) {
-    throw new Error('Failed to retrieve injected database pool from production Express app module');
+  pool = appModule.getPool();
+  if (!pool || pool !== sharedTestPool) {
+    console.error("\n❌ TEST INJECTION ERROR: appModule.getPool() did not return the exact injected test pool instance.");
+    process.exitCode = 1;
+    return;
   }
 
   const randomHex = crypto.randomBytes(4).toString('hex');
-  const testUserId = `TEST_CONC_${Date.now()}_${randomHex}`;
-  const testPhoneNumber = `0999${Math.floor(10000000 + Math.random() * 89999999)}`;
-  const testAuthToken = `TOKEN_TEST_${crypto.randomUUID()}`;
-
-  let testPassed = false;
-  let serverInstance = null;
+  testUserId = `TEST_CONC_${Date.now()}_${randomHex}`;
+  testPhoneNumber = `0999${Math.floor(10000000 + Math.random() * 89999999)}`;
+  testAuthToken = `TOKEN_TEST_${crypto.randomUUID()}`;
 
   // Individual Assertion Checklist Statuses
   const assertResults = {
+    preStateValid: false,
     exactOneSuccess200: false,
     exactFourRejected409: false,
     zeroUnexpectedErrors: false,
@@ -77,12 +89,18 @@ async function runRealEndpointConcurrencyTest() {
   };
 
   try {
-    // 4. Create independent test user in PostgreSQL test database
+    // 4. Ensure testUserId does not already exist (Collision check)
+    const collisionCheck = await pool.query(`SELECT id FROM public.users WHERE id = $1`, [testUserId]);
+    if (collisionCheck.rows.length > 0) {
+      throw new Error(`Test User ID collision detected (${testUserId}). Execution stopped to prevent overwriting existing record.`);
+    }
+
     console.log(`\n1. Initializing test user in test database...`);
     console.log(`- Test User ID: ${testUserId}`);
     console.log(`- Test Phone Number: ${testPhoneNumber}`);
     console.log(`- Initial Score: 10`);
 
+    // Insert user and score safely without ON CONFLICT DO UPDATE
     await pool.query(`
       INSERT INTO public.users (
         id, first_name, last_name, phone_number, auth_token, total_score, feedback_reward_claimed, status, created_at, updated_at
@@ -92,23 +110,35 @@ async function runRealEndpointConcurrencyTest() {
     await pool.query(`
       INSERT INTO public.user_scores (user_id, total_score, updated_at)
       VALUES ($1, 10, NOW())
-      ON CONFLICT (user_id) DO UPDATE SET total_score = 10, updated_at = NOW()
     `, [testUserId]);
 
-    // Verify initial DB state using user_id for user_scores table
+    // 5. Pre-Concurrency Assertions
+    console.log(`\n2. Verifying Pre-Concurrency Assertions...`);
     const initUserRes = await pool.query(`SELECT id, total_score, feedback_reward_claimed FROM public.users WHERE id = $1`, [testUserId]);
     const initScoreRes = await pool.query(`SELECT user_id, total_score FROM public.user_scores WHERE user_id = $1`, [testUserId]);
+    const initFeedbackRes = await pool.query(`SELECT id FROM public.user_feedback WHERE user_id = $1`, [testUserId]);
 
     if (initUserRes.rows.length === 0 || initScoreRes.rows.length === 0) {
-      throw new Error(`Failed to initialize test user in PostgreSQL test database.`);
+      throw new Error(`Failed to initialize test user records in test database.`);
     }
 
-    console.log(`- Initial 'users' total_score: ${initUserRes.rows[0].total_score}`);
-    console.log(`- Initial 'user_scores' total_score (where user_id = $1): ${initScoreRes.rows[0].total_score}`);
-    console.log(`- Initial feedback_reward_claimed: ${initUserRes.rows[0].feedback_reward_claimed}`);
+    const initUsersScore = Number(initUserRes.rows[0].total_score);
+    const initScoresScore = Number(initScoreRes.rows[0].total_score);
+    const initClaimed = initUserRes.rows[0].feedback_reward_claimed;
+    const initFeedbackCount = initFeedbackRes.rows.length;
 
-    // 5. Start temporary Express listener on dynamic free port (port 0) on 127.0.0.1
-    console.log(`\n2. Starting test listener on dynamic free port (127.0.0.1:0)...`);
+    console.log(`- Initial 'users' total_score: ${initUsersScore}`);
+    console.log(`- Initial 'user_scores' total_score (where user_id = $1): ${initScoresScore}`);
+    console.log(`- Initial feedback_reward_claimed: ${initClaimed}`);
+    console.log(`- Initial user_feedback count: ${initFeedbackCount}`);
+
+    if (initUsersScore !== 10 || initScoresScore !== 10 || initClaimed !== false || initFeedbackCount !== 0) {
+      throw new Error(`Pre-concurrency assertions failed: scores must be 10, claimed false, and feedback count 0.`);
+    }
+    assertResults.preStateValid = true;
+
+    // 6. Start temporary Express listener on dynamic free port (port 0) on 127.0.0.1
+    console.log(`\n3. Starting test listener on dynamic free port (127.0.0.1:0)...`);
     let testPort = 0;
 
     await new Promise((resolve, reject) => {
@@ -169,8 +199,8 @@ async function runRealEndpointConcurrencyTest() {
       });
     };
 
-    // 6. Send 5 concurrent HTTP POST requests simultaneously against production endpoint
-    console.log(`\n3. Sending 5 concurrent HTTP POST requests to production /api/user/feedback...`);
+    // 7. Send 5 concurrent HTTP POST requests simultaneously against production endpoint
+    console.log(`\n4. Sending 5 concurrent HTTP POST requests to production /api/user/feedback...`);
     const CONCURRENT_COUNT = 5;
     const tasks = Array.from({ length: CONCURRENT_COUNT }, (_, i) => sendFeedbackApiRequest(i + 1));
     const responses = await Promise.all(tasks);
@@ -180,7 +210,7 @@ async function runRealEndpointConcurrencyTest() {
     const rejected409List = responses.filter(r => r.statusCode === 409);
     const unexpectedErrors = responses.filter(r => r.statusCode !== 200 && r.statusCode !== 409);
 
-    console.log(`\n4. Concurrency Response Summary:`);
+    console.log(`\n5. Concurrency Response Summary:`);
     console.log(`- Total Parallel Requests Sent: ${CONCURRENT_COUNT}`);
     console.log(`- HTTP 200 OK (Successful): ${successful200List.length}`);
     console.log(`- HTTP 409 Conflict (Rejected): ${rejected409List.length}`);
@@ -190,8 +220,8 @@ async function runRealEndpointConcurrencyTest() {
       console.log(`  Task #${r.taskIndex}: HTTP ${r.statusCode} -> ${JSON.stringify(r.body)}`);
     });
 
-    // 7. Verify Database State Post-Concurrency
-    console.log(`\n5. Verifying Database State Post-Concurrency...`);
+    // 8. Verify Database State Post-Concurrency
+    console.log(`\n6. Verifying Database State Post-Concurrency...`);
     const finalUserRes = await pool.query(`SELECT total_score, feedback_reward_claimed FROM public.users WHERE id = $1`, [testUserId]);
     const finalScoreRes = await pool.query(`SELECT total_score FROM public.user_scores WHERE user_id = $1`, [testUserId]);
     const feedbackRecordsRes = await pool.query(`SELECT id, rating, comment FROM public.user_feedback WHERE user_id = $1`, [testUserId]);
@@ -206,12 +236,12 @@ async function runRealEndpointConcurrencyTest() {
     console.log(`- Total records inserted in 'user_feedback': ${feedbackRecordCount}`);
     console.log(`- 'feedback_reward_claimed' status: ${feedbackClaimedStatus}`);
 
-    // 8. Test subsequent duplicate request
-    console.log(`\n6. Testing subsequent duplicate claim attempt...`);
+    // 9. Test subsequent duplicate request
+    console.log(`\n7. Testing subsequent duplicate claim attempt...`);
     const duplicateRes = await sendFeedbackApiRequest(99);
     console.log(`- Duplicate Request Status: HTTP ${duplicateRes.statusCode} -> ${JSON.stringify(duplicateRes.body)}`);
 
-    // 9. Evaluate Assertions
+    // 10. Evaluate Assertions
     assertResults.exactOneSuccess200 = successful200List.length === 1;
     assertResults.exactFourRejected409 = rejected409List.length === (CONCURRENT_COUNT - 1);
     assertResults.zeroUnexpectedErrors = unexpectedErrors.length === 0;
@@ -224,7 +254,8 @@ async function runRealEndpointConcurrencyTest() {
 
     testPassed = Object.values(assertResults).every(res => res === true);
 
-    console.log(`\n7. Detailed Assertion Results:`);
+    console.log(`\n8. Detailed Assertion Results:`);
+    console.log(`- Pre-State Assertion (score=10, claimed=false, feedback=0) -> [${assertResults.preStateValid ? 'PASS' : 'FAIL'}]`);
     console.log(`- Condition 1: Exactly 1 HTTP 200 response -> [${assertResults.exactOneSuccess200 ? 'PASS' : 'FAIL'}]`);
     console.log(`- Condition 2: Exactly 4 HTTP 409 responses -> [${assertResults.exactFourRejected409 ? 'PASS' : 'FAIL'}]`);
     console.log(`- Condition 3: Zero unexpected errors/HTTP 500 -> [${assertResults.zeroUnexpectedErrors ? 'PASS' : 'FAIL'}]`);
@@ -245,35 +276,43 @@ async function runRealEndpointConcurrencyTest() {
     console.error(`\n❌ CONCURRENCY TEST EXCEPTION:`, err.message);
     testPassed = false;
   } finally {
-    // 10. Graceful resource closing & safe cleanup in all cases
+    // 11. Graceful resource closing & safe cleanup with foreign key dependency order
     if (serverInstance) {
       try {
         await new Promise(resolve => serverInstance.close(resolve));
         console.log(`\n- Test HTTP server listener closed.`);
       } catch (srvErr) {
         console.error(`⚠️ Error closing test HTTP server:`, srvErr.message);
+        cleanupErrorOccurred = true;
       }
     }
 
     if (testUserId && pool) {
       try {
-        console.log(`\nCleanup: Safely removing test user records (${testUserId})...`);
+        console.log(`\nCleanup: Safely removing test user records (${testUserId}) in dependency order...`);
         await pool.query(`DELETE FROM public.user_feedback WHERE user_id = $1`, [testUserId]);
         await pool.query(`DELETE FROM public.user_scores WHERE user_id = $1`, [testUserId]);
         await pool.query(`DELETE FROM public.users WHERE id = $1`, [testUserId]);
         console.log(`- Test user cleanup completed successfully.`);
       } catch (cleanupErr) {
         console.error(`⚠️ Cleanup error for test user (${testUserId}):`, cleanupErr.message);
+        cleanupErrorOccurred = true;
       }
     }
 
     if (pool) {
       try {
         await pool.end();
-        console.log(`- PostgreSQL pool closed.`);
+        console.log(`- PostgreSQL test pool closed.`);
       } catch (poolErr) {
         console.error(`⚠️ Error closing PostgreSQL pool:`, poolErr.message);
+        cleanupErrorOccurred = true;
       }
+    }
+
+    if (cleanupErrorOccurred) {
+      console.error(`\n❌ TEST TEARDOWN WARNING: One or more cleanup errors occurred during teardown. Marking test as FAILED.`);
+      testPassed = false;
     }
 
     process.exitCode = testPassed ? 0 : 1;

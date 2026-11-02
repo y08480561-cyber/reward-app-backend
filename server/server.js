@@ -3690,6 +3690,11 @@ app.use((err, req, res, next) => {
 
 // Export Express App, Pool accessor, and Test Pool setter for testing and modular usage
 function setTestPool(customPool) {
+  if (pool && pool !== customPool) {
+    try {
+      pool.end().catch(() => {});
+    } catch (e) {}
+  }
   pool = customPool;
   isDbConnected = true;
 }
