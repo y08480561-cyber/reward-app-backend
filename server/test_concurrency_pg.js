@@ -1,30 +1,68 @@
 const http = require('http');
 const crypto = require('crypto');
 const { Pool } = require('pg');
-const app = require('./server'); // Imports REAL Express production app from server.js
 
+// 1. Load environment variables before requiring main application
 require('dotenv').config();
 
-// PostgreSQL Connection configuration
-const connectionString = process.env.DATABASE_URL || 'postgres://localhost:5432/reqabat';
-
 async function runRealEndpointConcurrencyTest() {
-  console.log("=== Real Endpoint (/api/user/feedback) PostgreSQL Concurrency Test ===");
-  const pool = new Pool({ connectionString, max: 15 });
+  console.log("=== Production Endpoint (/api/user/feedback) PostgreSQL Concurrency Test ===");
+
+  // 2. Strict Safety Guard: Require explicit, valid TEST_DATABASE_URL to protect production database
+  const testDbUrl = process.env.TEST_DATABASE_URL;
+  const prodDbUrl = process.env.DATABASE_URL;
+
+  if (!testDbUrl || typeof testDbUrl !== 'string' || testDbUrl.trim() === '') {
+    console.error("\n❌ SAFETY GUARD STOPPED EXECUTION:");
+    console.error("The concurrency test CANNOT run without an explicit 'TEST_DATABASE_URL' environment variable.");
+    console.error("To protect your production database, please set 'TEST_DATABASE_URL' in your .env file or environment.");
+    console.error("Example:");
+    console.error("  TEST_DATABASE_URL=postgres://user:pass@test-host:5432/test_db node server/test_concurrency_pg.js\n");
+    process.exitCode = 1;
+    return;
+  }
+
+  if (prodDbUrl && testDbUrl.trim() === prodDbUrl.trim()) {
+    console.error("\n❌ SAFETY GUARD STOPPED EXECUTION:");
+    console.error("'TEST_DATABASE_URL' is identical to 'DATABASE_URL' (Production/Shared DB).");
+    console.error("Execution is blocked to prevent running test mutations on the production database.");
+    console.error("Please specify a separate, dedicated test database URL in 'TEST_DATABASE_URL'.\n");
+    process.exitCode = 1;
+    return;
+  }
+
+  // 3. Import production Express app (imports /server/server.js directly without rewriting handlers)
+  // Since TEST_DATABASE_URL is set in process.env prior to import, server.js initializes pool on TEST_DATABASE_URL
+  const appModule = require('./server');
+  const app = appModule.app || appModule;
+  const pool = (appModule.getPool && appModule.getPool()) || new Pool({ connectionString: testDbUrl });
 
   const randomHex = crypto.randomBytes(4).toString('hex');
   const testUserId = `TEST_CONC_${Date.now()}_${randomHex}`;
   const testPhoneNumber = `0999${Math.floor(10000000 + Math.random() * 89999999)}`;
   const testAuthToken = `TOKEN_TEST_${crypto.randomUUID()}`;
+
   let testPassed = false;
   let serverInstance = null;
 
+  // Individual Assertion Checklist Statuses
+  const assertResults = {
+    exactOneSuccess200: false,
+    exactFourRejected409: false,
+    zeroUnexpectedErrors: false,
+    usersScoreIncreasedBy2: false,
+    userScoresScoreIncreasedBy2: false,
+    feedbackRecordInserted: false,
+    rewardClaimedFlagTrue: false,
+    subsequentDuplicateBlocked409: false,
+    rejectedRequestsDidNotIncreaseScore: false
+  };
+
   try {
-    // 1. Create test user in public.users with valid auth_token
-    console.log(`\n1. Creating test user in PostgreSQL...`);
-    console.log(`- User ID: ${testUserId}`);
-    console.log(`- Phone Number: ${testPhoneNumber}`);
-    console.log(`- Auth Token: ${testAuthToken}`);
+    // 4. Create independent test user in PostgreSQL test database
+    console.log(`\n1. Initializing test user in test database...`);
+    console.log(`- Test User ID: ${testUserId}`);
+    console.log(`- Test Phone Number: ${testPhoneNumber}`);
     console.log(`- Initial Score: 10`);
 
     await pool.query(`
@@ -39,30 +77,32 @@ async function runRealEndpointConcurrencyTest() {
       ON CONFLICT (user_id) DO UPDATE SET total_score = 10, updated_at = NOW()
     `, [testUserId]);
 
-    // Verify initial DB state
-    const initUserRes = await pool.query(`SELECT id, total_score, feedback_reward_claimed, auth_token FROM public.users WHERE id = $1`, [testUserId]);
+    // Verify initial DB state using user_id for user_scores table
+    const initUserRes = await pool.query(`SELECT id, total_score, feedback_reward_claimed FROM public.users WHERE id = $1`, [testUserId]);
     const initScoreRes = await pool.query(`SELECT user_id, total_score FROM public.user_scores WHERE user_id = $1`, [testUserId]);
 
     if (initUserRes.rows.length === 0 || initScoreRes.rows.length === 0) {
-      throw new Error(`Failed to initialize test user in database.`);
+      throw new Error(`Failed to initialize test user in PostgreSQL test database.`);
     }
 
     console.log(`- Initial 'users' total_score: ${initUserRes.rows[0].total_score}`);
     console.log(`- Initial 'user_scores' total_score (where user_id = $1): ${initScoreRes.rows[0].total_score}`);
     console.log(`- Initial feedback_reward_claimed: ${initUserRes.rows[0].feedback_reward_claimed}`);
 
-    // 2. Start local listener for the imported production Express app on ephemeral test port
-    console.log(`\n2. Starting test listener for the imported production Express app...`);
-    const TEST_PORT = 3099;
+    // 5. Start temporary Express listener on dynamic free port (port 0) on 127.0.0.1
+    console.log(`\n2. Starting test listener on dynamic free port (127.0.0.1:0)...`);
+    let testPort = 0;
 
-    await new Promise((resolve) => {
-      serverInstance = app.listen(TEST_PORT, '127.0.0.1', () => {
-        console.log(`- Production app test listener running on http://127.0.0.1:${TEST_PORT}`);
+    await new Promise((resolve, reject) => {
+      serverInstance = app.listen(0, '127.0.0.1', () => {
+        testPort = serverInstance.address().port;
+        console.log(`- Production Express app test listener running on http://127.0.0.1:${testPort}`);
         resolve();
       });
+      serverInstance.on('error', reject);
     });
 
-    // Helper to send HTTP POST request to the imported production Express app
+    // Helper to send HTTP POST request to imported production Express app
     const sendFeedbackApiRequest = (taskIndex) => {
       return new Promise((resolve) => {
         const postData = JSON.stringify({
@@ -72,7 +112,7 @@ async function runRealEndpointConcurrencyTest() {
 
         const options = {
           hostname: '127.0.0.1',
-          port: TEST_PORT,
+          port: testPort,
           path: '/api/user/feedback',
           method: 'POST',
           headers: {
@@ -111,28 +151,28 @@ async function runRealEndpointConcurrencyTest() {
       });
     };
 
-    // 3. Send 5 concurrent HTTP POST requests simultaneously against the real production endpoint
+    // 6. Send 5 concurrent HTTP POST requests simultaneously against production endpoint
     console.log(`\n3. Sending 5 concurrent HTTP POST requests to production /api/user/feedback...`);
     const CONCURRENT_COUNT = 5;
     const tasks = Array.from({ length: CONCURRENT_COUNT }, (_, i) => sendFeedbackApiRequest(i + 1));
     const responses = await Promise.all(tasks);
 
-    // Filter exact HTTP status codes
+    // Exact HTTP status filtering
     const successful200List = responses.filter(r => r.statusCode === 200);
     const rejected409List = responses.filter(r => r.statusCode === 409);
     const unexpectedErrors = responses.filter(r => r.statusCode !== 200 && r.statusCode !== 409);
 
     console.log(`\n4. Concurrency Response Summary:`);
-    console.log(`- Total Requests Sent: ${CONCURRENT_COUNT}`);
-    console.log(`- Successful HTTP 200 Responses: ${successful200List.length}`);
-    console.log(`- Rejected HTTP 409 Responses: ${rejected409List.length}`);
+    console.log(`- Total Parallel Requests Sent: ${CONCURRENT_COUNT}`);
+    console.log(`- HTTP 200 OK (Successful): ${successful200List.length}`);
+    console.log(`- HTTP 409 Conflict (Rejected): ${rejected409List.length}`);
     console.log(`- Unexpected Errors: ${unexpectedErrors.length}`);
 
     responses.forEach(r => {
       console.log(`  Task #${r.taskIndex}: HTTP ${r.statusCode} -> ${JSON.stringify(r.body)}`);
     });
 
-    // 4. Verify post-concurrency database state
+    // 7. Verify Database State Post-Concurrency
     console.log(`\n5. Verifying Database State Post-Concurrency...`);
     const finalUserRes = await pool.query(`SELECT total_score, feedback_reward_claimed FROM public.users WHERE id = $1`, [testUserId]);
     const finalScoreRes = await pool.query(`SELECT total_score FROM public.user_scores WHERE user_id = $1`, [testUserId]);
@@ -148,67 +188,77 @@ async function runRealEndpointConcurrencyTest() {
     console.log(`- Total records inserted in 'user_feedback': ${feedbackRecordCount}`);
     console.log(`- 'feedback_reward_claimed' status: ${feedbackClaimedStatus}`);
 
-    // 5. Test subsequent duplicate request
+    // 8. Test subsequent duplicate request
     console.log(`\n6. Testing subsequent duplicate claim attempt...`);
     const duplicateRes = await sendFeedbackApiRequest(99);
     console.log(`- Duplicate Request Status: HTTP ${duplicateRes.statusCode} -> ${JSON.stringify(duplicateRes.body)}`);
 
-    // 6. Strict Assert Checklist
-    const isSuccess200Valid = successful200List.length === 1;
-    const isRejected409Valid = rejected409List.length === (CONCURRENT_COUNT - 1);
-    const isNoUnexpectedErrors = unexpectedErrors.length === 0;
-    const isUsersScoreValid = finalUsersScore === 12;
-    const isScoresScoreValid = finalScoresScore === 12;
-    const isFeedbackCountValid = feedbackRecordCount === 1;
-    const isClaimedFlagValid = feedbackClaimedStatus === true;
-    const isDuplicateBlocked409 = duplicateRes.statusCode === 409;
+    // 9. Evaluate Assertions
+    assertResults.exactOneSuccess200 = successful200List.length === 1;
+    assertResults.exactFourRejected409 = rejected409List.length === (CONCURRENT_COUNT - 1);
+    assertResults.zeroUnexpectedErrors = unexpectedErrors.length === 0;
+    assertResults.usersScoreIncreasedBy2 = finalUsersScore === 12;
+    assertResults.userScoresScoreIncreasedBy2 = finalScoresScore === 12;
+    assertResults.feedbackRecordInserted = feedbackRecordCount === 1;
+    assertResults.rewardClaimedFlagTrue = feedbackClaimedStatus === true;
+    assertResults.subsequentDuplicateBlocked409 = duplicateRes.statusCode === 409;
+    assertResults.rejectedRequestsDidNotIncreaseScore = (finalUsersScore === 12 && feedbackRecordCount === 1);
 
-    testPassed = isSuccess200Valid &&
-                 isRejected409Valid &&
-                 isNoUnexpectedErrors &&
-                 isUsersScoreValid &&
-                 isScoresScoreValid &&
-                 isFeedbackCountValid &&
-                 isClaimedFlagValid &&
-                 isDuplicateBlocked409;
+    testPassed = Object.values(assertResults).every(res => res === true);
 
-    console.log(`\n7. Strict Assertion Checklist:`);
-    console.log(`  [${isSuccess200Valid ? 'PASS' : 'FAIL'}] Exactly 1 HTTP 200 Success`);
-    console.log(`  [${isRejected409Valid ? 'PASS' : 'FAIL'}] Exactly ${CONCURRENT_COUNT - 1} HTTP 409 Rejected`);
-    console.log(`  [${isNoUnexpectedErrors ? 'PASS' : 'FAIL'}] Zero unexpected errors (HTTP 500 / Network)`);
-    console.log(`  [${isUsersScoreValid ? 'PASS' : 'FAIL'}] 'users.total_score' increased by exactly +2 (10 -> ${finalUsersScore})`);
-    console.log(`  [${isScoresScoreValid ? 'PASS' : 'FAIL'}] 'user_scores.total_score' increased by exactly +2 (10 -> ${finalScoresScore})`);
-    console.log(`  [${isFeedbackCountValid ? 'PASS' : 'FAIL'}] Exactly 1 feedback record inserted in 'user_feedback'`);
-    console.log(`  [${isClaimedFlagValid ? 'PASS' : 'FAIL'}] 'feedback_reward_claimed' set to true`);
-    console.log(`  [${isDuplicateBlocked409 ? 'PASS' : 'FAIL'}] Subsequent duplicate request rejected with HTTP 409`);
+    console.log(`\n7. Detailed Assertion Results:`);
+    console.log(`- Condition 1: Exactly 1 HTTP 200 response -> [${assertResults.exactOneSuccess200 ? 'PASS' : 'FAIL'}]`);
+    console.log(`- Condition 2: Exactly 4 HTTP 409 responses -> [${assertResults.exactFourRejected409 ? 'PASS' : 'FAIL'}]`);
+    console.log(`- Condition 3: Zero unexpected errors/HTTP 500 -> [${assertResults.zeroUnexpectedErrors ? 'PASS' : 'FAIL'}]`);
+    console.log(`- Condition 4: 'users.total_score' increased 10 -> 12 -> [${assertResults.usersScoreIncreasedBy2 ? 'PASS' : 'FAIL'}]`);
+    console.log(`- Condition 5: 'user_scores.total_score' increased 10 -> 12 -> [${assertResults.userScoresScoreIncreasedBy2 ? 'PASS' : 'FAIL'}]`);
+    console.log(`- Condition 6: Exactly 1 record in 'user_feedback' -> [${assertResults.feedbackRecordInserted ? 'PASS' : 'FAIL'}]`);
+    console.log(`- Condition 7: 'feedback_reward_claimed' = true -> [${assertResults.rewardClaimedFlagTrue ? 'PASS' : 'FAIL'}]`);
+    console.log(`- Condition 8: Subsequent duplicate request returns HTTP 409 -> [${assertResults.subsequentDuplicateBlocked409 ? 'PASS' : 'FAIL'}]`);
+    console.log(`- Condition 9: Rejected requests caused zero extra points -> [${assertResults.rejectedRequestsDidNotIncreaseScore ? 'PASS' : 'FAIL'}]`);
 
     if (testPassed) {
       console.log("\n✅ ALL CONCURRENCY & TRANSACTION ASSERTS PASSED PERFECTLY!");
     } else {
-      console.error("\n❌ CONCURRENCY TEST FAILED! Assertions failed.");
+      console.error("\n❌ CONCURRENCY TEST FAILED!");
     }
 
   } catch (err) {
     console.error(`\n❌ CONCURRENCY TEST EXCEPTION:`, err.message);
     testPassed = false;
   } finally {
-    if (serverInstance) serverInstance.close();
-
-    if (testPassed) {
-      console.log(`\n8. Test Passed: Cleaning up test user records (${testUserId})...`);
-      await pool.query(`DELETE FROM public.user_feedback WHERE user_id = $1`, [testUserId]);
-      await pool.query(`DELETE FROM public.user_scores WHERE user_id = $1`, [testUserId]);
-      await pool.query(`DELETE FROM public.users WHERE id = $1`, [testUserId]);
-      console.log(`- Test user cleanup completed successfully.`);
-      await pool.end();
-    } else {
-      console.log(`\n⚠️ TEST FAILED: PRESERVING test user records for manual inspection.`);
-      console.log(`- Preserved User ID: ${testUserId}`);
-      console.log(`- Preserved Phone Number: ${testPhoneNumber}`);
-      await pool.end();
-      // Exit process with non-zero code on failure
-      process.exit(1);
+    // 10. Graceful resource closing & safe cleanup in all cases
+    if (serverInstance) {
+      try {
+        await new Promise(resolve => serverInstance.close(resolve));
+        console.log(`\n- Test HTTP server listener closed.`);
+      } catch (srvErr) {
+        console.error(`⚠️ Error closing test HTTP server:`, srvErr.message);
+      }
     }
+
+    if (testUserId && pool) {
+      try {
+        console.log(`\nCleanup: Safely removing test user records (${testUserId})...`);
+        await pool.query(`DELETE FROM public.user_feedback WHERE user_id = $1`, [testUserId]);
+        await pool.query(`DELETE FROM public.user_scores WHERE user_id = $1`, [testUserId]);
+        await pool.query(`DELETE FROM public.users WHERE id = $1`, [testUserId]);
+        console.log(`- Test user cleanup completed successfully.`);
+      } catch (cleanupErr) {
+        console.error(`⚠️ Cleanup error for test user (${testUserId}):`, cleanupErr.message);
+      }
+    }
+
+    if (pool) {
+      try {
+        await pool.end();
+        console.log(`- PostgreSQL pool closed.`);
+      } catch (poolErr) {
+        console.error(`⚠️ Error closing PostgreSQL pool:`, poolErr.message);
+      }
+    }
+
+    process.exitCode = testPassed ? 0 : 1;
   }
 }
 
