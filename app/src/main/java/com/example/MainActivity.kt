@@ -109,6 +109,8 @@ class MainActivity : ComponentActivity() {
                                     }
                                     AppScreen.LEADERBOARD -> {
                                         LeaderboardScreen(
+                                            uiState = uiState,
+                                            onRefresh = { viewModel.loadLeaderboard() },
                                             onBack = { viewModel.navigateTo(AppScreen.SQUARES) }
                                         )
                                     }

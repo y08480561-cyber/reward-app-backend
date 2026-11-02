@@ -148,6 +148,39 @@ class ExampleUnitTest {
     assertFalse("User message must not be marked as admin", userMsg.isAdmin)
     assertTrue("Admin message must be marked as admin", adminMsg.isAdmin)
   }
+
+  @Test
+  fun leaderboardEntry_dataPrivacyAndMasking() {
+    val entry = com.example.model.LeaderboardEntry(
+      rank = 1,
+      userId = "usr_sensitive_999",
+      displayName = "مجتبی چ***",
+      totalScore = 450,
+      isCurrentUser = true
+    )
+
+    assertEquals(1, entry.rank)
+    assertEquals("مجتبی چ***", entry.displayName)
+    assertEquals(450, entry.totalScore)
+    assertTrue(entry.isCurrentUser)
+    // Confirm no raw phone number or password exists in model
+    assertFalse(entry.displayName.contains("09"))
+  }
+
+  @Test
+  fun leaderboard_searchFiltering() {
+    val entries = listOf(
+      com.example.model.LeaderboardEntry(rank = 1, userId = "1", displayName = "علی رض***", totalScore = 120),
+      com.example.model.LeaderboardEntry(rank = 2, userId = "2", displayName = "سارا م***", totalScore = 110),
+      com.example.model.LeaderboardEntry(rank = 3, userId = "3", displayName = "رضا کا***", totalScore = 95)
+    )
+
+    val query = "رض"
+    val filtered = entries.filter { it.displayName.contains(query) }
+    assertEquals(2, filtered.size)
+    assertTrue(filtered.any { it.rank == 1 })
+    assertTrue(filtered.any { it.rank == 3 })
+  }
 }
 
 

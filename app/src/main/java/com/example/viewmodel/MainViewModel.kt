@@ -150,6 +150,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(currentScreen = screen, errorMessage = null, infoMessage = null) }
         if (screen == AppScreen.PRIZES) {
             loadRewardsData()
+        } else if (screen == AppScreen.LEADERBOARD) {
+            loadLeaderboard()
         } else if (screen == AppScreen.MEMBERSHIP) {
             loadMembershipData()
         } else if (screen == AppScreen.STORE) {
@@ -208,11 +210,37 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun loadLeaderboard() {
+    fun loadLeaderboard() {
         val user = _uiState.value.currentUser ?: return
         viewModelScope.launch {
-            val leaderboard = backendRepository.getLeaderboard(user.id)
-            _uiState.update { it.copy(leaderboard = leaderboard) }
+            _uiState.update {
+                it.copy(
+                    isLeaderboardLoading = true,
+                    leaderboardErrorMessage = null,
+                    leaderboardErrorCode = null
+                )
+            }
+            when (val result = backendRepository.fetchLeaderboard(user.id)) {
+                is Result.Success -> {
+                    _uiState.update {
+                        it.copy(
+                            leaderboard = result.data,
+                            isLeaderboardLoading = false,
+                            leaderboardErrorMessage = null,
+                            leaderboardErrorCode = null
+                        )
+                    }
+                }
+                is Result.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isLeaderboardLoading = false,
+                            leaderboardErrorMessage = result.message,
+                            leaderboardErrorCode = if (result.code != -1) result.code else null
+                        )
+                    }
+                }
+            }
         }
     }
 

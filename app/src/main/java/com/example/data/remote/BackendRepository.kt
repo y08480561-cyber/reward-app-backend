@@ -603,56 +603,71 @@ class BackendRepository(
     }
 
     /**
+     * Fetch public competition leaderboard from server.
+     * Endpoint: GET /api/leaderboard
+     * Only public rank, masked display name, and total score are returned.
+     * Returns Result.Success or Result.Error with distinct HTTP error code or network error code.
+     */
+    suspend fun fetchLeaderboard(currentUserId: String): Result<List<LeaderboardEntry>> = withContext(Dispatchers.IO) {
+        val url = "${prefs.serverUrl.trimEnd('/')}/api/leaderboard"
+        try {
+            val request = Request.Builder()
+                .url(url)
+                .header("x-user-id", currentUserId)
+                .get()
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                val code = response.code
+                val body = response.body?.string().orEmpty()
+                if (response.isSuccessful) {
+                    val json = JSONObject(body)
+                    val array = json.optJSONArray("leaderboard")
+                    val list = mutableListOf<LeaderboardEntry>()
+                    if (array != null) {
+                        for (i in 0 until array.length()) {
+                            val item = array.getJSONObject(i)
+                            list.add(
+                                LeaderboardEntry(
+                                    rank = item.optInt("rank", i + 1),
+                                    userId = item.optString("userId"),
+                                    displayName = item.optString("displayName", "کاربر مسابقه"),
+                                    totalScore = item.optInt("totalScore", 0),
+                                    isCurrentUser = item.optBoolean("isCurrentUser", item.optString("userId") == currentUserId),
+                                    adsCompletedToday = 0
+                                )
+                            )
+                        }
+                    }
+                    Result.Success(list)
+                } else {
+                    val msg = when (code) {
+                        401 -> "خطای احراز هویت (کد ۴۰۱): دسترسی نیازمند مجوز است."
+                        403 -> "خطای عدم دسترسی (کد ۴۰۳): اجازه دسترسی به این بخش وجود ندارد."
+                        404 -> "مسیر سرویس رتبه‌بندی یافت نشد (کد ۴۰۴)."
+                        500, 502, 503 -> "خطای سرور (کد $code): لطفاً لحظاتی دیگر مجدداً تلاش کنید."
+                        else -> "خطای سرور (کد $code) در دریافت جدول رتبه‌بندی."
+                    }
+                    Result.Error(msg, code)
+                }
+            }
+        } catch (e: Exception) {
+            val classified = classifyNetworkException(e)
+            val networkMsg = "خطای اتصال به شبکه: ${classified.userFacingMessage}"
+            Result.Error(networkMsg, -1)
+        }
+    }
+
+    /**
      * Get real-time Leaderboard from server without fake seed data
      */
     suspend fun getLeaderboard(currentUserId: String): List<LeaderboardEntry> = withContext(Dispatchers.IO) {
+        val res = fetchLeaderboard(currentUserId)
+        if (res is Result.Success && res.data.isNotEmpty()) {
+            return@withContext res.data
+        }
         val currentUser = userDao.getCurrentUser()
         val currentScore = currentUser?.totalScore ?: prefs.totalScore
-
-        val url = "${prefs.serverUrl.trimEnd('/')}/api/leaderboard"
-        for (attempt in 1..2) {
-            try {
-                val request = Request.Builder()
-                    .url(url)
-                    .header("x-user-id", currentUserId)
-                    .get()
-                    .build()
-
-                client.newCall(request).execute().use { response ->
-                    val body = response.body?.string().orEmpty()
-                    if (response.isSuccessful) {
-                        val json = JSONObject(body)
-                        val array = json.optJSONArray("leaderboard")
-                        if (array != null) {
-                            val list = mutableListOf<LeaderboardEntry>()
-                            for (i in 0 until array.length()) {
-                                val item = array.getJSONObject(i)
-                                list.add(
-                                    LeaderboardEntry(
-                                        rank = item.optInt("rank", i + 1),
-                                        userId = item.optString("userId"),
-                                        displayName = item.optString("displayName", "کاربر مسابقه"),
-                                        totalScore = item.optInt("totalScore", 0),
-                                        isCurrentUser = item.optBoolean("isCurrentUser", item.optString("userId") == currentUserId),
-                                        adsCompletedToday = 0
-                                    )
-                                )
-                            }
-                            if (list.isNotEmpty()) {
-                                return@withContext list
-                            }
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                val classified = classifyNetworkException(e)
-                if (attempt < 2 && (classified.category == NetworkErrorCategory.TIMEOUT_FAILURE || classified.category == NetworkErrorCategory.TCP_CONNECT_FAILURE)) {
-                    kotlinx.coroutines.delay(1000)
-                    continue
-                }
-            }
-        }
-
         listOf(
             LeaderboardEntry(
                 rank = 1,
