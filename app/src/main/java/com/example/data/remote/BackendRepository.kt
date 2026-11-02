@@ -921,13 +921,15 @@ class BackendRepository(
      */
     suspend fun fetchLoginNotificationConfig(): Result<com.example.model.LoginNotificationConfig> = withContext(Dispatchers.IO) {
         val url = "${prefs.serverUrl.trimEnd('/')}/api/app/login-notification"
+        Log.d("BackendRepository", "Fetching login notification from: $url")
         try {
             val request = Request.Builder().url(url).get().build()
             client.newCall(request).execute().use { response ->
                 val body = response.body?.string().orEmpty()
+                Log.d("BackendRepository", "Response code: ${response.code}, Body: $body")
                 if (response.isSuccessful) {
                     val json = JSONObject(body)
-                    val settingsObj = json.optJSONObject("settings")
+                    val settingsObj = json.optJSONObject("data")
                     if (settingsObj != null) {
                         val config = com.example.model.LoginNotificationConfig(
                             id = settingsObj.optString("id", "default"),
@@ -945,15 +947,18 @@ class BackendRepository(
                         prefs.cachedLoginNotificationJson = settingsObj.toString()
                         Result.Success(config)
                     } else {
+                        Log.e("BackendRepository", "Settings object not found in response")
                         Result.Error("تنظیمات در پاسخ سرور یافت نشد.")
                     }
                 } else {
+                    Log.e("BackendRepository", "Response not successful")
                     val cached = parseCachedLoginNotification()
                     if (cached != null) Result.Success(cached)
                     else Result.Error("خطا در دریافت تنظیمات ورود: ${response.code}")
                 }
             }
         } catch (e: Exception) {
+            Log.e("BackendRepository", "Network error: ${e.message}")
             val cached = parseCachedLoginNotification()
             if (cached != null) Result.Success(cached)
             else Result.Error("خطای شبکه در دریافت تنظیمات ورود: ${e.message}")
