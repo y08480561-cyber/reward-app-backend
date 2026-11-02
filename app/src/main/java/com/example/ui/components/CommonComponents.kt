@@ -78,14 +78,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.example.ui.theme.CardSurface
-import com.example.ui.theme.GoldAccent
-import com.example.ui.theme.GoldLight
-import com.example.ui.theme.NavyLight
-import com.example.ui.theme.NavyPrimary
-import com.example.ui.theme.NavySecondary
-import com.example.ui.theme.SuccessGreen
-import com.example.ui.theme.TextOnDark
+import com.example.ui.theme.*
 import com.example.viewmodel.AppScreen
 import java.util.Locale
 
@@ -138,8 +131,9 @@ fun AppHeader(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(4.dp),
-        color = NavyPrimary
+            .shadow(8.dp),
+        color = NavyPrimary,
+        border = BorderStroke(1.dp, Brush.verticalGradient(listOf(Color(0x33D4AF37), Color(0x11D4AF37))))
     ) {
         Row(
             modifier = Modifier
@@ -153,31 +147,42 @@ fun AppHeader(
                 onClick = onProfileClick,
                 modifier = Modifier.testTag("btn_header_profile")
             ) {
-                Icon(
-                    imageVector = Icons.Default.Person,
-                    contentDescription = "پروفایل",
-                    tint = GoldLight
-                )
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(Color(0x1AD4AF37))
+                        .border(1.dp, Color(0x44D4AF37), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = "پروفایل",
+                        tint = GoldLight,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
 
             // Title
             Text(
                 text = title,
-                color = Color.White,
+                color = WarmWhite,
                 fontWeight = FontWeight.Bold,
                 fontSize = 17.sp,
                 textAlign = TextAlign.Center
             )
 
-            // Score Pill Badge
+            // Luxury Score Pill Badge
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(20.dp))
                     .background(
                         Brush.horizontalGradient(
-                            listOf(GoldAccent, Color(0xFFFBBF24))
+                            listOf(Color(0xFFD4AF37), Color(0xFFF5D77A), Color(0xFFAA8010))
                         )
                     )
+                    .border(1.dp, Color(0x88FFFFFF), RoundedCornerShape(20.dp))
                     .clickable { onProfileClick() }
                     .padding(horizontal = 12.dp, vertical = 6.dp),
                 contentAlignment = Alignment.Center
@@ -186,13 +191,13 @@ fun AppHeader(
                     Icon(
                         imageVector = Icons.Default.Star,
                         contentDescription = null,
-                        tint = NavyPrimary,
+                        tint = LuxuryBlack,
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = "${totalScore.toPersianDigits()} امتیاز",
-                        color = NavyPrimary,
+                        color = LuxuryBlack,
                         fontWeight = FontWeight.ExtraBold,
                         fontSize = 13.sp
                     )
@@ -234,31 +239,32 @@ fun AppBottomNavigation(
                 .padding(horizontal = 8.dp, vertical = 8.dp),
             contentAlignment = Alignment.BottomCenter
         ) {
-            // Protrusion background (the "bump" for the logo)
+            // Protrusion background bump for central logo
             Surface(
                 modifier = Modifier
                     .offset(y = (-18).dp)
                     .size(80.dp),
                 shape = CircleShape,
-                color = Color.White.copy(alpha = 0.95f),
-                tonalElevation = 12.dp,
-                shadowElevation = 12.dp
+                color = Color(0xF2121722),
+                tonalElevation = 14.dp,
+                shadowElevation = 14.dp,
+                border = BorderStroke(1.dp, Color(0x44D4AF37))
             ) {}
 
-            // Main Navigation Capsule
+            // Main Navigation Luxury Capsule
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(64.dp)
-                    .shadow(16.dp, RoundedCornerShape(32.dp)),
-                color = Color.White.copy(alpha = 0.95f),
+                    .shadow(20.dp, RoundedCornerShape(32.dp)),
+                color = Color(0xF2121722),
                 shape = RoundedCornerShape(32.dp),
                 border = BorderStroke(
                     1.dp,
                     Brush.verticalGradient(
                         listOf(
-                            Color.White.copy(alpha = 0.8f),
-                            Color.White.copy(alpha = 0.2f)
+                            Color(0x66D4AF37),
+                            Color(0x22D4AF37)
                         )
                     )
                 )
@@ -306,7 +312,7 @@ fun AppBottomNavigation(
                 }
             }
 
-            // Floating Central Logo Button (Now 100 Squares)
+            // Floating Central Luxury Logo Button (100 Squares)
             CentralLogoButton(
                 selected = currentScreen == AppScreen.SQUARES,
                 label = "۱۰۰ مربع",
@@ -352,7 +358,7 @@ fun BottomNavItem(
                         .size(34.dp)
                         .background(
                             Brush.radialGradient(
-                                listOf(GoldLight.copy(alpha = 0.6f), Color.Transparent)
+                                listOf(Color(0x33D4AF37), Color.Transparent)
                             ),
                             CircleShape
                         )
@@ -361,7 +367,7 @@ fun BottomNavItem(
             Icon(
                 imageVector = icon,
                 contentDescription = label,
-                tint = if (selected) NavyPrimary else Color(0xFF64748B),
+                tint = if (selected) GoldLight else Color(0xFF8E98A8),
                 modifier = Modifier.size(24.dp)
             )
         }
@@ -369,7 +375,7 @@ fun BottomNavItem(
             text = label,
             fontSize = 10.sp,
             fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.Medium,
-            color = if (selected) NavyPrimary else Color(0xFF64748B)
+            color = if (selected) GoldLight else Color(0xFF8E98A8)
         )
     }
 }
@@ -400,13 +406,13 @@ fun CentralLogoButton(
             .shadow(16.dp, CircleShape)
             .background(
                 Brush.verticalGradient(
-                    listOf(NavyPrimary, Color(0xFF0F766E))
+                    listOf(Color(0xFFF5D77A), Color(0xFFD4AF37), Color(0xFFAA8010))
                 ),
                 CircleShape
             )
             .border(
                 width = 2.dp,
-                brush = Brush.linearGradient(listOf(GoldAccent, GoldLight)),
+                brush = Brush.linearGradient(listOf(Color.White, Color(0xFFF5D77A))),
                 shape = CircleShape
             )
             .clickable(onClick = onClick)
@@ -421,13 +427,13 @@ fun CentralLogoButton(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = if (selected) GoldAccent else Color.White,
+                tint = LuxuryBlack,
                 modifier = Modifier.size(28.dp)
             )
             if (label != null) {
                 Text(
                     text = label,
-                    color = if (selected) GoldAccent else Color.White,
+                    color = LuxuryBlack,
                     fontSize = 9.sp,
                     fontWeight = FontWeight.ExtraBold,
                     modifier = Modifier.padding(top = 2.dp)
@@ -437,9 +443,6 @@ fun CentralLogoButton(
     }
 }
 
-/**
- * Metric Card with Navy/Gold gradient or clean surface
- */
 @Composable
 fun MetricCard(
     title: String,
@@ -451,9 +454,10 @@ fun MetricCard(
 ) {
     Surface(
         modifier = modifier
-            .shadow(3.dp, RoundedCornerShape(16.dp))
+            .shadow(6.dp, RoundedCornerShape(16.dp))
             .clip(RoundedCornerShape(16.dp)),
-        color = CardSurface
+        color = CardSurface,
+        border = BorderStroke(1.dp, Color(0x26D4AF37))
     ) {
         Column(
             modifier = Modifier.padding(14.dp),
@@ -468,7 +472,8 @@ fun MetricCard(
                     modifier = Modifier
                         .size(36.dp)
                         .clip(CircleShape)
-                        .background(accentColor.copy(alpha = 0.15f)),
+                        .background(accentColor.copy(alpha = 0.15f))
+                        .border(1.dp, accentColor.copy(alpha = 0.3f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -481,7 +486,7 @@ fun MetricCard(
                 Text(
                     text = title,
                     fontSize = 12.sp,
-                    color = Color(0xFF64748B),
+                    color = Color(0xFFB0B7C3),
                     fontWeight = FontWeight.Medium
                 )
             }
@@ -490,14 +495,14 @@ fun MetricCard(
                 text = value,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
-                color = NavyPrimary
+                color = WarmWhite
             )
             if (subValue != null) {
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = subValue,
                     fontSize = 11.sp,
-                    color = Color(0xFF94A3B8)
+                    color = Color(0xFF8E98A8)
                 )
             }
         }
@@ -518,10 +523,10 @@ fun RewardCelebrationModal(
                 .clip(RoundedCornerShape(24.dp))
                 .background(
                     Brush.verticalGradient(
-                        listOf(NavyPrimary, NavySecondary)
+                        listOf(LuxuryBlack, NavyPrimary)
                     )
                 )
-                .border(2.dp, GoldAccent, RoundedCornerShape(24.dp))
+                .border(1.5.dp, GoldAccent, RoundedCornerShape(24.dp))
                 .padding(24.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -534,14 +539,18 @@ fun RewardCelebrationModal(
                     modifier = Modifier
                         .size(72.dp)
                         .clip(CircleShape)
-                        .background(GoldAccent)
-                        .shadow(8.dp, CircleShape),
+                        .background(
+                            Brush.linearGradient(
+                                listOf(Color(0xFFF5D77A), Color(0xFFD4AF37), Color(0xFFAA8010))
+                            )
+                        )
+                        .shadow(12.dp, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.EmojiEvents,
                         contentDescription = null,
-                        tint = NavyPrimary,
+                        tint = LuxuryBlack,
                         modifier = Modifier.size(44.dp)
                     )
                 }
@@ -556,7 +565,7 @@ fun RewardCelebrationModal(
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "+${pointsAwarded.toPersianDigits()} امتیاز معتبر تپسل",
-                    color = Color.White,
+                    color = WarmWhite,
                     fontWeight = FontWeight.ExtraBold,
                     fontSize = 24.sp,
                     textAlign = TextAlign.Center
@@ -579,7 +588,7 @@ fun RewardCelebrationModal(
                 ) {
                     Text(
                         text = "ادامه رقابت",
-                        color = NavyPrimary,
+                        color = LuxuryBlack,
                         fontWeight = FontWeight.Bold,
                         fontSize = 15.sp
                     )
@@ -606,7 +615,8 @@ fun ExperienceFeedbackDialog(
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(24.dp),
-            color = Color.White,
+            color = CardSurface,
+            border = BorderStroke(1.dp, Color(0x33D4AF37)),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 20.dp)
@@ -620,7 +630,8 @@ fun ExperienceFeedbackDialog(
                     modifier = Modifier
                         .size(64.dp)
                         .clip(CircleShape)
-                        .background(GoldAccent.copy(alpha = 0.15f)),
+                        .background(GoldAccent.copy(alpha = 0.15f))
+                        .border(1.dp, GoldAccent.copy(alpha = 0.3f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -637,7 +648,7 @@ fun ExperienceFeedbackDialog(
                     text = if (isInternalView) "ثبت بازخورد مستقیم" else "تجربه شما برای ما مهم است!",
                     fontWeight = FontWeight.ExtraBold,
                     fontSize = 18.sp,
-                    color = NavyPrimary,
+                    color = WarmWhite,
                     textAlign = TextAlign.Center
                 )
 
@@ -648,7 +659,7 @@ fun ExperienceFeedbackDialog(
                         "با ارسال نظر صادقانه خود (مثبت یا منفی)، ما را در بهبود اپلیکیشن یاری کنید و ۲ امتیاز هدیه بگیرید."
                         else "از اینکه همراه ما هستید خوشحالیم. لطفاً با ثبت امتیاز در مایکت یا ارسال بازخورد مستقیم، ما را حمایت کنید.",
                     fontSize = 13.sp,
-                    color = Color(0xFF64748B),
+                    color = Color(0xFFB0B7C3),
                     textAlign = TextAlign.Center,
                     lineHeight = 22.sp
                 )
@@ -661,11 +672,11 @@ fun ExperienceFeedbackDialog(
                         onClick = onOpenMyket,
                         modifier = Modifier.fillMaxWidth().height(50.dp),
                         shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = NavyPrimary)
+                        colors = ButtonDefaults.buttonColors(containerColor = GoldAccent)
                     ) {
-                        Icon(imageVector = Icons.Default.Launch, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Icon(imageVector = Icons.Default.Launch, contentDescription = null, modifier = Modifier.size(18.dp), tint = LuxuryBlack)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("مشاهده در مایکت", fontWeight = FontWeight.Bold)
+                        Text("مشاهده در مایکت", fontWeight = FontWeight.Bold, color = LuxuryBlack)
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
@@ -674,9 +685,9 @@ fun ExperienceFeedbackDialog(
                         onClick = { isInternalView = true },
                         modifier = Modifier.fillMaxWidth().height(50.dp),
                         shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, NavyPrimary.copy(alpha = 0.3f))
+                        border = BorderStroke(1.dp, Color(0x66D4AF37))
                     ) {
-                        Text("ثبت بازخورد و دریافت ۲ امتیاز", color = NavyPrimary, fontWeight = FontWeight.Bold)
+                        Text("ثبت بازخورد و دریافت ۲ امتیاز", color = GoldLight, fontWeight = FontWeight.Bold)
                     }
                     
                     Spacer(modifier = Modifier.height(12.dp))

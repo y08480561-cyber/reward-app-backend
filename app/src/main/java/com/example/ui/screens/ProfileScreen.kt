@@ -19,23 +19,21 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -47,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -54,16 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.User
 import com.example.ui.components.toPersianDigits
-import com.example.ui.theme.CardSurface
-import com.example.ui.theme.ErrorRed
-import com.example.ui.theme.GoldAccent
-import com.example.ui.theme.GoldLight
-import com.example.ui.theme.NavyLight
-import com.example.ui.theme.NavyPrimary
-import com.example.ui.theme.NavySecondary
-import com.example.ui.theme.TextPrimary
-import com.example.ui.theme.TextSecondary
-import com.example.viewmodel.AppScreen
+import com.example.ui.theme.*
 
 @Composable
 fun ProfileScreen(
@@ -77,298 +67,350 @@ fun ProfileScreen(
     var showLogoutDialog by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF8FAFC))
-            .verticalScroll(scrollState)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .background(LuxuryDarkGradient)
     ) {
-        // User Profile Header
-        Surface(
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .shadow(3.dp, RoundedCornerShape(20.dp)),
-            shape = RoundedCornerShape(20.dp),
-            color = NavyPrimary
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Column(
+            // User Profile VIP Header Card
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .shadow(12.dp, RoundedCornerShape(24.dp), spotColor = GoldAccent.copy(alpha = 0.3f)),
+                shape = RoundedCornerShape(24.dp),
+                color = CardSurface,
+                border = androidx.compose.foundation.BorderStroke(1.dp, LuxuryBorder)
             ) {
-                Box(
+                Column(
                     modifier = Modifier
-                        .size(70.dp)
-                        .clip(CircleShape)
-                        .background(GoldAccent),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = null,
-                        tint = NavyPrimary,
-                        modifier = Modifier.size(42.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        text = user.fullName,
-                        color = Color.White,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    
-                    if (user.panelType != "free") {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = if (user.panelType == "gold") GoldAccent else Color(0xFFE2E8F0),
-                            modifier = Modifier.border(
-                                width = 1.dp,
-                                color = if (user.panelType == "gold") Color.White else Color(0xFFCBD5E1),
-                                shape = RoundedCornerShape(12.dp)
+                        .fillMaxWidth()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color(0xFF1B2332), CardSurface)
                             )
-                        ) {
-                            Text(
-                                text = if (user.panelType == "gold") "👑 طلایی (۶X)" else "🥈 نقره‌ای (۳X)",
-                                color = if (user.panelType == "gold") NavyPrimary else Color(0xFF475569),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    text = user.phoneNumber.toPersianDigits(),
-                    color = GoldLight,
-                    fontSize = 13.sp
-                )
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // User ID Pill
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(Color.White.copy(alpha = 0.15f))
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(
-                        text = "شناسه کاربری: ${user.id}",
-                        color = Color.White,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
-        }
-
-        // Store & Upgrade Banner Button
-        Button(
-            onClick = onNavigateToStore,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(54.dp)
-                .shadow(4.dp, RoundedCornerShape(16.dp))
-                .testTag("btn_goto_store"),
-            shape = RoundedCornerShape(16.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = GoldAccent)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Storefront,
-                        contentDescription = null,
-                        tint = NavyPrimary,
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = "فروشگاه، ارتقای حساب و بازگشایی آنی",
-                        color = NavyPrimary,
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 14.sp
-                    )
-                }
-                Text(
-                    text = "مشاهده",
-                    color = NavyPrimary,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp
-                )
-            }
-        }
-
-        // Support & Help Desk Card
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .shadow(2.dp, RoundedCornerShape(16.dp))
-                .clickable { onNavigateToSupport() }
-                .testTag("btn_profile_support"),
-            shape = RoundedCornerShape(16.dp),
-            color = Color.White,
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF0284C7).copy(alpha = 0.35f))
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
-                            .size(38.dp)
-                            .background(Color(0xFFE0F2FE), CircleShape),
+                            .size(76.dp)
+                            .clip(CircleShape)
+                            .background(GoldGradientBrush)
+                            .border(2.5.dp, GoldLight, CircleShape)
+                            .shadow(10.dp, CircleShape, spotColor = GoldAccent),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Info,
+                            imageVector = Icons.Default.Person,
                             contentDescription = null,
-                            tint = Color(0xFF0284C7),
-                            modifier = Modifier.size(20.dp)
+                            tint = LuxuryBlack,
+                            modifier = Modifier.size(46.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column {
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
                         Text(
-                            text = "مرکز پشتیبانی و پیام‌ها",
-                            color = NavyPrimary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
+                            text = user.fullName,
+                            color = WarmWhite,
+                            fontSize = 19.sp,
+                            fontWeight = FontWeight.ExtraBold
                         )
-                        Text(
-                            text = "ثبت تیکت، پیگیری و گفت‌وگوی مستقیم با مدیریت",
-                            color = Color(0xFF64748B),
-                            fontSize = 11.sp
-                        )
+                        
+                        if (user.panelType != "free") {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (user.panelType == "gold") GoldAccent.copy(alpha = 0.2f) else SilverAccent.copy(alpha = 0.2f),
+                                modifier = Modifier.border(
+                                    width = 1.dp,
+                                    color = if (user.panelType == "gold") GoldAccent else SilverAccent,
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                            ) {
+                                Text(
+                                    text = if (user.panelType == "gold") "👑 طلایی (۶X)" else "🥈 نقره‌ای (۳X)",
+                                    color = if (user.panelType == "gold") GoldLight else SilverAccent,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
                     }
-                }
-                Text(
-                    text = "ورود ←",
-                    color = Color(0xFF0284C7),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp
-                )
-            }
-        }
 
-        // Stats Card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = CardSurface)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = "آمار حساب کاربری",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = NavyPrimary
-                )
-                Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
-                activeCompetition?.let { comp ->
-                    ProfileStatRow(
-                        label = "مسابقه فعال",
-                        value = "دوره ${comp.competitionNumber} (${comp.title})"
+                    Text(
+                        text = user.phoneNumber.toPersianDigits(),
+                        color = SilverAccent,
+                        fontSize = 13.sp
                     )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // User ID Pill - Dark Glass
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0x1AF5F2E9))
+                            .border(1.dp, LuxuryBorder.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+                            .padding(horizontal = 14.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = "شناسه کاربری: ${user.id}",
+                            color = WarmWhite.copy(alpha = 0.85f),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
                 }
-                ProfileStatRow(
-                    label = "مجموع امتیازهای دوره جاری",
-                    value = "${user.totalScore.toPersianDigits()} امتیاز"
-                )
-                ProfileStatRow(
-                    label = "وضعیت حساب",
-                    value = "فعال و تایید شده"
-                )
-                Spacer(modifier = Modifier.height(12.dp))
+            }
+
+            // Store & Upgrade Banner Button - Metallic Gold Shimmer
+            Button(
+                onClick = onNavigateToStore,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .shadow(10.dp, RoundedCornerShape(18.dp), spotColor = GoldAccent)
+                    .testTag("btn_goto_store"),
+                shape = RoundedCornerShape(18.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = GoldAccent)
+            ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(CircleShape)
+                                .background(LuxuryBlack.copy(alpha = 0.15f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Storefront,
+                                contentDescription = null,
+                                tint = LuxuryBlack,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "فروشگاه، ارتقای حساب و بازگشایی آنی",
+                            color = LuxuryBlack,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 13.sp
+                        )
+                    }
                     Text(
-                        text = "دریافت اعلان‌ها",
-                        fontSize = 12.sp,
-                        color = NavyPrimary,
-                        fontWeight = FontWeight.Bold
-                    )
-                    androidx.compose.material3.Switch(
-                        checked = user.notificationsEnabled,
-                        onCheckedChange = onToggleNotifications
+                        text = "مشاهده ←",
+                        color = LuxuryBlack,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 12.sp
                     )
                 }
             }
-        }
 
-        // Logout Button
-        OutlinedButton(
-            onClick = { showLogoutDialog = true },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp)
-                .testTag("btn_logout"),
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = ErrorRed)
-        ) {
-            Icon(
-                imageVector = Icons.Default.ExitToApp,
-                contentDescription = null,
-                tint = ErrorRed,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("خروج از حساب کاربری", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-        }
+            // Support & Help Desk Card - Luxury Dark Style
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .shadow(6.dp, RoundedCornerShape(18.dp))
+                    .clickable { onNavigateToSupport() }
+                    .testTag("btn_profile_support"),
+                shape = RoundedCornerShape(18.dp),
+                color = CardSurface,
+                border = androidx.compose.foundation.BorderStroke(1.dp, LuxuryBorder)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(18.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(GoldAccent.copy(alpha = 0.15f))
+                                .border(1.dp, LuxuryBorder, RoundedCornerShape(12.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = GoldLight,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "مرکز پشتیبانی و پیام‌ها",
+                                color = WarmWhite,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "ثبت تیکت، پیگیری و گفت‌وگوی مستقیم با مدیریت",
+                                color = SilverAccent,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+                    Text(
+                        text = "ورود ←",
+                        color = GoldLight,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                }
+            }
 
-        Spacer(modifier = Modifier.height(100.dp))
+            // Stats Card - Luxury VIP Design
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = CardSurface),
+                border = androidx.compose.foundation.BorderStroke(1.dp, LuxuryBorder)
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .width(4.dp)
+                                .height(16.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(GoldAccent)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "آمار و اطلاعات حساب کاربری",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = WarmWhite
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    activeCompetition?.let { comp ->
+                        ProfileStatRow(
+                            label = "مسابقه فعال",
+                            value = "دوره ${comp.competitionNumber} (${comp.title})"
+                        )
+                    }
+                    ProfileStatRow(
+                        label = "مجموع امتیازهای دوره جاری",
+                        value = "${user.totalScore.toPersianDigits()} امتیاز",
+                        isHighlight = true
+                    )
+                    ProfileStatRow(
+                        label = "وضعیت حساب",
+                        value = "فعال و تایید شده"
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider(color = LuxuryBorder.copy(alpha = 0.3f), thickness = 1.dp)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "دریافت اعلان‌ها و اطلاعیه‌ها",
+                            fontSize = 12.sp,
+                            color = WarmWhite,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Switch(
+                            checked = user.notificationsEnabled,
+                            onCheckedChange = onToggleNotifications,
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = LuxuryBlack,
+                                checkedTrackColor = GoldAccent
+                            )
+                        )
+                    }
+                }
+            }
+
+            // Logout Button - Luxury Muted Style
+            OutlinedButton(
+                onClick = { showLogoutDialog = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp)
+                    .testTag("btn_logout"),
+                shape = RoundedCornerShape(14.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, ErrorRed.copy(alpha = 0.5f)),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = ErrorRed)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ExitToApp,
+                    contentDescription = null,
+                    tint = ErrorRed,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("خروج از حساب کاربری", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            }
+
+            Spacer(modifier = Modifier.height(100.dp))
+        }
     }
 
     if (showLogoutDialog) {
         AlertDialog(
             onDismissRequest = { showLogoutDialog = false },
+            containerColor = CardSurface,
             title = {
-                Text(text = "خروج از حساب", fontWeight = FontWeight.Bold, color = NavyPrimary)
+                Text(
+                    text = "خروج از حساب کاربری",
+                    fontWeight = FontWeight.Bold,
+                    color = WarmWhite
+                )
             },
             text = {
                 Text(
-                    text = "آیا مطمئن هستید که می‌خواهید خارج شوید؟ با خروج از حساب، امتیازها در سرور باقی می‌مانند و با ورود مجدد بازیابی خواهند شد.",
-                    color = Color(0xFF475569)
+                    text = "آیا اطمینان دارید که می‌خواهید از حساب خود خارج شوید؟",
+                    color = SilverAccent,
+                    fontSize = 13.sp
                 )
             },
             confirmButton = {
-                TextButton(
+                Button(
                     onClick = {
                         showLogoutDialog = false
                         onLogout()
-                    }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = ErrorRed),
+                    shape = RoundedCornerShape(10.dp)
                 ) {
-                    Text("بله، خروج", color = ErrorRed, fontWeight = FontWeight.Bold)
+                    Text("خروج قطعی", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showLogoutDialog = false }) {
-                    Text("انصراف", color = NavyPrimary, fontWeight = FontWeight.Bold)
+                    Text("انصراف", color = SilverAccent)
                 }
             }
         )
@@ -376,14 +418,24 @@ fun ProfileScreen(
 }
 
 @Composable
-fun ProfileStatRow(label: String, value: String) {
+private fun ProfileStatRow(label: String, value: String, isHighlight: Boolean = false) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
+            .padding(vertical = 7.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(text = label, fontSize = 12.sp, color = Color(0xFF64748B))
-        Text(text = value, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = NavyPrimary)
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            color = SilverAccent
+        )
+        Text(
+            text = value,
+            fontSize = if (isHighlight) 14.sp else 12.sp,
+            fontWeight = if (isHighlight) FontWeight.ExtraBold else FontWeight.Bold,
+            color = if (isHighlight) GoldLight else WarmWhite
+        )
     }
 }

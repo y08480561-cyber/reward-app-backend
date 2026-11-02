@@ -55,12 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.data.remote.HealthCheckResult
-import com.example.ui.theme.GoldAccent
-import com.example.ui.theme.GoldDark
-import com.example.ui.theme.GoldLight
-import com.example.ui.theme.NavyPrimary
-import com.example.ui.theme.NavySecondary
-import com.example.ui.theme.VazirmatnFontFamily
+import com.example.ui.theme.*
 import com.example.viewmodel.AuthMode
 import com.example.viewmodel.AuthUiState
 
@@ -86,11 +81,16 @@ fun AuthScreen(
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = Color(0xFFF1F5F9)
+        color = LuxuryBlack
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(LuxuryBlack, NavyPrimary, LuxuryBlack)
+                    )
+                )
                 .verticalScroll(scrollState)
         ) {
             // Header Hero Banner
@@ -101,8 +101,13 @@ fun AuthScreen(
                     .clip(RoundedCornerShape(bottomStart = 36.dp, bottomEnd = 36.dp))
                     .background(
                         Brush.verticalGradient(
-                            listOf(NavyPrimary, NavySecondary)
+                            listOf(NavyPrimary, LuxuryBlack)
                         )
+                    )
+                    .border(
+                        width = 1.dp,
+                        brush = Brush.verticalGradient(listOf(Color(0x33D4AF37), Color(0x11D4AF37))),
+                        shape = RoundedCornerShape(bottomStart = 36.dp, bottomEnd = 36.dp)
                     ),
                 contentAlignment = Alignment.Center
             ) {
@@ -112,20 +117,21 @@ fun AuthScreen(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(68.dp)
+                            .size(70.dp)
                             .clip(CircleShape)
                             .background(
                                 Brush.linearGradient(
                                     listOf(GoldLight, GoldAccent, GoldDark)
                                 )
                             )
-                            .shadow(12.dp, CircleShape),
+                            .border(1.5.dp, Color.White.copy(alpha = 0.5f), CircleShape)
+                            .shadow(16.dp, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.Default.EmojiEvents,
                             contentDescription = null,
-                            tint = NavyPrimary,
+                            tint = LuxuryBlack,
                             modifier = Modifier.size(42.dp)
                         )
                     }
@@ -133,7 +139,7 @@ fun AuthScreen(
                     Text(
                         text = "رقابت کن، جایزه ببر",
                         fontFamily = VazirmatnFontFamily,
-                        color = Color.White,
+                        color = WarmWhite,
                         fontSize = 22.sp,
                         fontWeight = FontWeight.ExtraBold,
                         textAlign = TextAlign.Center
@@ -142,7 +148,7 @@ fun AuthScreen(
                     Text(
                         text = "سامانه مسابقه ۱۰۰ مربع جایزه‌دار و ثبت زنده در سرور",
                         fontFamily = VazirmatnFontFamily,
-                        color = GoldAccent,
+                        color = GoldLight,
                         fontSize = 12.5.sp,
                         fontWeight = FontWeight.Medium,
                         textAlign = TextAlign.Center
@@ -156,17 +162,17 @@ fun AuthScreen(
                     .padding(horizontal = 16.dp, vertical = 14.dp)
             ) {
                 // ==============================================================
-                // Eye-catching Dynamic Notification Card (Frosted Glass Style)
+                // Eye-catching Dynamic Notification Card (Luxury Glass Style)
                 // ==============================================================
                 if (loginNotification.isVisible) {
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .shadow(10.dp, RoundedCornerShape(22.dp))
+                            .shadow(12.dp, RoundedCornerShape(22.dp))
                             .border(
-                                width = 1.5.dp,
+                                width = 1.dp,
                                 brush = Brush.linearGradient(
-                                    listOf(GoldAccent, GoldAccent.copy(alpha = 0.3f), GoldAccent)
+                                    listOf(GoldAccent, Color(0x44D4AF37), GoldLight)
                                 ),
                                 shape = RoundedCornerShape(22.dp)
                             ),
@@ -179,8 +185,8 @@ fun AuthScreen(
                                 .background(
                                     Brush.verticalGradient(
                                         listOf(
-                                            Color(0xFF0F2542).copy(alpha = 0.92f), // Frosted Navy
-                                            Color(0xFF16325B).copy(alpha = 0.96f)
+                                            Color(0xF0161D28),
+                                            Color(0xF00F151E)
                                         )
                                     )
                                 )
@@ -200,7 +206,7 @@ fun AuthScreen(
                                             .clip(RoundedCornerShape(30.dp))
                                             .background(
                                                 Brush.horizontalGradient(
-                                                    listOf(GoldAccent, Color(0xFFFFA000))
+                                                    listOf(GoldAccent, GoldLight)
                                                 )
                                             )
                                             .padding(horizontal = 14.dp, vertical = 5.dp)
@@ -212,7 +218,7 @@ fun AuthScreen(
                                             Icon(
                                                 imageVector = getIconByName(loginNotification.badgeIcon),
                                                 contentDescription = null,
-                                                tint = NavyPrimary,
+                                                tint = LuxuryBlack,
                                                 modifier = Modifier.size(16.dp)
                                             )
                                             Spacer(modifier = Modifier.width(6.dp))
@@ -221,7 +227,7 @@ fun AuthScreen(
                                                 fontFamily = VazirmatnFontFamily,
                                                 fontSize = 11.sp,
                                                 fontWeight = FontWeight.Black,
-                                                color = NavyPrimary
+                                                color = LuxuryBlack
                                             )
                                         }
                                     }
@@ -235,7 +241,7 @@ fun AuthScreen(
                                     fontFamily = VazirmatnFontFamily,
                                     fontSize = 17.sp,
                                     fontWeight = FontWeight.ExtraBold,
-                                    color = GoldAccent,
+                                    color = GoldLight,
                                     textAlign = TextAlign.Center,
                                     lineHeight = 26.sp
                                 )
@@ -247,7 +253,7 @@ fun AuthScreen(
                                         fontFamily = VazirmatnFontFamily,
                                         fontSize = 12.5.sp,
                                         fontWeight = FontWeight.Normal,
-                                        color = Color.White.copy(alpha = 0.9f),
+                                        color = WarmWhite.copy(alpha = 0.9f),
                                         textAlign = TextAlign.Center,
                                         lineHeight = 21.sp
                                     )
@@ -260,8 +266,8 @@ fun AuthScreen(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .clip(RoundedCornerShape(16.dp))
-                                            .background(Color(0xFF0A192F).copy(alpha = 0.8f))
-                                            .border(1.2.dp, GoldAccent.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+                                            .background(Color(0xFF1B2332).copy(alpha = 0.85f))
+                                            .border(1.dp, Color(0x44D4AF37), RoundedCornerShape(16.dp))
                                             .padding(14.dp)
                                     ) {
                                         Row(
@@ -271,7 +277,8 @@ fun AuthScreen(
                                                 modifier = Modifier
                                                     .size(38.dp)
                                                     .clip(CircleShape)
-                                                    .background(GoldAccent.copy(alpha = 0.15f)),
+                                                    .background(GoldAccent.copy(alpha = 0.15f))
+                                                    .border(1.dp, GoldAccent.copy(alpha = 0.3f), CircleShape),
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 Icon(
@@ -288,7 +295,7 @@ fun AuthScreen(
                                                     fontFamily = VazirmatnFontFamily,
                                                     fontSize = 13.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = GoldAccent
+                                                    color = GoldLight
                                                 )
                                                 if (loginNotification.warningDescription.isNotBlank()) {
                                                     Spacer(modifier = Modifier.height(3.dp))
@@ -296,7 +303,7 @@ fun AuthScreen(
                                                         text = loginNotification.warningDescription,
                                                         fontFamily = VazirmatnFontFamily,
                                                         fontSize = 11.sp,
-                                                        color = Color(0xFFCBD5E1),
+                                                        color = TextSecondary,
                                                         lineHeight = 18.sp
                                                     )
                                                 }
@@ -312,14 +319,14 @@ fun AuthScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // ==============================================================
-                // Personal Info Card
+                // Personal Info Card (Luxury Obsidian & Gold)
                 // ==============================================================
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .shadow(4.dp, RoundedCornerShape(18.dp))
-                        .border(1.5.dp, NavySecondary.copy(alpha = 0.25f), RoundedCornerShape(18.dp)),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                        .shadow(8.dp, RoundedCornerShape(18.dp))
+                        .border(1.dp, Color(0x33D4AF37), RoundedCornerShape(18.dp)),
+                    colors = CardDefaults.cardColors(containerColor = CardSurface),
                     shape = RoundedCornerShape(18.dp)
                 ) {
                     Column(
@@ -335,14 +342,14 @@ fun AuthScreen(
                                 modifier = Modifier
                                     .size(34.dp)
                                     .clip(CircleShape)
-                                    .background(NavyPrimary)
-                                    .shadow(2.dp, CircleShape),
+                                    .background(Color(0x1AD4AF37))
+                                    .border(1.dp, Color(0x44D4AF37), CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Person,
                                     contentDescription = null,
-                                    tint = GoldAccent,
+                                    tint = GoldLight,
                                     modifier = Modifier.size(19.dp)
                                 )
                             }
@@ -352,25 +359,27 @@ fun AuthScreen(
                                 fontFamily = VazirmatnFontFamily,
                                 fontSize = 14.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
-                                color = NavyPrimary
+                                color = WarmWhite
                             )
                         }
 
                         OutlinedTextField(
                             value = state.firstName,
                             onValueChange = onFirstNameChange,
-                            label = { Text("نام کوچک", fontFamily = VazirmatnFontFamily) },
-                            placeholder = { Text("مثلاً علی", fontFamily = VazirmatnFontFamily) },
+                            label = { Text("نام کوچک", fontFamily = VazirmatnFontFamily, color = TextSecondary) },
+                            placeholder = { Text("مثلاً علی", fontFamily = VazirmatnFontFamily, color = TextMuted) },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("input_first_name"),
                             shape = RoundedCornerShape(14.dp),
                             singleLine = true,
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = NavyPrimary,
-                                unfocusedBorderColor = NavySecondary.copy(alpha = 0.35f),
-                                focusedContainerColor = Color(0xFFF8FAFC),
-                                unfocusedContainerColor = Color.White
+                                focusedTextColor = WarmWhite,
+                                unfocusedTextColor = WarmWhite,
+                                focusedBorderColor = GoldAccent,
+                                unfocusedBorderColor = Color(0x33D4AF37),
+                                focusedContainerColor = Color(0xFF131722),
+                                unfocusedContainerColor = Color(0xFF131722)
                             )
                         )
 
@@ -379,18 +388,20 @@ fun AuthScreen(
                         OutlinedTextField(
                             value = state.lastName,
                             onValueChange = onLastNameChange,
-                            label = { Text("نام خانوادگی", fontFamily = VazirmatnFontFamily) },
-                            placeholder = { Text("مثلاً رضایی", fontFamily = VazirmatnFontFamily) },
+                            label = { Text("نام خانوادگی", fontFamily = VazirmatnFontFamily, color = TextSecondary) },
+                            placeholder = { Text("مثلاً رضایی", fontFamily = VazirmatnFontFamily, color = TextMuted) },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("input_last_name"),
                             shape = RoundedCornerShape(14.dp),
                             singleLine = true,
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = NavyPrimary,
-                                unfocusedBorderColor = NavySecondary.copy(alpha = 0.35f),
-                                focusedContainerColor = Color(0xFFF8FAFC),
-                                unfocusedContainerColor = Color.White
+                                focusedTextColor = WarmWhite,
+                                unfocusedTextColor = WarmWhite,
+                                focusedBorderColor = GoldAccent,
+                                unfocusedBorderColor = Color(0x33D4AF37),
+                                focusedContainerColor = Color(0xFF131722),
+                                unfocusedContainerColor = Color(0xFF131722)
                             )
                         )
                     }
@@ -404,9 +415,9 @@ fun AuthScreen(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .shadow(4.dp, RoundedCornerShape(18.dp))
-                        .border(1.5.dp, NavySecondary.copy(alpha = 0.25f), RoundedCornerShape(18.dp)),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                        .shadow(8.dp, RoundedCornerShape(18.dp))
+                        .border(1.dp, Color(0x33D4AF37), RoundedCornerShape(18.dp)),
+                    colors = CardDefaults.cardColors(containerColor = CardSurface),
                     shape = RoundedCornerShape(18.dp)
                 ) {
                     Column(
@@ -422,14 +433,14 @@ fun AuthScreen(
                                 modifier = Modifier
                                     .size(34.dp)
                                     .clip(CircleShape)
-                                    .background(NavyPrimary)
-                                    .shadow(2.dp, CircleShape),
+                                    .background(Color(0x1AD4AF37))
+                                    .border(1.dp, Color(0x44D4AF37), CircleShape),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.PhoneAndroid,
                                     contentDescription = null,
-                                    tint = GoldAccent,
+                                    tint = GoldLight,
                                     modifier = Modifier.size(19.dp)
                                 )
                             }
@@ -439,7 +450,7 @@ fun AuthScreen(
                                 fontFamily = VazirmatnFontFamily,
                                 fontSize = 14.5.sp,
                                 fontWeight = FontWeight.ExtraBold,
-                                color = NavyPrimary
+                                color = WarmWhite
                             )
                         }
 
@@ -449,10 +460,11 @@ fun AuthScreen(
                             label = {
                                 Text(
                                     text = stringResource(R.string.irancell_phone_hint),
-                                    fontFamily = VazirmatnFontFamily
+                                    fontFamily = VazirmatnFontFamily,
+                                    color = TextSecondary
                                 )
                             },
-                            placeholder = { Text("09351234567", fontFamily = VazirmatnFontFamily) },
+                            placeholder = { Text("09351234567", fontFamily = VazirmatnFontFamily, color = TextMuted) },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .testTag("input_phone_number"),
@@ -460,17 +472,19 @@ fun AuthScreen(
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = NavyPrimary,
-                                unfocusedBorderColor = NavySecondary.copy(alpha = 0.35f),
-                                focusedContainerColor = Color(0xFFF8FAFC),
-                                unfocusedContainerColor = Color.White
+                                focusedTextColor = WarmWhite,
+                                unfocusedTextColor = WarmWhite,
+                                focusedBorderColor = GoldAccent,
+                                unfocusedBorderColor = Color(0x33D4AF37),
+                                focusedContainerColor = Color(0xFF131722),
+                                unfocusedContainerColor = Color(0xFF131722)
                             ),
                             supportingText = {
                                 Text(
                                     text = "تنها شماره‌های معتبر شبکه ایرانسل مجاز به شرکت در رقابت می‌باشند.",
                                     fontFamily = VazirmatnFontFamily,
                                     fontSize = 11.sp,
-                                    color = Color(0xFF64748B)
+                                    color = TextSecondary
                                 )
                             }
                         )
@@ -482,7 +496,7 @@ fun AuthScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(54.dp)
-                                .shadow(6.dp, RoundedCornerShape(14.dp))
+                                .shadow(8.dp, RoundedCornerShape(14.dp))
                                 .testTag("btn_direct_login"),
                             shape = RoundedCornerShape(14.dp),
                             colors = ButtonDefaults.buttonColors(
@@ -491,12 +505,12 @@ fun AuthScreen(
                             enabled = !state.isLoading
                         ) {
                             if (state.isLoading) {
-                                CircularProgressIndicator(color = NavyPrimary, modifier = Modifier.size(24.dp))
+                                CircularProgressIndicator(color = LuxuryBlack, modifier = Modifier.size(24.dp))
                             } else {
                                 Icon(
                                     imageVector = Icons.Default.CheckCircle,
                                     contentDescription = null,
-                                    tint = NavyPrimary,
+                                    tint = LuxuryBlack,
                                     modifier = Modifier.size(22.dp)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
@@ -504,7 +518,7 @@ fun AuthScreen(
                                     text = "ورود مستقیم و شروع مسابقه",
                                     fontFamily = VazirmatnFontFamily,
                                     fontWeight = FontWeight.Black,
-                                    color = NavyPrimary,
+                                    color = LuxuryBlack,
                                     fontSize = 15.5.sp
                                 )
                             }
@@ -520,14 +534,14 @@ fun AuthScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(14.dp))
-                                .background(Color(0xFFE0F2FE))
-                                .border(1.5.dp, Color(0xFF0284C7), RoundedCornerShape(14.dp))
+                                .background(Color(0xFF16253A))
+                                .border(1.dp, Color(0x66D4AF37), RoundedCornerShape(14.dp))
                                 .padding(14.dp)
                         ) {
                             Text(
                                 text = state.infoMessage ?: "",
                                 fontFamily = VazirmatnFontFamily,
-                                color = Color(0xFF0369A1),
+                                color = GoldLight,
                                 fontSize = 12.5.sp,
                                 fontWeight = FontWeight.Bold,
                                 textAlign = TextAlign.Center,

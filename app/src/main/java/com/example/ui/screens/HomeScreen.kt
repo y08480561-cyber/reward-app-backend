@@ -50,13 +50,7 @@ import com.example.model.User
 import com.example.ui.components.HomeAnnouncementBanner
 import com.example.ui.components.formatRemainingTimePersian
 import com.example.ui.components.toPersianDigits
-import com.example.ui.theme.CardSurface
-import com.example.ui.theme.GoldAccent
-import com.example.ui.theme.GoldLight
-import com.example.ui.theme.NavyLight
-import com.example.ui.theme.NavyPrimary
-import com.example.ui.theme.NavySecondary
-import com.example.ui.theme.SuccessGreen
+import com.example.ui.theme.*
 import com.example.viewmodel.AppScreen
 
 @Composable
@@ -73,7 +67,11 @@ fun HomeScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF8FAFC))
+            .background(
+                Brush.verticalGradient(
+                    listOf(LuxuryBlack, NavyPrimary, LuxuryBlack)
+                )
+            )
             .verticalScroll(scrollState)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -86,17 +84,28 @@ fun HomeScreen(
             )
         }
 
-        // 2. Active Competition Banner Card
+        // 2. Active Competition Banner Card (Luxury Metallic Trim)
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .shadow(4.dp, RoundedCornerShape(20.dp)),
+                .shadow(10.dp, RoundedCornerShape(20.dp)),
             shape = RoundedCornerShape(20.dp),
-            color = NavyPrimary
+            color = CardSurface,
+            border = androidx.compose.foundation.BorderStroke(
+                1.5.dp,
+                Brush.horizontalGradient(
+                    listOf(GoldAccent, Color(0x33D4AF37), GoldLight)
+                )
+            )
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color(0xFF161E2E), Color(0xFF0F1622))
+                        )
+                    )
                     .padding(18.dp)
             ) {
                 Row(
@@ -107,19 +116,24 @@ fun HomeScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .size(32.dp)
+                                .size(34.dp)
                                 .clip(CircleShape)
-                                .background(GoldAccent),
+                                .background(
+                                    Brush.linearGradient(
+                                        listOf(GoldLight, GoldAccent, GoldDark)
+                                    )
+                                )
+                                .shadow(6.dp, CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.EmojiEvents,
                                 contentDescription = null,
-                                tint = NavyPrimary,
-                                modifier = Modifier.size(18.dp)
+                                tint = LuxuryBlack,
+                                modifier = Modifier.size(19.dp)
                             )
                         }
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
                         Text(
                             text = if (competition != null) "مسابقه دوره ${competition.competitionNumber.toPersianDigits()}" else "مسابقه جاری",
                             color = GoldLight,
@@ -130,8 +144,8 @@ fun HomeScreen(
 
                     Surface(
                         shape = RoundedCornerShape(12.dp),
-                        color = SuccessGreen.copy(alpha = 0.2f),
-                        modifier = Modifier.border(1.dp, SuccessGreen, RoundedCornerShape(12.dp))
+                        color = SuccessGreen.copy(alpha = 0.15f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, SuccessGreen)
                     ) {
                         Text(
                             text = "در حال برگزاری",
@@ -143,12 +157,12 @@ fun HomeScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 Text(
                     text = competition?.title ?: "رقابت کن، جایزه ببر (جوایز ارزنده)",
-                    color = Color.White,
-                    fontSize = 16.sp,
+                    color = WarmWhite,
+                    fontSize = 16.5.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
 
@@ -162,12 +176,12 @@ fun HomeScreen(
                 ) {
                     Text(
                         text = "امتیاز شما در این دوره:",
-                        color = Color(0xFF94A3B8),
+                        color = Color(0xFFB0B7C3),
                         fontSize = 12.sp
                     )
                     Text(
                         text = "${user.totalScore.toPersianDigits()} امتیاز",
-                        color = GoldAccent,
+                        color = GoldLight,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -175,13 +189,13 @@ fun HomeScreen(
             }
         }
 
-        // 3. Quick Action Button to 50 Squares
+        // 3. Quick Action Button to 100 Squares (Metallic Gold CTA)
         Button(
             onClick = { onNavigate(AppScreen.SQUARES) },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(54.dp)
-                .shadow(4.dp, RoundedCornerShape(16.dp))
+                .shadow(10.dp, RoundedCornerShape(16.dp))
                 .testTag("btn_home_start_squares"),
             shape = RoundedCornerShape(16.dp),
             colors = ButtonDefaults.buttonColors(containerColor = GoldAccent)
@@ -194,20 +208,20 @@ fun HomeScreen(
                 Icon(
                     imageVector = Icons.Default.GridView,
                     contentDescription = null,
-                    tint = NavyPrimary,
+                    tint = LuxuryBlack,
                     modifier = Modifier.size(22.dp)
                 )
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
                     text = "ورود به جدول ۱۰۰ مربع جایزه‌دار",
-                    color = NavyPrimary,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 14.sp
+                    color = LuxuryBlack,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 15.sp
                 )
             }
         }
 
-        // 4. Quick Access Grid
+        // 4. Quick Access Grid (Luxury Obsidian & Gold)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -219,24 +233,33 @@ fun HomeScreen(
                     .clickable { onNavigate(AppScreen.LEADERBOARD) }
                     .testTag("home_card_leaderboard"),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = CardSurface)
+                colors = CardDefaults.cardColors(containerColor = CardSurface),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x33D4AF37))
             ) {
                 Column(
                     modifier = Modifier.padding(14.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.EmojiEvents,
-                        contentDescription = "رتبه‌بندی",
-                        tint = GoldAccent,
-                        modifier = Modifier.size(28.dp)
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(Color(0x1AD4AF37)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.EmojiEvents,
+                            contentDescription = "رتبه‌بندی",
+                            tint = GoldLight,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "جدول رتبه‌بندی",
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp,
-                        color = NavyPrimary
+                        color = WarmWhite
                     )
                 }
             }
@@ -248,72 +271,89 @@ fun HomeScreen(
                     .clickable { onNavigate(AppScreen.PRIZES) }
                     .testTag("home_card_prizes"),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = CardSurface)
+                colors = CardDefaults.cardColors(containerColor = CardSurface),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x33C0C0C0))
             ) {
                 Column(
                     modifier = Modifier.padding(14.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.CardGiftcard,
-                        contentDescription = "جوایز",
-                        tint = Color(0xFF0284C7),
-                        modifier = Modifier.size(28.dp)
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(Color(0x1AC0C0C0)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CardGiftcard,
+                            contentDescription = "جوایز",
+                            tint = SilverAccent,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "جوایز دوره",
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp,
-                        color = NavyPrimary
+                        color = WarmWhite
                     )
                 }
             }
         }
 
-        // 5. Quick Support Banner Card
+        // 5. Quick Support Banner Card (Luxury Concierge Desk)
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .shadow(2.dp, RoundedCornerShape(16.dp))
+                .shadow(6.dp, RoundedCornerShape(16.dp))
                 .clickable { onNavigate(AppScreen.SUPPORT) }
                 .testTag("home_card_support"),
             shape = RoundedCornerShape(16.dp),
-            color = Color.White,
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF0284C7).copy(alpha = 0.35f))
+            color = CardSurface,
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x33D4AF37))
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(14.dp),
+                    .padding(16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.SupportAgent,
-                        contentDescription = null,
-                        tint = Color(0xFF0284C7),
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(Color(0x1AD4AF37)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.SupportAgent,
+                            contentDescription = null,
+                            tint = GoldLight,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
                             text = "مرکز پشتیبانی و پیام‌ها",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp,
-                            color = NavyPrimary
+                            fontSize = 13.5.sp,
+                            color = WarmWhite
                         )
                         Text(
                             text = "پاسخ مستقیم مدیر به سوالات و مشکلات شما",
                             fontSize = 11.sp,
-                            color = Color(0xFF64748B)
+                            color = Color(0xFFB0B7C3)
                         )
                     }
                 }
                 Text(
                     text = "ارسال تیکت ←",
-                    color = Color(0xFF0284C7),
+                    color = GoldLight,
                     fontWeight = FontWeight.Bold,
                     fontSize = 12.sp
                 )

@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -80,16 +81,16 @@ fun SupportScreen(
                 title = {
                     Column {
                         Text(
-                            text = if (activeTicket != null) "گفت‌وگوی تیکت" else "پشتیبانی و ارتباط با مدیریت",
+                            text = if (activeTicket != null) "گفت‌وگوی تیکت پشتیبانی" else "مرکز پشتیبانی و ارتباط با مدیریت",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
-                            color = NavyPrimary
+                            color = WarmWhite
                         )
                         if (activeTicket != null) {
                             Text(
                                 text = "کد پیگیری: ${activeTicket.trackingCode}",
                                 fontSize = 12.sp,
-                                color = GoldAccent,
+                                color = GoldLight,
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
@@ -109,7 +110,7 @@ fun SupportScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "بازگشت",
-                            tint = NavyPrimary
+                            tint = GoldAccent
                         )
                     }
                 },
@@ -127,12 +128,12 @@ fun SupportScreen(
                         Icon(
                             imageVector = Icons.Default.Refresh,
                             contentDescription = "به‌روزرسانی",
-                            tint = NavyPrimary
+                            tint = GoldAccent
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White
+                    containerColor = LuxuryBlack
                 )
             )
         }
@@ -141,7 +142,7 @@ fun SupportScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .background(Color(0xFFF8FAFC))
+                .background(LuxuryDarkGradient)
         ) {
             if (activeTicket != null) {
                 // Detail / Conversation Thread View
@@ -187,26 +188,43 @@ fun SupportTabsView(
     var selectedTab by remember { mutableIntStateOf(0) }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Tab Selection
+        // Luxury Tab Selection
         TabRow(
             selectedTabIndex = selectedTab,
-            containerColor = Color.White,
-            contentColor = NavyPrimary,
+            containerColor = CardSurface,
+            contentColor = WarmWhite,
             indicator = { tabPositions ->
                 TabRowDefaults.SecondaryIndicator(
                     modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
                     color = GoldAccent
                 )
-            }
+            },
+            modifier = Modifier.border(
+                width = 1.dp,
+                brush = Brush.horizontalGradient(
+                    listOf(Color.Transparent, LuxuryBorder, Color.Transparent)
+                ),
+                shape = androidx.compose.ui.graphics.RectangleShape
+            )
         ) {
             Tab(
                 selected = selectedTab == 0,
                 onClick = { selectedTab = 0 },
                 text = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.ListAlt, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("درخواست‌های من (${tickets.size.toPersianDigits()})", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Icon(
+                            Icons.Default.ListAlt,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = if (selectedTab == 0) GoldLight else SilverAccent
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            "درخواست‌های من (${tickets.size.toPersianDigits()})",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            color = if (selectedTab == 0) GoldLight else SilverAccent
+                        )
                     }
                 }
             )
@@ -215,9 +233,19 @@ fun SupportTabsView(
                 onClick = { selectedTab = 1 },
                 text = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.AddComment, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("ثبت درخواست جدید", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Icon(
+                            Icons.Default.AddComment,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = if (selectedTab == 1) GoldLight else SilverAccent
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            "ثبت درخواست جدید",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            color = if (selectedTab == 1) GoldLight else SilverAccent
+                        )
                     }
                 }
             )
@@ -229,9 +257,9 @@ fun SupportTabsView(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(12.dp),
-                shape = RoundedCornerShape(12.dp),
-                color = ErrorRed.copy(alpha = 0.12f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, ErrorRed)
+                shape = RoundedCornerShape(14.dp),
+                color = ErrorRed.copy(alpha = 0.15f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, ErrorRed.copy(alpha = 0.5f))
             ) {
                 Row(
                     modifier = Modifier.padding(12.dp),
@@ -239,9 +267,9 @@ fun SupportTabsView(
                 ) {
                     Icon(Icons.Default.Warning, contentDescription = null, tint = ErrorRed, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = errorMessage, color = ErrorRed, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                    Text(text = errorMessage, color = WarmWhite, fontSize = 12.sp, modifier = Modifier.weight(1f))
                     IconButton(onClick = onClearMessages, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.Close, contentDescription = null, tint = ErrorRed, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Close, contentDescription = null, tint = WarmWhite, modifier = Modifier.size(16.dp))
                     }
                 }
             }
@@ -252,9 +280,9 @@ fun SupportTabsView(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(12.dp),
-                shape = RoundedCornerShape(12.dp),
-                color = SuccessGreen.copy(alpha = 0.12f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, SuccessGreen)
+                shape = RoundedCornerShape(14.dp),
+                color = SuccessGreen.copy(alpha = 0.15f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, SuccessGreen.copy(alpha = 0.5f))
             ) {
                 Row(
                     modifier = Modifier.padding(12.dp),
@@ -262,9 +290,9 @@ fun SupportTabsView(
                 ) {
                     Icon(Icons.Default.CheckCircle, contentDescription = null, tint = SuccessGreen, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = successMessage, color = SuccessGreen, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                    Text(text = successMessage, color = WarmWhite, fontSize = 12.sp, modifier = Modifier.weight(1f))
                     IconButton(onClick = onClearMessages, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.Close, contentDescription = null, tint = SuccessGreen, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Close, contentDescription = null, tint = WarmWhite, modifier = Modifier.size(16.dp))
                     }
                 }
             }
@@ -314,35 +342,46 @@ fun TicketsListTab(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Icon(
-                imageVector = Icons.Default.SupportAgent,
-                contentDescription = null,
-                tint = Color(0xFF94A3B8),
-                modifier = Modifier.size(72.dp)
-            )
-            Spacer(modifier = Modifier.height(16.dp))
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(CircleShape)
+                    .background(GoldAccent.copy(alpha = 0.12f))
+                    .border(1.dp, LuxuryBorder, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.SupportAgent,
+                    contentDescription = null,
+                    tint = GoldLight,
+                    modifier = Modifier.size(44.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(18.dp))
             Text(
                 text = "هنوز درخواست پشتیبانی ثبت نکرده‌اید",
                 fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-                color = NavyPrimary
+                fontSize = 16.sp,
+                color = WarmWhite
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "در صورت بروز هرگونه سوال یا مشکل پیرامون امتیازها، جوایز یا عضویت، می‌توانید تیکت جدید ارسال نمایید.",
+                text = "در صورت بروز هرگونه سوال یا مسئله پیرامون امتیازها، جوایز یا عضویت، می‌توانید تیکت جدید ارسال نمایید.",
                 fontSize = 12.sp,
-                color = Color(0xFF64748B),
-                textAlign = TextAlign.Center
+                color = SilverAccent,
+                textAlign = TextAlign.Center,
+                lineHeight = 20.sp
             )
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(24.dp))
             Button(
                 onClick = onGoToNewTicket,
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = NavyPrimary)
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = GoldAccent),
+                modifier = Modifier.shadow(8.dp, RoundedCornerShape(14.dp), spotColor = GoldAccent)
             ) {
-                Icon(Icons.Default.Add, contentDescription = null, tint = GoldAccent, modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.Add, contentDescription = null, tint = LuxuryBlack, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("ثبت اولین تیکت پشتیبانی", color = Color.White, fontWeight = FontWeight.Bold)
+                Text("ثبت اولین تیکت پشتیبانی", color = LuxuryBlack, fontWeight = FontWeight.ExtraBold)
             }
         }
         return
@@ -365,12 +404,13 @@ fun SupportTicketCard(ticket: SupportTicket, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
+            .shadow(6.dp, RoundedCornerShape(18.dp))
+            .border(1.dp, LuxuryBorder, RoundedCornerShape(18.dp))
             .testTag("ticket_card_${ticket.trackingCode}"),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = CardSurface)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(18.dp)) {
             // Header: Tracking Code + Status Badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -381,7 +421,7 @@ fun SupportTicketCard(ticket: SupportTicket, onClick: () -> Unit) {
                     Icon(
                         imageVector = Icons.Default.ConfirmationNumber,
                         contentDescription = null,
-                        tint = GoldAccent,
+                        tint = GoldLight,
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
@@ -389,7 +429,7 @@ fun SupportTicketCard(ticket: SupportTicket, onClick: () -> Unit) {
                         text = ticket.trackingCode,
                         fontWeight = FontWeight.ExtraBold,
                         fontSize = 13.sp,
-                        color = NavyPrimary
+                        color = GoldLight
                     )
                 }
                 TicketStatusBadge(status = ticket.statusEnum)
@@ -400,9 +440,9 @@ fun SupportTicketCard(ticket: SupportTicket, onClick: () -> Unit) {
             // Subject
             Text(
                 text = ticket.subject,
-                fontSize = 14.sp,
+                fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
-                color = NavyPrimary,
+                color = WarmWhite,
                 maxLines = 1
             )
 
@@ -412,30 +452,31 @@ fun SupportTicketCard(ticket: SupportTicket, onClick: () -> Unit) {
                 Text(
                     text = "موضوع: ${ticket.categoryEnum.titlePersian}",
                     fontSize = 11.sp,
-                    color = Color(0xFF64748B)
+                    color = SilverAccent
                 )
             }
 
             // Last message preview
             if (ticket.lastMessage.isNotBlank()) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(10.dp))
                 Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = Color(0xFFF1F5F9),
+                    shape = RoundedCornerShape(10.dp),
+                    color = Color(0x1AF5F2E9),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, LuxuryBorder.copy(alpha = 0.3f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
                         text = if (ticket.lastSenderType == "ADMIN") "پاسخ مدیریت: ${ticket.lastMessage}" else "پیام شما: ${ticket.lastMessage}",
                         fontSize = 11.sp,
-                        color = if (ticket.lastSenderType == "ADMIN") Color(0xFF0284C7) else Color(0xFF475569),
+                        color = if (ticket.lastSenderType == "ADMIN") GoldLight else WarmWhite.copy(alpha = 0.85f),
                         maxLines = 2,
-                        modifier = Modifier.padding(8.dp)
+                        modifier = Modifier.padding(10.dp)
                     )
                 }
             }
 
             // Footer: Date and Chevron
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -444,13 +485,13 @@ fun SupportTicketCard(ticket: SupportTicket, onClick: () -> Unit) {
                 Text(
                     text = formatTicketDate(ticket.updatedAtMs),
                     fontSize = 10.sp,
-                    color = Color(0xFF94A3B8)
+                    color = SilverAccent
                 )
                 Text(
                     text = "مشاهده گفت‌وگو ←",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = NavyPrimary
+                    color = GoldLight
                 )
             }
         }
@@ -460,22 +501,23 @@ fun SupportTicketCard(ticket: SupportTicket, onClick: () -> Unit) {
 @Composable
 fun TicketStatusBadge(status: SupportStatus) {
     val (bgColor, textColor) = when (status) {
-        SupportStatus.NEW -> Pair(Color(0xFFFEE2E2), Color(0xFFDC2626))
-        SupportStatus.IN_PROGRESS -> Pair(Color(0xFFFEF3C7), Color(0xFFD97706))
-        SupportStatus.ANSWERED -> Pair(Color(0xFFDCFCE7), Color(0xFF16A34A))
-        SupportStatus.CLOSED -> Pair(Color(0xFFE2E8F0), Color(0xFF64748B))
+        SupportStatus.NEW -> Pair(Color(0x28EF4444), Color(0xFFF87171))
+        SupportStatus.IN_PROGRESS -> Pair(Color(0x28F59E0B), Color(0xFFFBBF24))
+        SupportStatus.ANSWERED -> Pair(Color(0x2810B981), Color(0xFF34D399))
+        SupportStatus.CLOSED -> Pair(Color(0x2864748B), Color(0xFF94A3B8))
     }
 
     Surface(
         shape = RoundedCornerShape(20.dp),
-        color = bgColor
+        color = bgColor,
+        border = androidx.compose.foundation.BorderStroke(1.dp, textColor.copy(alpha = 0.4f))
     ) {
         Text(
             text = status.titlePersian,
             color = textColor,
             fontSize = 10.sp,
             fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
         )
     }
 }
@@ -498,31 +540,33 @@ fun NewTicketTab(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Card(
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = CardSurface),
+            border = androidx.compose.foundation.BorderStroke(1.dp, LuxuryBorder),
+            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(20.dp)) {
                 Text(
                     text = "ثبت درخواست پشتیبانی جدید",
                     fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
-                    color = NavyPrimary
+                    fontSize = 16.sp,
+                    color = WarmWhite
                 )
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = "پیام شما مستقیماً برای مدیر ارسال شده و پاسخ در همین بخش نمایش داده می‌شود.",
                     fontSize = 11.sp,
-                    color = Color(0xFF64748B)
+                    color = SilverAccent
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(18.dp))
 
                 // Category Selection
                 Text(
                     text = "انتخاب موضوع درخواست:",
                     fontWeight = FontWeight.Bold,
                     fontSize = 12.sp,
-                    color = NavyPrimary
+                    color = GoldLight
                 )
                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -556,59 +600,71 @@ fun NewTicketTab(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(18.dp))
 
-                // Subject TextField
+                // Subject Input
                 OutlinedTextField(
                     value = subject,
                     onValueChange = { subject = it },
                     label = { Text("عنوان درخواست") },
-                    placeholder = { Text("مثلاً: عدم ثبت امتیاز تماشای تبلیغ") },
+                    placeholder = { Text("مثال: عدم افزایش امتیاز پس از مشاهده ویدیو", fontSize = 12.sp) },
+                    modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("input_ticket_subject"),
-                    shape = RoundedCornerShape(12.dp)
+                    textStyle = androidx.compose.ui.text.TextStyle(color = WarmWhite),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = GoldAccent,
+                        unfocusedBorderColor = LuxuryBorder,
+                        focusedLabelColor = GoldLight,
+                        unfocusedLabelColor = SilverAccent
+                    )
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-                // Message Body TextField
+                // Message Body Input
                 OutlinedTextField(
                     value = message,
                     onValueChange = { message = it },
-                    label = { Text("متن کامل پیام") },
-                    placeholder = { Text("لطفاً توضیحات کامل و شماره مربع یا مشکل خود را به دقت بنویسید...") },
-                    minLines = 4,
-                    maxLines = 8,
+                    label = { Text("متن و شرح کامل مشکل یا سوال") },
+                    placeholder = { Text("لطفاً توضیحات خود را با جزئیات بنویسید...", fontSize = 12.sp) },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .testTag("input_ticket_message"),
-                    shape = RoundedCornerShape(12.dp)
+                        .height(130.dp),
+                    maxLines = 6,
+                    textStyle = androidx.compose.ui.text.TextStyle(color = WarmWhite),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = GoldAccent,
+                        unfocusedBorderColor = LuxuryBorder,
+                        focusedLabelColor = GoldLight,
+                        unfocusedLabelColor = SilverAccent
+                    )
                 )
 
                 Spacer(modifier = Modifier.height(20.dp))
 
                 Button(
                     onClick = {
-                        onSubmit(subject, selectedCategory.key, message)
+                        if (subject.isNotBlank() && message.isNotBlank() && !isSending) {
+                            onSubmit(subject.trim(), selectedCategory.name, message.trim())
+                        }
                     },
-                    enabled = !isSending && subject.trim().length >= 3 && message.trim().length >= 5,
+                    enabled = subject.isNotBlank() && message.isNotBlank() && !isSending,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp)
+                        .height(50.dp)
+                        .shadow(8.dp, RoundedCornerShape(14.dp), spotColor = GoldAccent)
                         .testTag("btn_submit_ticket"),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = NavyPrimary)
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = GoldAccent)
                 ) {
                     if (isSending) {
-                        CircularProgressIndicator(color = GoldAccent, modifier = Modifier.size(20.dp))
+                        CircularProgressIndicator(color = LuxuryBlack, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("در حال ثبت درخواست...")
+                        Text("در حال ثبت درخواست...", color = LuxuryBlack)
                     } else {
-                        Icon(Icons.Default.Send, contentDescription = null, tint = GoldAccent, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Send, contentDescription = null, tint = LuxuryBlack, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("ارسال درخواست به مدیریت", fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("ارسال درخواست به مدیریت", fontWeight = FontWeight.ExtraBold, color = LuxuryBlack)
                     }
                 }
             }
@@ -630,15 +686,15 @@ fun CategoryChip(
             .clip(RoundedCornerShape(10.dp))
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(10.dp),
-        color = if (isSelected) NavyPrimary else Color(0xFFF1F5F9),
+        color = if (isSelected) Color(0x33D4AF37) else Color(0x1AF5F2E9),
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
-            if (isSelected) GoldAccent else Color(0xFFE2E8F0)
+            if (isSelected) GoldAccent else LuxuryBorder.copy(alpha = 0.4f)
         )
     ) {
         Text(
             text = category.titlePersian,
-            color = if (isSelected) GoldAccent else Color(0xFF475569),
+            color = if (isSelected) GoldLight else SilverAccent,
             fontSize = 11.sp,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
             textAlign = TextAlign.Center,
@@ -682,13 +738,17 @@ fun TicketConversationView(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Ticket Header Banner
+        // Ticket Header Banner - Luxury Styling
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            color = NavyPrimary,
-            shadowElevation = 4.dp
+            color = LuxuryBlack,
+            shadowElevation = 6.dp,
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                Brush.horizontalGradient(listOf(Color.Transparent, LuxuryBorder, Color.Transparent))
+            )
         ) {
-            Column(modifier = Modifier.padding(14.dp)) {
+            Column(modifier = Modifier.padding(16.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -696,9 +756,9 @@ fun TicketConversationView(
                 ) {
                     Text(
                         text = ticket.subject,
-                        fontSize = 14.sp,
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        color = WarmWhite,
                         modifier = Modifier.weight(1f)
                     )
                     TicketStatusBadge(status = ticket.statusEnum)
@@ -711,12 +771,12 @@ fun TicketConversationView(
                     Text(
                         text = "موضوع: ${ticket.categoryEnum.titlePersian}",
                         fontSize = 11.sp,
-                        color = Color(0xFF94A3B8)
+                        color = SilverAccent
                     )
                     Text(
                         text = "ثبت: ${formatTicketDate(ticket.createdAtMs)}",
                         fontSize = 10.sp,
-                        color = Color(0xFF94A3B8)
+                        color = SilverAccent
                     )
                 }
             }
@@ -728,18 +788,19 @@ fun TicketConversationView(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(8.dp),
-                shape = RoundedCornerShape(8.dp),
-                color = ErrorRed.copy(alpha = 0.12f)
+                shape = RoundedCornerShape(10.dp),
+                color = ErrorRed.copy(alpha = 0.15f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, ErrorRed.copy(alpha = 0.4f))
             ) {
                 Row(
-                    modifier = Modifier.padding(8.dp),
+                    modifier = Modifier.padding(10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(Icons.Default.Error, contentDescription = null, tint = ErrorRed, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text(text = errorMessage, color = ErrorRed, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                    Text(text = errorMessage, color = WarmWhite, fontSize = 11.sp, modifier = Modifier.weight(1f))
                     IconButton(onClick = onRetry, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.Refresh, contentDescription = "تلاش مجدد", tint = ErrorRed, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Refresh, contentDescription = "تلاش مجدد", tint = WarmWhite, modifier = Modifier.size(16.dp))
                     }
                 }
             }
@@ -756,8 +817,8 @@ fun TicketConversationView(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(messages, key = { it.id }) { msg ->
                     MessageBubble(message = msg)
@@ -772,19 +833,20 @@ fun TicketConversationView(
                     .fillMaxWidth()
                     .padding(bottom = dynamicBottomPadding)
                     .padding(horizontal = 12.dp, vertical = 8.dp),
-                shape = RoundedCornerShape(12.dp),
-                color = Color(0xFFE2E8F0)
+                shape = RoundedCornerShape(14.dp),
+                color = CardSurface,
+                border = androidx.compose.foundation.BorderStroke(1.dp, LuxuryBorder)
             ) {
                 Row(
-                    modifier = Modifier.padding(12.dp),
+                    modifier = Modifier.padding(14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFF64748B), modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Icon(Icons.Default.Lock, contentDescription = null, tint = SilverAccent, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = "این تیکت توسط مدیریت بسته شده است. در صورت نیاز به راهنمایی بیشتر، لطفاً یک درخواست جدید ثبت کنید.",
                         fontSize = 11.sp,
-                        color = Color(0xFF475569)
+                        color = SilverAccent
                     )
                 }
             }
@@ -793,25 +855,33 @@ fun TicketConversationView(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = dynamicBottomPadding),
-                color = Color.White,
-                shadowElevation = 8.dp,
-                shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+                color = CardSurface,
+                shadowElevation = 12.dp,
+                shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, LuxuryBorder)
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     OutlinedTextField(
                         value = replyText,
                         onValueChange = { replyText = it },
-                        placeholder = { Text("پاسخ خود را بنویسید...", fontSize = 12.sp) },
+                        placeholder = { Text("پاسخ خود را بنویسید...", fontSize = 12.sp, color = SilverAccent) },
                         modifier = Modifier
                             .weight(1f)
                             .testTag("input_ticket_reply"),
                         shape = RoundedCornerShape(24.dp),
                         maxLines = 3,
+                        textStyle = androidx.compose.ui.text.TextStyle(color = WarmWhite),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = GoldAccent,
+                            unfocusedBorderColor = LuxuryBorder,
+                            focusedTextColor = WarmWhite,
+                            unfocusedTextColor = WarmWhite
+                        ),
                         keyboardOptions = KeyboardOptions(
                             imeAction = ImeAction.Send
                         ),
@@ -825,7 +895,7 @@ fun TicketConversationView(
                             }
                         )
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
                     IconButton(
                         onClick = {
                             if (replyText.trim().isNotEmpty() && !isSending) {
@@ -836,17 +906,21 @@ fun TicketConversationView(
                         },
                         enabled = !isSending && replyText.trim().isNotEmpty(),
                         modifier = Modifier
-                            .size(44.dp)
-                            .background(NavyPrimary, CircleShape)
+                            .size(46.dp)
+                            .background(
+                                if (replyText.trim().isNotEmpty()) GoldGradientBrush else Brush.linearGradient(listOf(Color(0xFF334155), Color(0xFF1E293B))),
+                                CircleShape
+                            )
+                            .shadow(if (replyText.trim().isNotEmpty()) 6.dp else 0.dp, CircleShape, spotColor = GoldAccent)
                             .testTag("btn_send_reply")
                     ) {
                         if (isSending) {
-                            CircularProgressIndicator(color = GoldAccent, modifier = Modifier.size(18.dp))
+                            CircularProgressIndicator(color = LuxuryBlack, modifier = Modifier.size(18.dp))
                         } else {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.Send,
                                 contentDescription = "ارسال پاسخ",
-                                tint = GoldAccent,
+                                tint = if (replyText.trim().isNotEmpty()) LuxuryBlack else SilverAccent,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -872,45 +946,50 @@ fun MessageBubble(message: SupportMessage) {
             modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
         ) {
             if (isAdmin) {
-                Icon(Icons.Default.Verified, contentDescription = null, tint = GoldAccent, modifier = Modifier.size(13.dp))
-                Spacer(modifier = Modifier.width(3.dp))
+                Icon(Icons.Default.Verified, contentDescription = null, tint = GoldLight, modifier = Modifier.size(13.dp))
+                Spacer(modifier = Modifier.width(4.dp))
                 Text(
                     text = "پشتیبانی مدیریت",
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
-                    color = GoldAccent
+                    color = GoldLight
                 )
             } else {
                 Text(
                     text = "شما",
                     fontSize = 10.sp,
-                    color = Color(0xFF64748B)
+                    color = SilverAccent
                 )
             }
             Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = formatMessageTime(message.createdAtMs),
                 fontSize = 9.sp,
-                color = Color(0xFF94A3B8)
+                color = SilverAccent.copy(alpha = 0.8f)
             )
         }
 
-        // Bubble Body
+        // Bubble Body - Luxury Dark Styling
         Surface(
             shape = RoundedCornerShape(
                 topStart = 16.dp,
                 topEnd = 16.dp,
-                bottomStart = if (isAdmin) 2.dp else 16.dp,
-                bottomEnd = if (isAdmin) 16.dp else 2.dp
+                bottomStart = if (isAdmin) 3.dp else 16.dp,
+                bottomEnd = if (isAdmin) 16.dp else 3.dp
             ),
-            color = if (isAdmin) NavyPrimary else Color(0xFFE2E8F0),
-            shadowElevation = 1.dp
+            color = if (isAdmin) Color(0xFF182030) else Color(0xFF222B3C),
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                if (isAdmin) LuxuryBorder else Color(0x33C0C0C0)
+            ),
+            shadowElevation = 2.dp
         ) {
             Text(
                 text = message.messageText,
-                color = if (isAdmin) Color.White else NavyPrimary,
+                color = WarmWhite,
                 fontSize = 13.sp,
-                modifier = Modifier.padding(12.dp)
+                modifier = Modifier.padding(14.dp),
+                lineHeight = 20.sp
             )
         }
     }
@@ -931,171 +1010,5 @@ private fun formatMessageTime(timestamp: Long): String {
         sdf.format(Date(timestamp)).toPersianDigits()
     } catch (e: Exception) {
         ""
-    }
-}
-
-@Composable
-fun GiftBannerAdminTab(
-    giftBannerConfig: com.example.model.RewardAppearanceConfig,
-    isSaving: Boolean,
-    onSave: (title: String, description: String, imageUrl: String, isActive: Boolean, termsText: String) -> Unit
-) {
-    var heroTitle by remember(giftBannerConfig) { mutableStateOf(giftBannerConfig.heroTitle) }
-    var heroSubtitle by remember(giftBannerConfig) { mutableStateOf(giftBannerConfig.heroSubtitle) }
-    var heroBannerUrl by remember(giftBannerConfig) { mutableStateOf(giftBannerConfig.heroBannerUrl) }
-    var termsText by remember(giftBannerConfig) { mutableStateOf(giftBannerConfig.termsText) }
-    var isActive by remember(giftBannerConfig) { mutableStateOf(giftBannerConfig.isActive) }
-
-    val scrollState = rememberScrollState()
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(scrollState)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Card(
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.AdminPanelSettings,
-                        contentDescription = null,
-                        tint = GoldAccent,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "مدیریت بنر هدیه (تنظیمات ویترین جوایز)",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp,
-                        color = NavyPrimary
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    text = "اطلاعات وارد شده در این بخش مستقیماً در صفحه ویترین جوایز اپلیکیشن به عنوان بنر معرفی هدیه نمایش داده می‌شود.",
-                    fontSize = 11.sp,
-                    color = Color(0xFF64748B),
-                    lineHeight = 18.sp
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Title Input
-                OutlinedTextField(
-                    value = heroTitle,
-                    onValueChange = { heroTitle = it },
-                    label = { Text("عنوان هدیه") },
-                    placeholder = { Text("مثلاً: گوشی هوشمند سامسونگ Galaxy A55") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().testTag("input_banner_title"),
-                    shape = RoundedCornerShape(12.dp)
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Subtitle Input
-                OutlinedTextField(
-                    value = heroSubtitle,
-                    onValueChange = { heroSubtitle = it },
-                    label = { Text("توضیحات هدیه") },
-                    placeholder = { Text("مثلاً: هدیه ویژه این دوره برای برندگان مسابقه ۱۰۰ مربع") },
-                    minLines = 2,
-                    maxLines = 4,
-                    modifier = Modifier.fillMaxWidth().testTag("input_banner_subtitle"),
-                    shape = RoundedCornerShape(12.dp)
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Banner Image URL Input
-                OutlinedTextField(
-                    value = heroBannerUrl,
-                    onValueChange = { heroBannerUrl = it },
-                    label = { Text("لینک تصویر هدیه (URL)") },
-                    placeholder = { Text("https://example.com/image.jpg") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().testTag("input_banner_url"),
-                    shape = RoundedCornerShape(12.dp)
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Terms Input
-                OutlinedTextField(
-                    value = termsText,
-                    onValueChange = { termsText = it },
-                    label = { Text("متن راهنما یا شرایط تکمیلی") },
-                    placeholder = { Text("این بنر صرفاً جهت اطلاع‌رسانی می‌باشد.") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth().testTag("input_banner_terms"),
-                    shape = RoundedCornerShape(12.dp)
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Active Toggle
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xFFF8FAFC), RoundedCornerShape(12.dp))
-                        .padding(12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "وضعیت نمایش بنر هدیه",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = NavyPrimary
-                        )
-                        Text(
-                            text = if (isActive) "بنر هدیه در اپلیکیشن فعال و قابل مشاهده است" else "بنر هدیه در حالت غیرفعال/در حال بروزرسانی قرار دارد",
-                            fontSize = 11.sp,
-                            color = if (isActive) Color(0xFF16A34A) else Color(0xFFDC2626)
-                        )
-                    }
-                    Switch(
-                        checked = isActive,
-                        onCheckedChange = { isActive = it },
-                        modifier = Modifier.testTag("switch_banner_active")
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                // Save Button
-                Button(
-                    onClick = {
-                        onSave(heroTitle, heroSubtitle, heroBannerUrl, isActive, termsText)
-                    },
-                    enabled = !isSaving && heroTitle.trim().isNotBlank(),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                        .testTag("btn_save_gift_banner"),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = NavyPrimary)
-                ) {
-                    if (isSaving) {
-                        CircularProgressIndicator(color = GoldAccent, modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("در حال ذخیره‌سازی...")
-                    } else {
-                        Icon(Icons.Default.Save, contentDescription = null, tint = GoldAccent, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("ذخیره تغییرات بنر هدیه", fontWeight = FontWeight.Bold, color = Color.White)
-                    }
-                }
-            }
-        }
     }
 }

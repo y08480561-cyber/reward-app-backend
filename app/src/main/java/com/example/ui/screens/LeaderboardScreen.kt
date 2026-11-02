@@ -67,14 +67,22 @@ fun LeaderboardScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(SlateBackground)
+            .background(
+                Brush.verticalGradient(
+                    listOf(LuxuryBlack, NavyPrimary, LuxuryBlack)
+                )
+            )
     ) {
         // --- Top Bar ---
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .shadow(6.dp),
-            color = NavyPrimary
+                .shadow(8.dp),
+            color = NavyPrimary,
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                Brush.verticalGradient(listOf(Color(0x33D4AF37), Color(0x11D4AF37)))
+            )
         ) {
             Column(modifier = Modifier.statusBarsPadding()) {
                 Row(
@@ -87,23 +95,32 @@ fun LeaderboardScreen(
                         onClick = onBack,
                         modifier = Modifier.testTag("leaderboard_back_button")
                     ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "بازگشت",
-                            tint = Color.White
-                        )
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(Color(0x1AD4AF37)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "بازگشت",
+                                tint = GoldLight,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "جدول رتبه‌بندی مسابقه",
-                            color = Color.White,
+                            color = WarmWhite,
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp
                         )
                         Text(
                             text = "برترین شرکت‌کنندگان و امتیازات کل",
-                            color = TextMuted,
+                            color = GoldLight.copy(alpha = 0.8f),
                             fontSize = 12.sp
                         )
                     }
@@ -123,7 +140,7 @@ fun LeaderboardScreen(
             }
         }
 
-        // --- Current User Floating Highlight Card ---
+        // --- Current User Floating Highlight Card (Luxury VIP Trim) ---
         if (currentUserEntry != null && !uiState.isLeaderboardLoading) {
             Card(
                 modifier = Modifier
@@ -131,12 +148,23 @@ fun LeaderboardScreen(
                     .padding(horizontal = 16.dp, vertical = 8.dp)
                     .testTag("current_user_rank_card"),
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = NavySecondary),
-                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                colors = CardDefaults.cardColors(containerColor = CardSurface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.5.dp,
+                    Brush.horizontalGradient(
+                        listOf(GoldAccent, GoldLight, GoldAccent)
+                    )
+                )
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color(0xFF1B2332), Color(0xFF121722))
+                            )
+                        )
                         .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
@@ -144,14 +172,20 @@ fun LeaderboardScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .size(44.dp)
+                                .size(46.dp)
                                 .clip(CircleShape)
-                                .background(Brush.linearGradient(listOf(GoldAccent, GoldDark))),
+                                .background(
+                                    Brush.linearGradient(
+                                        listOf(GoldLight, GoldAccent, GoldDark)
+                                    )
+                                )
+                                .border(1.dp, Color.White.copy(alpha = 0.6f), CircleShape)
+                                .shadow(8.dp, CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 text = "#${currentUserEntry.rank}",
-                                color = Color.White,
+                                color = LuxuryBlack,
                                 fontWeight = FontWeight.Black,
                                 fontSize = 16.sp
                             )
@@ -161,18 +195,19 @@ fun LeaderboardScreen(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     text = currentUserEntry.displayName,
-                                    color = Color.White,
+                                    color = WarmWhite,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 15.sp
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Surface(
                                     shape = RoundedCornerShape(6.dp),
-                                    color = GoldAccent.copy(alpha = 0.2f)
+                                    color = GoldAccent.copy(alpha = 0.2f),
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, GoldAccent.copy(alpha = 0.5f))
                                 ) {
                                     Text(
                                         text = "شما",
-                                        color = GoldAccent,
+                                        color = GoldLight,
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -181,7 +216,7 @@ fun LeaderboardScreen(
                             }
                             Text(
                                 text = "وضعیت رتبه شما در مسابقه جاری",
-                                color = TextMuted,
+                                color = Color(0xFFB0B7C3),
                                 fontSize = 12.sp
                             )
                         }
@@ -189,7 +224,8 @@ fun LeaderboardScreen(
 
                     Surface(
                         shape = RoundedCornerShape(12.dp),
-                        color = NavyPrimary
+                        color = Color(0xFF131722),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x66D4AF37))
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
@@ -198,13 +234,13 @@ fun LeaderboardScreen(
                             Icon(
                                 imageVector = Icons.Default.Stars,
                                 contentDescription = null,
-                                tint = GoldAccent,
+                                tint = GoldLight,
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = "${currentUserEntry.totalScore} امتیاز",
-                                color = GoldAccent,
+                                color = GoldLight,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp
                             )
@@ -214,7 +250,7 @@ fun LeaderboardScreen(
             }
         }
 
-        // --- Search Bar ---
+        // --- Search Bar (Luxury Obsidian Input) ---
         if (uiState.leaderboard.isNotEmpty() && !uiState.isLeaderboardLoading) {
             OutlinedTextField(
                 value = searchQuery,
@@ -230,7 +266,7 @@ fun LeaderboardScreen(
                     Icon(
                         imageVector = Icons.Default.Search,
                         contentDescription = "جستجو",
-                        tint = NavyLight
+                        tint = GoldLight
                     )
                 },
                 trailingIcon = {
@@ -247,8 +283,10 @@ fun LeaderboardScreen(
                 singleLine = true,
                 shape = RoundedCornerShape(12.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = NavySecondary,
-                    unfocusedBorderColor = Color(0xFFE2E8F0),
+                    focusedTextColor = WarmWhite,
+                    unfocusedTextColor = WarmWhite,
+                    focusedBorderColor = GoldAccent,
+                    unfocusedBorderColor = Color(0x33D4AF37),
                     focusedContainerColor = CardSurface,
                     unfocusedContainerColor = CardSurface
                 )
@@ -278,7 +316,7 @@ fun LeaderboardScreen(
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
                             text = "در حال دریافت آخرین رتبه‌بندی مسابقه...",
-                            color = TextSecondary,
+                            color = GoldLight,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Medium
                         )
@@ -295,7 +333,8 @@ fun LeaderboardScreen(
                             .testTag("leaderboard_error_card"),
                         shape = RoundedCornerShape(16.dp),
                         colors = CardDefaults.cardColors(containerColor = CardSurface),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x44EF4444)),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
                     ) {
                         Column(
                             modifier = Modifier
@@ -307,7 +346,7 @@ fun LeaderboardScreen(
                                 modifier = Modifier
                                     .size(56.dp)
                                     .clip(CircleShape)
-                                    .background(ErrorRedLight),
+                                    .background(Color(0x2AEF4444)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
@@ -326,12 +365,12 @@ fun LeaderboardScreen(
                                 },
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 16.sp,
-                                color = TextPrimary
+                                color = WarmWhite
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 text = uiState.leaderboardErrorMessage ?: "امکان برقراری ارتباط با سرور فراهم نشد.",
-                                color = TextSecondary,
+                                color = Color(0xFFB0B7C3),
                                 fontSize = 13.sp,
                                 textAlign = TextAlign.Center
                             )
@@ -339,16 +378,17 @@ fun LeaderboardScreen(
                             Button(
                                 onClick = onRefresh,
                                 modifier = Modifier.testTag("leaderboard_retry_button"),
-                                colors = ButtonDefaults.buttonColors(containerColor = NavySecondary),
+                                colors = ButtonDefaults.buttonColors(containerColor = GoldAccent),
                                 shape = RoundedCornerShape(10.dp)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Refresh,
                                     contentDescription = null,
+                                    tint = LuxuryBlack,
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("تلاش مجدد")
+                                Text("تلاش مجدد", color = LuxuryBlack, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -366,7 +406,7 @@ fun LeaderboardScreen(
                         Icon(
                             imageVector = Icons.Default.EmojiEvents,
                             contentDescription = null,
-                            tint = TextMuted,
+                            tint = Color(0x44D4AF37),
                             modifier = Modifier.size(56.dp)
                         )
                         Spacer(modifier = Modifier.height(12.dp))
@@ -376,7 +416,7 @@ fun LeaderboardScreen(
                             } else {
                                 "هنوز رتبه‌بندی در مسابقه ثبت نشده است."
                             },
-                            color = TextSecondary,
+                            color = Color(0xFFB0B7C3),
                             fontWeight = FontWeight.Medium,
                             fontSize = 14.sp
                         )
@@ -417,7 +457,8 @@ private fun TopThreePodiumSection(topThree: List<LeaderboardEntry>) {
             .testTag("leaderboard_podium_card"),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = CardSurface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x33D4AF37)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
     ) {
         Column(
             modifier = Modifier
@@ -429,7 +470,7 @@ private fun TopThreePodiumSection(topThree: List<LeaderboardEntry>) {
                 text = "سکوهای برتر دوره مسابقه",
                 fontWeight = FontWeight.Bold,
                 fontSize = 14.sp,
-                color = NavyPrimary
+                color = GoldLight
             )
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -442,8 +483,8 @@ private fun TopThreePodiumSection(topThree: List<LeaderboardEntry>) {
                 if (topThree.size > 1) {
                     PodiumPillar(
                         entry = topThree[1],
-                        rankColor = Color(0xFF94A3B8),
-                        borderColor = Color(0xFFCBD5E1),
+                        rankColor = SilverAccent,
+                        borderColor = Color(0x66C0C0C0),
                         pillarHeight = 70.dp,
                         trophyIcon = "🥈"
                     )
@@ -465,7 +506,7 @@ private fun TopThreePodiumSection(topThree: List<LeaderboardEntry>) {
                     PodiumPillar(
                         entry = topThree[2],
                         rankColor = BronzeTrophy,
-                        borderColor = Color(0xFFE2E8F0),
+                        borderColor = Color(0x66CD7F32),
                         pillarHeight = 55.dp,
                         trophyIcon = "🥉"
                     )
@@ -493,7 +534,7 @@ private fun PodiumPillar(
             text = entry.displayName,
             fontWeight = FontWeight.Bold,
             fontSize = 12.sp,
-            color = TextPrimary,
+            color = WarmWhite,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center
@@ -512,7 +553,7 @@ private fun PodiumPillar(
                 .height(pillarHeight)
                 .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
                 .background(rankColor.copy(alpha = 0.15f))
-                .border(1.dp, borderColor, RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
+                .border(1.5.dp, borderColor, RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -530,9 +571,9 @@ private fun LeaderboardItemRow(entry: LeaderboardEntry) {
     val isTop3 = entry.rank in 1..3
     val rankBadgeColor = when (entry.rank) {
         1 -> GoldAccent
-        2 -> Color(0xFF94A3B8)
+        2 -> SilverAccent
         3 -> BronzeTrophy
-        else -> NavyLight
+        else -> Color(0xFF8E98A8)
     }
 
     Card(
@@ -541,12 +582,14 @@ private fun LeaderboardItemRow(entry: LeaderboardEntry) {
             .testTag("leaderboard_row_${entry.rank}"),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (entry.isCurrentUser) Color(0xFFEFF6FF) else CardSurface
+            containerColor = if (entry.isCurrentUser) Color(0xFF1B2332) else CardSurface
         ),
         border = if (entry.isCurrentUser) {
-            androidx.compose.foundation.BorderStroke(1.5.dp, NavySecondary)
-        } else null,
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            androidx.compose.foundation.BorderStroke(1.5.dp, GoldAccent)
+        } else {
+            androidx.compose.foundation.BorderStroke(1.dp, Color(0x22D4AF37))
+        },
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
             modifier = Modifier
@@ -559,7 +602,8 @@ private fun LeaderboardItemRow(entry: LeaderboardEntry) {
                 modifier = Modifier
                     .size(34.dp)
                     .clip(CircleShape)
-                    .background(rankBadgeColor.copy(alpha = if (isTop3) 0.2f else 0.1f)),
+                    .background(rankBadgeColor.copy(alpha = if (isTop3) 0.25f else 0.15f))
+                    .border(1.dp, rankBadgeColor.copy(alpha = 0.4f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -579,7 +623,7 @@ private fun LeaderboardItemRow(entry: LeaderboardEntry) {
                         text = entry.displayName,
                         fontWeight = if (entry.isCurrentUser || isTop3) FontWeight.Bold else FontWeight.Medium,
                         fontSize = 14.sp,
-                        color = TextPrimary,
+                        color = WarmWhite,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -587,11 +631,12 @@ private fun LeaderboardItemRow(entry: LeaderboardEntry) {
                         Spacer(modifier = Modifier.width(6.dp))
                         Surface(
                             shape = RoundedCornerShape(4.dp),
-                            color = NavySecondary.copy(alpha = 0.15f)
+                            color = GoldAccent.copy(alpha = 0.2f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, GoldAccent.copy(alpha = 0.5f))
                         ) {
                             Text(
                                 text = "شما",
-                                color = NavySecondary,
+                                color = GoldLight,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
@@ -604,7 +649,11 @@ private fun LeaderboardItemRow(entry: LeaderboardEntry) {
             // Score Badge
             Surface(
                 shape = RoundedCornerShape(8.dp),
-                color = if (isTop3) GoldAccent.copy(alpha = 0.15f) else Color(0xFFF1F5F9)
+                color = if (isTop3) GoldAccent.copy(alpha = 0.2f) else Color(0xFF1F2634),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    if (isTop3) GoldAccent.copy(alpha = 0.5f) else Color(0x22FFFFFF)
+                )
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
@@ -614,14 +663,14 @@ private fun LeaderboardItemRow(entry: LeaderboardEntry) {
                         Icon(
                             imageVector = Icons.Default.EmojiEvents,
                             contentDescription = null,
-                            tint = GoldAccent,
+                            tint = GoldLight,
                             modifier = Modifier.size(14.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                     }
                     Text(
                         text = "${entry.totalScore} امتیاز",
-                        color = if (isTop3) GoldDark else TextPrimary,
+                        color = if (isTop3) GoldLight else WarmWhite,
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp
                     )
