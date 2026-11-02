@@ -670,20 +670,26 @@ fun ExperienceFeedbackDialog(
                     // Main View: Options
                     Button(
                         onClick = onOpenMyket,
-                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                            .testTag("btn_myket_review"),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = GoldAccent)
                     ) {
                         Icon(imageVector = Icons.Default.Launch, contentDescription = null, modifier = Modifier.size(18.dp), tint = LuxuryBlack)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("مشاهده در مایکت", fontWeight = FontWeight.Bold, color = LuxuryBlack)
+                        Text("ثبت نظر در مایکت", fontWeight = FontWeight.Bold, color = LuxuryBlack)
                     }
 
                     Spacer(modifier = Modifier.height(12.dp))
 
                     OutlinedButton(
                         onClick = { isInternalView = true },
-                        modifier = Modifier.fillMaxWidth().height(50.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                            .testTag("btn_feedback_internal"),
                         shape = RoundedCornerShape(12.dp),
                         border = BorderStroke(1.dp, Color(0x66D4AF37))
                     ) {
@@ -692,8 +698,11 @@ fun ExperienceFeedbackDialog(
                     
                     Spacer(modifier = Modifier.height(12.dp))
                     
-                    TextButton(onClick = onDismiss) {
-                        Text("بعداً نظر می‌دهم", color = Color(0xFF94A3B8), fontSize = 12.sp)
+                    TextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.testTag("btn_dismiss_feedback")
+                    ) {
+                        Text("فعلاً نه", color = Color(0xFF94A3B8), fontSize = 13.sp)
                     }
                 } else {
                     // Internal Feedback View: Form

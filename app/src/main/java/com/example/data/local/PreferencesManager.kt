@@ -109,12 +109,40 @@ class PreferencesManager(context: Context) {
         set(value) = prefs.edit().putBoolean(KEY_USE_TEST_ADS, value).apply()
 
     var isFeedbackShown: Boolean
-        get() = prefs.getBoolean(KEY_FEEDBACK_SHOWN, false)
-        set(value) = prefs.edit().putBoolean(KEY_FEEDBACK_SHOWN, value).apply()
+        get() {
+            val currentUid = userId
+            return if (currentUid.isNotBlank()) {
+                prefs.getBoolean("feedback_dialog_shown_$currentUid", prefs.getBoolean(KEY_FEEDBACK_SHOWN, false))
+            } else {
+                prefs.getBoolean(KEY_FEEDBACK_SHOWN, false)
+            }
+        }
+        set(value) {
+            val currentUid = userId
+            val edit = prefs.edit().putBoolean(KEY_FEEDBACK_SHOWN, value)
+            if (currentUid.isNotBlank()) {
+                edit.putBoolean("feedback_dialog_shown_$currentUid", value)
+            }
+            edit.apply()
+        }
 
     var isFeedbackRewarded: Boolean
-        get() = prefs.getBoolean(KEY_FEEDBACK_REWARDED, false)
-        set(value) = prefs.edit().putBoolean(KEY_FEEDBACK_REWARDED, value).apply()
+        get() {
+            val currentUid = userId
+            return if (currentUid.isNotBlank()) {
+                prefs.getBoolean("feedback_reward_claimed_$currentUid", prefs.getBoolean(KEY_FEEDBACK_REWARDED, false))
+            } else {
+                prefs.getBoolean(KEY_FEEDBACK_REWARDED, false)
+            }
+        }
+        set(value) {
+            val currentUid = userId
+            val edit = prefs.edit().putBoolean(KEY_FEEDBACK_REWARDED, value)
+            if (currentUid.isNotBlank()) {
+                edit.putBoolean("feedback_reward_claimed_$currentUid", value)
+            }
+            edit.apply()
+        }
 
     fun saveUserSession(
         id: String,

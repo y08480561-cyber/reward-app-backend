@@ -213,14 +213,24 @@ class MainActivity : ComponentActivity() {
                                         viewModel.submitInternalFeedback(rating, comment)
                                     },
                                     onOpenMyket = {
+                                        val appPackage = this@MainActivity.packageName
                                         try {
-                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("myket://comment?id=com.aistudio.reqabat.trophy"))
+                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("myket://comment?id=$appPackage"))
                                             intent.setPackage("ir.mservices.market")
                                             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                             startActivity(intent)
                                         } catch (e: Exception) {
-                                            val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://myket.ir/app/com.aistudio.reqabat.trophy"))
-                                            startActivity(webIntent)
+                                            try {
+                                                val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://myket.ir/app/$appPackage"))
+                                                webIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                startActivity(webIntent)
+                                            } catch (e2: Exception) {
+                                                android.widget.Toast.makeText(
+                                                    this@MainActivity,
+                                                    "امکان باز کردن مایکت یا مرورگر وجود ندارد.",
+                                                    android.widget.Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
                                         }
                                         viewModel.markFeedbackShown()
                                     }
