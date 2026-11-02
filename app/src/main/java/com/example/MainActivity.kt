@@ -109,8 +109,6 @@ class MainActivity : ComponentActivity() {
                                     }
                                     AppScreen.LEADERBOARD -> {
                                         LeaderboardScreen(
-                                            leaderboard = uiState.leaderboard,
-                                            isLoading = uiState.isLoading,
                                             onBack = { viewModel.navigateTo(AppScreen.SQUARES) }
                                         )
                                     }
