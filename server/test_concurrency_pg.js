@@ -31,11 +31,29 @@ async function runRealEndpointConcurrencyTest() {
     return;
   }
 
-  // 3. Import production Express app (imports /server/server.js directly without rewriting handlers)
-  // Since TEST_DATABASE_URL is set in process.env prior to import, server.js initializes pool on TEST_DATABASE_URL
+  // 3. Import production Express app and inject single shared test pool
   const appModule = require('./server');
   const app = appModule.app || appModule;
-  const pool = (appModule.getPool && appModule.getPool()) || new Pool({ connectionString: testDbUrl });
+
+  const isLocalhost = testDbUrl.includes('localhost') || testDbUrl.includes('127.0.0.1');
+  const sharedTestPool = new Pool({
+    connectionString: testDbUrl,
+    ssl: isLocalhost ? false : { rejectUnauthorized: false },
+    max: 20,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
+  });
+
+  if (typeof appModule.setTestPool === 'function') {
+    appModule.setTestPool(sharedTestPool);
+  } else {
+    throw new Error('appModule.setTestPool is not available in server.js module');
+  }
+
+  const pool = appModule.getPool();
+  if (!pool) {
+    throw new Error('Failed to retrieve injected database pool from production Express app module');
+  }
 
   const randomHex = crypto.randomBytes(4).toString('hex');
   const testUserId = `TEST_CONC_${Date.now()}_${randomHex}`;

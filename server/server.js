@@ -71,7 +71,7 @@ function isValidUuid(str) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 }
 
-const activeDbUrl = process.env.TEST_DATABASE_URL || DATABASE_URL;
+const activeDbUrl = DATABASE_URL;
 
 if (activeDbUrl) {
   const isLocalhost = activeDbUrl.includes('localhost') || activeDbUrl.includes('127.0.0.1');
@@ -3688,10 +3688,16 @@ app.use((err, req, res, next) => {
   res.status(500).json({ success: false, error: 'خطای داخلی سرور رخ داد.' });
 });
 
-// Export Express App and Pool accessor for testing and modular usage
+// Export Express App, Pool accessor, and Test Pool setter for testing and modular usage
+function setTestPool(customPool) {
+  pool = customPool;
+  isDbConnected = true;
+}
+
 module.exports = app;
 module.exports.app = app;
 module.exports.getPool = () => pool;
+module.exports.setTestPool = setTestPool;
 
 // Startup Server with PostgreSQL Verification if run directly
 if (require.main === module) {
