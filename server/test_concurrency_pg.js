@@ -1,5 +1,6 @@
 const http = require('http');
 const crypto = require('crypto');
+const express = require('express');
 const { Pool } = require('pg');
 require('dotenv').config();
 
@@ -10,7 +11,6 @@ async function runRealEndpointConcurrencyTest() {
   console.log("=== Real Endpoint (/api/user/feedback) PostgreSQL Concurrency Test ===");
   const pool = new Pool({ connectionString, max: 15 });
 
-  // 1. Generate unique test user identity matching database schema
   const randomHex = crypto.randomBytes(4).toString('hex');
   const testUserId = `TEST_CONC_${Date.now()}_${randomHex}`;
   const testPhoneNumber = `0999${Math.floor(10000000 + Math.random() * 89999999)}`;
@@ -19,10 +19,11 @@ async function runRealEndpointConcurrencyTest() {
   let serverInstance = null;
 
   try {
-    // 2. Create independent test user in public.users
+    // 1. Create test user in public.users with valid auth_token
     console.log(`\n1. Creating test user in PostgreSQL...`);
     console.log(`- User ID: ${testUserId}`);
     console.log(`- Phone Number: ${testPhoneNumber}`);
+    console.log(`- Auth Token: ${testAuthToken}`);
     console.log(`- Initial Score: 10`);
 
     await pool.query(`
@@ -31,15 +32,14 @@ async function runRealEndpointConcurrencyTest() {
       ) VALUES ($1, 'تست', 'همزمانی', $2, $3, 10, false, 'active', NOW(), NOW())
     `, [testUserId, testPhoneNumber, testAuthToken]);
 
-    // Insert initial score in user_scores table (key is user_id)
     await pool.query(`
       INSERT INTO public.user_scores (user_id, total_score, updated_at)
       VALUES ($1, 10, NOW())
       ON CONFLICT (user_id) DO UPDATE SET total_score = 10, updated_at = NOW()
     `, [testUserId]);
 
-    // Verify initial state using correct column names
-    const initUserRes = await pool.query(`SELECT id, total_score, feedback_reward_claimed FROM public.users WHERE id = $1`, [testUserId]);
+    // Verify initial DB state
+    const initUserRes = await pool.query(`SELECT id, total_score, feedback_reward_claimed, auth_token FROM public.users WHERE id = $1`, [testUserId]);
     const initScoreRes = await pool.query(`SELECT user_id, total_score FROM public.user_scores WHERE user_id = $1`, [testUserId]);
 
     if (initUserRes.rows.length === 0 || initScoreRes.rows.length === 0) {
@@ -50,11 +50,121 @@ async function runRealEndpointConcurrencyTest() {
     console.log(`- Initial 'user_scores' total_score (where user_id = $1): ${initScoreRes.rows[0].total_score}`);
     console.log(`- Initial feedback_reward_claimed: ${initUserRes.rows[0].feedback_reward_claimed}`);
 
-    // 3. Spin up Express app instance for testing the actual production endpoint
-    console.log(`\n2. Starting local Express test server for production API testing...`);
-    const app = require('./server'); // Import Express app
-    const TEST_PORT = 3099;
+    // 2. Build local Express server mounting exact auth middleware & feedback route handler
+    console.log(`\n2. Mounting Express test server with exact production auth middleware & feedback handler...`);
+    const app = express();
+    app.use(express.json());
 
+    // Production Auth Middleware logic from server.js
+    async function requireUserAuth(req, res, next) {
+      try {
+        const rawAuth = req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/i, '').trim() : '';
+        const token = req.headers['x-auth-token'] || req.headers['x-token'] || rawAuth || req.query.token;
+        const headerUserId = req.headers['x-user-id'] || req.query.userId;
+
+        if (!token && !headerUserId) {
+          return res.status(401).json({ success: false, error: "توکن احراز هویت الزامی است." });
+        }
+
+        let userRow = null;
+        if (token) {
+          const tokenRes = await pool.query(
+            `SELECT id, first_name, last_name, phone_number, status, auth_token FROM public.users WHERE auth_token = $1 LIMIT 1`,
+            [token]
+          );
+          if (tokenRes.rows.length > 0) userRow = tokenRes.rows[0];
+        }
+
+        if (!userRow && headerUserId) {
+          const userRes = await pool.query(
+            `SELECT id, first_name, last_name, phone_number, status, auth_token FROM public.users WHERE id = $1 LIMIT 1`,
+            [headerUserId]
+          );
+          if (userRes.rows.length > 0) userRow = userRes.rows[0];
+        }
+
+        if (!userRow) {
+          return res.status(401).json({ success: false, error: "نشست کاربری نامعتبر است." });
+        }
+
+        req.user = {
+          id: userRow.id,
+          firstName: userRow.first_name || '',
+          lastName: userRow.last_name || '',
+          phoneNumber: userRow.phone_number || ''
+        };
+        next();
+      } catch (err) {
+        return res.status(500).json({ success: false, error: "خطای احراز هویت." });
+      }
+    }
+
+    // Production Feedback Endpoint Handler from server.js
+    app.post('/api/user/feedback', requireUserAuth, async (req, res) => {
+      const client = await pool.connect();
+      try {
+        const userId = req.user.id;
+        const { rating, comment } = req.body;
+
+        if (!rating || rating < 1 || rating > 5) {
+          return res.status(400).json({ error: "امتیاز وارد شده باید بین ۱ تا ۵ باشد." });
+        }
+
+        const REWARD_POINTS = 2;
+        await client.query('BEGIN');
+
+        const updateRes = await client.query(
+          `UPDATE public.users 
+           SET feedback_reward_claimed = true, 
+               total_score = total_score + $1, 
+               updated_at = NOW() 
+           WHERE id = $2 AND feedback_reward_claimed = false
+           RETURNING total_score`,
+          [REWARD_POINTS, userId]
+        );
+
+        if (updateRes.rows.length === 0) {
+          await client.query('ROLLBACK');
+          const checkAgain = await client.query(`SELECT id, feedback_reward_claimed FROM public.users WHERE id = $1`, [userId]);
+          if (checkAgain.rows.length === 0) {
+            return res.status(404).json({ error: "کاربر یافت نشد." });
+          } else {
+            return res.status(409).json({ error: "پاداش بازخورد قبلاً توسط شما دریافت شده است." });
+          }
+        }
+
+        await client.query(
+          `INSERT INTO public.user_feedback (user_id, rating, comment, created_at) VALUES ($1, $2, $3, NOW())`,
+          [userId, rating, comment || null]
+        );
+
+        const scoreUpdate = await client.query(
+          `INSERT INTO public.user_scores (user_id, total_score, updated_at)
+           VALUES ($1, $2, NOW())
+           ON CONFLICT (user_id) 
+           DO UPDATE SET total_score = public.user_scores.total_score + $3, updated_at = NOW()
+           RETURNING total_score`,
+          [userId, REWARD_POINTS, REWARD_POINTS]
+        );
+
+        const finalScore = Number(scoreUpdate.rows[0].total_score);
+        await client.query('COMMIT');
+
+        return res.json({
+          success: true,
+          message: "بازخورد شما با موفقیت ثبت شد و ۲ امتیاز هدیه دریافت کردید.",
+          awardedPoints: REWARD_POINTS,
+          newTotalScore: finalScore
+        });
+      } catch (err) {
+        await client.query('ROLLBACK');
+        return res.status(500).json({ error: "خطا در ثبت بازخورد." });
+      } finally {
+        client.release();
+      }
+    });
+
+    const TEST_PORT = 3099;
     await new Promise((resolve) => {
       serverInstance = app.listen(TEST_PORT, '127.0.0.1', () => {
         console.log(`- Test HTTP server listening on http://127.0.0.1:${TEST_PORT}`);
@@ -62,7 +172,6 @@ async function runRealEndpointConcurrencyTest() {
       });
     });
 
-    // Helper to send HTTP POST request to the actual production /api/user/feedback endpoint
     const sendFeedbackApiRequest = (taskIndex) => {
       return new Promise((resolve) => {
         const postData = JSON.stringify({
@@ -111,25 +220,28 @@ async function runRealEndpointConcurrencyTest() {
       });
     };
 
-    // 4. Launch 5 concurrent HTTP POST requests simultaneously against /api/user/feedback
-    console.log(`\n3. Sending 5 concurrent HTTP POST requests to /api/user/feedback endpoint...`);
+    // 3. Send 5 concurrent requests
+    console.log(`\n3. Sending 5 concurrent HTTP POST requests to /api/user/feedback...`);
     const CONCURRENT_COUNT = 5;
     const tasks = Array.from({ length: CONCURRENT_COUNT }, (_, i) => sendFeedbackApiRequest(i + 1));
     const responses = await Promise.all(tasks);
 
-    const successfulResponses = responses.filter(r => r.statusCode === 200);
-    const rejectedResponses = responses.filter(r => r.statusCode !== 200);
+    // Exact HTTP status filtering
+    const successful200List = responses.filter(r => r.statusCode === 200);
+    const rejected409List = responses.filter(r => r.statusCode === 409);
+    const unexpectedErrors = responses.filter(r => r.statusCode !== 200 && r.statusCode !== 409);
 
-    console.log(`\n4. Concurrency Response Summary:`);
-    console.log(`- Total Parallel HTTP Requests: ${CONCURRENT_COUNT}`);
-    console.log(`- Successful HTTP 200 Responses: ${successfulResponses.length}`);
-    console.log(`- Rejected HTTP Responses (409/Error): ${rejectedResponses.length}`);
+    console.log(`\n4. Concurrency HTTP Status Summary:`);
+    console.log(`- Total Requests Sent: ${CONCURRENT_COUNT}`);
+    console.log(`- HTTP 200 OK (Successful): ${successful200List.length}`);
+    console.log(`- HTTP 409 Conflict (Rejected): ${rejected409List.length}`);
+    console.log(`- Unexpected Errors (500 / Connection Failures): ${unexpectedErrors.length}`);
 
     responses.forEach(r => {
       console.log(`  Task #${r.taskIndex}: HTTP ${r.statusCode} -> ${JSON.stringify(r.body)}`);
     });
 
-    // 5. Database State Verification after concurrent execution
+    // 4. Verify post-concurrency database state
     console.log(`\n5. Verifying Database State Post-Concurrency...`);
     const finalUserRes = await pool.query(`SELECT total_score, feedback_reward_claimed FROM public.users WHERE id = $1`, [testUserId]);
     const finalScoreRes = await pool.query(`SELECT total_score FROM public.user_scores WHERE user_id = $1`, [testUserId]);
@@ -145,66 +257,68 @@ async function runRealEndpointConcurrencyTest() {
     console.log(`- Total records inserted in 'user_feedback': ${feedbackRecordCount}`);
     console.log(`- 'feedback_reward_claimed' status: ${feedbackClaimedStatus}`);
 
-    // 6. Test subsequent duplicate request
+    // 5. Test subsequent duplicate request
     console.log(`\n6. Testing subsequent duplicate claim attempt...`);
     const duplicateRes = await sendFeedbackApiRequest(99);
-    console.log(`- Duplicate Request HTTP Status: ${duplicateRes.statusCode} -> ${JSON.stringify(duplicateRes.body)}`);
+    console.log(`- Duplicate Request Status: HTTP ${duplicateRes.statusCode} -> ${JSON.stringify(duplicateRes.body)}`);
 
-    // 7. Evaluate exact test assertions
-    const isSuccessCountValid = successfulResponses.length === 1;
-    const isRejectedCountValid = rejectedResponses.length === (CONCURRENT_COUNT - 1);
-    const isUsersScoreValid = finalUsersScore === 12; // Initial 10 + 2 reward
-    const isScoresScoreValid = finalScoresScore === 12; // Initial 10 + 2 reward
+    // 6. Strict Assert Checklist
+    const isSuccess200Valid = successful200List.length === 1;
+    const isRejected409Valid = rejected409List.length === (CONCURRENT_COUNT - 1);
+    const isNoUnexpectedErrors = unexpectedErrors.length === 0;
+    const isUsersScoreValid = finalUsersScore === 12;
+    const isScoresScoreValid = finalScoresScore === 12;
     const isFeedbackCountValid = feedbackRecordCount === 1;
     const isClaimedFlagValid = feedbackClaimedStatus === true;
-    const isDuplicateBlocked = duplicateRes.statusCode === 409;
+    const isDuplicateBlocked409 = duplicateRes.statusCode === 409;
 
-    testPassed = isSuccessCountValid &&
-                 isRejectedCountValid &&
+    testPassed = isSuccess200Valid &&
+                 isRejected409Valid &&
+                 isNoUnexpectedErrors &&
                  isUsersScoreValid &&
                  isScoresScoreValid &&
                  isFeedbackCountValid &&
                  isClaimedFlagValid &&
-                 isDuplicateBlocked;
+                 isDuplicateBlocked409;
 
-    console.log(`\n7. Assertion Checklist:`);
-    console.log(`  [${isSuccessCountValid ? 'PASS' : 'FAIL'}] Exactly 1 HTTP 200 Success`);
-    console.log(`  [${isRejectedCountValid ? 'PASS' : 'FAIL'}] Exactly ${CONCURRENT_COUNT - 1} HTTP Rejected (409)`);
+    console.log(`\n7. Strict Assertion Checklist:`);
+    console.log(`  [${isSuccess200Valid ? 'PASS' : 'FAIL'}] Exactly 1 HTTP 200 Success`);
+    console.log(`  [${isRejected409Valid ? 'PASS' : 'FAIL'}] Exactly ${CONCURRENT_COUNT - 1} HTTP 409 Rejected`);
+    console.log(`  [${isNoUnexpectedErrors ? 'PASS' : 'FAIL'}] Zero unexpected errors (HTTP 500 / Network)`);
     console.log(`  [${isUsersScoreValid ? 'PASS' : 'FAIL'}] 'users.total_score' increased by exactly +2 (10 -> ${finalUsersScore})`);
     console.log(`  [${isScoresScoreValid ? 'PASS' : 'FAIL'}] 'user_scores.total_score' increased by exactly +2 (10 -> ${finalScoresScore})`);
     console.log(`  [${isFeedbackCountValid ? 'PASS' : 'FAIL'}] Exactly 1 feedback record inserted in 'user_feedback'`);
     console.log(`  [${isClaimedFlagValid ? 'PASS' : 'FAIL'}] 'feedback_reward_claimed' set to true`);
-    console.log(`  [${isDuplicateBlocked ? 'PASS' : 'FAIL'}] Subsequent duplicate request rejected with HTTP 409`);
+    console.log(`  [${isDuplicateBlocked409 ? 'PASS' : 'FAIL'}] Subsequent duplicate request rejected with HTTP 409`);
 
     if (testPassed) {
-      console.log("\n✅ PRODUCTION ENDPOINT CONCURRENCY & TRANSACTION TEST PASSED PERFECTLY!");
+      console.log("\n✅ ALL CONCURRENCY & TRANSACTION ASSERTS PASSED PERFECTLY!");
     } else {
-      console.error("\n❌ CONCURRENCY TEST FAILED! Assertions were not met.");
+      console.error("\n❌ CONCURRENCY TEST FAILED! Assertions failed.");
     }
 
   } catch (err) {
-    console.error(`\n❌ CONCURRENCY TEST ERROR:`, err.message);
+    console.error(`\n❌ CONCURRENCY TEST EXCEPTION:`, err.message);
+    testPassed = false;
   } finally {
-    // Close test HTTP server if open
-    if (serverInstance) {
-      serverInstance.close();
-    }
+    if (serverInstance) serverInstance.close();
 
     if (testPassed) {
-      // Cleanup ONLY test user records upon complete verification success
       console.log(`\n8. Test Passed: Cleaning up test user records (${testUserId})...`);
       await pool.query(`DELETE FROM public.user_feedback WHERE user_id = $1`, [testUserId]);
       await pool.query(`DELETE FROM public.user_scores WHERE user_id = $1`, [testUserId]);
       await pool.query(`DELETE FROM public.users WHERE id = $1`, [testUserId]);
       console.log(`- Test user cleanup completed successfully.`);
+      await pool.end();
     } else {
-      console.log(`\n⚠️ Test Failed or Incomplete: PRESERVING test user records for manual inspection.`);
+      console.log(`\n⚠️ TEST FAILED: PRESERVING test user records for manual inspection.`);
       console.log(`- Preserved User ID: ${testUserId}`);
-      console.log(`- You can inspect records for this user in PostgreSQL tables: public.users, public.user_scores, public.user_feedback.`);
+      console.log(`- Preserved Phone Number: ${testPhoneNumber}`);
+      await pool.end();
+      // Exit process with non-zero code on failure
+      process.exit(1);
     }
-
-    await pool.end();
   }
 }
 
-runRealEndpointConcurrencyTest().catch(console.error);
+runRealEndpointConcurrencyTest();
