@@ -41,41 +41,9 @@ async function runRealEndpointConcurrencyTest() {
     return;
   }
 
-  // 3. Import production Express app and inject single shared test pool
-  const appModule = require('./server');
-  const app = appModule.app || appModule;
-
-  const isLocalhost = testDbUrl.includes('localhost') || testDbUrl.includes('127.0.0.1');
-  sharedTestPool = new Pool({
-    connectionString: testDbUrl,
-    ssl: isLocalhost ? false : { rejectUnauthorized: false },
-    max: 20,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
-  });
-
-  if (typeof appModule.setTestPool === 'function') {
-    appModule.setTestPool(sharedTestPool);
-  } else {
-    console.error("\n❌ TEST INJECTION ERROR: appModule.setTestPool is missing from server.js.");
-    process.exitCode = 1;
-    return;
-  }
-
-  pool = appModule.getPool();
-  if (!pool || pool !== sharedTestPool) {
-    console.error("\n❌ TEST INJECTION ERROR: appModule.getPool() did not return the exact injected test pool instance.");
-    process.exitCode = 1;
-    return;
-  }
-
-  const randomHex = crypto.randomBytes(4).toString('hex');
-  testUserId = `TEST_CONC_${Date.now()}_${randomHex}`;
-  testPhoneNumber = `0999${Math.floor(10000000 + Math.random() * 89999999)}`;
-  testAuthToken = `TOKEN_TEST_${crypto.randomUUID()}`;
-
   // Individual Assertion Checklist Statuses
   const assertResults = {
+    setupAndPoolInjected: false,
     preStateValid: false,
     exactOneSuccess200: false,
     exactFourRejected409: false,
@@ -89,14 +57,44 @@ async function runRealEndpointConcurrencyTest() {
   };
 
   try {
-    // 4. Ensure testUserId does not already exist (Collision check)
+    // 3. Import production Express app and inject single shared test pool inside try block
+    const isLocalhost = testDbUrl.includes('localhost') || testDbUrl.includes('127.0.0.1');
+    sharedTestPool = new Pool({
+      connectionString: testDbUrl,
+      ssl: isLocalhost ? false : { rejectUnauthorized: false },
+      max: 20,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 10000,
+    });
+
+    const appModule = require('./server');
+    const app = appModule.app || appModule;
+
+    if (typeof appModule.setTestPool !== 'function') {
+      throw new Error('appModule.setTestPool is missing from server.js module');
+    }
+
+    appModule.setTestPool(sharedTestPool);
+
+    pool = appModule.getPool();
+    if (!pool || pool !== sharedTestPool) {
+      throw new Error('appModule.getPool() did not return the exact injected test pool instance');
+    }
+    assertResults.setupAndPoolInjected = true;
+
+    // 4. Column type check: public.users.id is TEXT PRIMARY KEY. Construct unique string test ID with UUID
+    testUserId = `TEST_CONC_${Date.now()}_${crypto.randomUUID()}`;
+    testPhoneNumber = `0999${Math.floor(10000000 + Math.random() * 89999999)}`;
+    testAuthToken = `TOKEN_TEST_${crypto.randomUUID()}`;
+
+    // Collision Check
     const collisionCheck = await pool.query(`SELECT id FROM public.users WHERE id = $1`, [testUserId]);
     if (collisionCheck.rows.length > 0) {
       throw new Error(`Test User ID collision detected (${testUserId}). Execution stopped to prevent overwriting existing record.`);
     }
 
     console.log(`\n1. Initializing test user in test database...`);
-    console.log(`- Test User ID: ${testUserId}`);
+    console.log(`- Test User ID (type TEXT): ${testUserId}`);
     console.log(`- Test Phone Number: ${testPhoneNumber}`);
     console.log(`- Initial Score: 10`);
 
@@ -231,8 +229,8 @@ async function runRealEndpointConcurrencyTest() {
     const feedbackRecordCount = feedbackRecordsRes.rows.length;
     const feedbackClaimedStatus = finalUserRes.rows[0].feedback_reward_claimed;
 
-    console.log(`- Score in 'users' table (Before: 10 -> After: ${finalUsersScore})`);
-    console.log(`- Score in 'user_scores' table (where user_id = $1) (Before: 10 -> After: ${finalScoresScore})`);
+    console.log(`- Score in 'users' table (Before: ${initUsersScore} -> After: ${finalUsersScore})`);
+    console.log(`- Score in 'user_scores' table (where user_id = $1) (Before: ${initScoresScore} -> After: ${finalScoresScore})`);
     console.log(`- Total records inserted in 'user_feedback': ${feedbackRecordCount}`);
     console.log(`- 'feedback_reward_claimed' status: ${feedbackClaimedStatus}`);
 
@@ -241,30 +239,40 @@ async function runRealEndpointConcurrencyTest() {
     const duplicateRes = await sendFeedbackApiRequest(99);
     console.log(`- Duplicate Request Status: HTTP ${duplicateRes.statusCode} -> ${JSON.stringify(duplicateRes.body)}`);
 
-    // 10. Evaluate Assertions
+    // 10. Evaluate Assertions Independently
+    const usersScoreDiff = finalUsersScore - initUsersScore;
+    const scoresScoreDiff = finalScoresScore - initScoresScore;
+
     assertResults.exactOneSuccess200 = successful200List.length === 1;
     assertResults.exactFourRejected409 = rejected409List.length === (CONCURRENT_COUNT - 1);
     assertResults.zeroUnexpectedErrors = unexpectedErrors.length === 0;
-    assertResults.usersScoreIncreasedBy2 = finalUsersScore === 12;
-    assertResults.userScoresScoreIncreasedBy2 = finalScoresScore === 12;
+    assertResults.usersScoreIncreasedBy2 = usersScoreDiff === 2;
+    assertResults.userScoresScoreIncreasedBy2 = scoresScoreDiff === 2;
     assertResults.feedbackRecordInserted = feedbackRecordCount === 1;
     assertResults.rewardClaimedFlagTrue = feedbackClaimedStatus === true;
     assertResults.subsequentDuplicateBlocked409 = duplicateRes.statusCode === 409;
-    assertResults.rejectedRequestsDidNotIncreaseScore = (finalUsersScore === 12 && feedbackRecordCount === 1);
+
+    // Meaningful independent assertion: 4 rejected requests added 0 extra points
+    assertResults.rejectedRequestsDidNotIncreaseScore = 
+      (usersScoreDiff === 2) && 
+      (scoresScoreDiff === 2) && 
+      (successful200List.length * 2 === usersScoreDiff) &&
+      (rejected409List.length === 4);
 
     testPassed = Object.values(assertResults).every(res => res === true);
 
     console.log(`\n8. Detailed Assertion Results:`);
+    console.log(`- Setup & Test Pool Injection -> [${assertResults.setupAndPoolInjected ? 'PASS' : 'FAIL'}]`);
     console.log(`- Pre-State Assertion (score=10, claimed=false, feedback=0) -> [${assertResults.preStateValid ? 'PASS' : 'FAIL'}]`);
     console.log(`- Condition 1: Exactly 1 HTTP 200 response -> [${assertResults.exactOneSuccess200 ? 'PASS' : 'FAIL'}]`);
     console.log(`- Condition 2: Exactly 4 HTTP 409 responses -> [${assertResults.exactFourRejected409 ? 'PASS' : 'FAIL'}]`);
     console.log(`- Condition 3: Zero unexpected errors/HTTP 500 -> [${assertResults.zeroUnexpectedErrors ? 'PASS' : 'FAIL'}]`);
-    console.log(`- Condition 4: 'users.total_score' increased 10 -> 12 -> [${assertResults.usersScoreIncreasedBy2 ? 'PASS' : 'FAIL'}]`);
-    console.log(`- Condition 5: 'user_scores.total_score' increased 10 -> 12 -> [${assertResults.userScoresScoreIncreasedBy2 ? 'PASS' : 'FAIL'}]`);
+    console.log(`- Condition 4: 'users.total_score' increased exactly by 2 -> [${assertResults.usersScoreIncreasedBy2 ? 'PASS' : 'FAIL'}]`);
+    console.log(`- Condition 5: 'user_scores.total_score' increased exactly by 2 -> [${assertResults.userScoresScoreIncreasedBy2 ? 'PASS' : 'FAIL'}]`);
     console.log(`- Condition 6: Exactly 1 record in 'user_feedback' -> [${assertResults.feedbackRecordInserted ? 'PASS' : 'FAIL'}]`);
     console.log(`- Condition 7: 'feedback_reward_claimed' = true -> [${assertResults.rewardClaimedFlagTrue ? 'PASS' : 'FAIL'}]`);
     console.log(`- Condition 8: Subsequent duplicate request returns HTTP 409 -> [${assertResults.subsequentDuplicateBlocked409 ? 'PASS' : 'FAIL'}]`);
-    console.log(`- Condition 9: Rejected requests caused zero extra points -> [${assertResults.rejectedRequestsDidNotIncreaseScore ? 'PASS' : 'FAIL'}]`);
+    console.log(`- Condition 9: Independent proof: 4 rejected requests added 0 points -> [${assertResults.rejectedRequestsDidNotIncreaseScore ? 'PASS' : 'FAIL'}]`);
 
     if (testPassed) {
       console.log("\n✅ ALL CONCURRENCY & TRANSACTION ASSERTS PASSED PERFECTLY!");
@@ -276,23 +284,34 @@ async function runRealEndpointConcurrencyTest() {
     console.error(`\n❌ CONCURRENCY TEST EXCEPTION:`, err.message);
     testPassed = false;
   } finally {
-    // 11. Graceful resource closing & safe cleanup with foreign key dependency order
+    // 11. Teardown with Callback Error Inspection & Resource Cleanup
     if (serverInstance) {
       try {
-        await new Promise(resolve => serverInstance.close(resolve));
-        console.log(`\n- Test HTTP server listener closed.`);
+        await new Promise((resolve) => {
+          serverInstance.close((closeErr) => {
+            if (closeErr) {
+              console.error(`⚠️ Error closing test HTTP server callback:`, closeErr.message);
+              cleanupErrorOccurred = true;
+            } else {
+              console.log(`\n- Test HTTP server listener closed successfully.`);
+            }
+            resolve();
+          });
+        });
       } catch (srvErr) {
-        console.error(`⚠️ Error closing test HTTP server:`, srvErr.message);
+        console.error(`⚠️ Exception closing test HTTP server:`, srvErr.message);
         cleanupErrorOccurred = true;
       }
     }
 
-    if (testUserId && pool) {
+    const targetPool = pool || sharedTestPool;
+
+    if (testUserId && targetPool) {
       try {
         console.log(`\nCleanup: Safely removing test user records (${testUserId}) in dependency order...`);
-        await pool.query(`DELETE FROM public.user_feedback WHERE user_id = $1`, [testUserId]);
-        await pool.query(`DELETE FROM public.user_scores WHERE user_id = $1`, [testUserId]);
-        await pool.query(`DELETE FROM public.users WHERE id = $1`, [testUserId]);
+        await targetPool.query(`DELETE FROM public.user_feedback WHERE user_id = $1`, [testUserId]);
+        await targetPool.query(`DELETE FROM public.user_scores WHERE user_id = $1`, [testUserId]);
+        await targetPool.query(`DELETE FROM public.users WHERE id = $1`, [testUserId]);
         console.log(`- Test user cleanup completed successfully.`);
       } catch (cleanupErr) {
         console.error(`⚠️ Cleanup error for test user (${testUserId}):`, cleanupErr.message);
@@ -300,12 +319,12 @@ async function runRealEndpointConcurrencyTest() {
       }
     }
 
-    if (pool) {
+    if (sharedTestPool) {
       try {
-        await pool.end();
-        console.log(`- PostgreSQL test pool closed.`);
+        await sharedTestPool.end();
+        console.log(`- Shared PostgreSQL test pool closed successfully.`);
       } catch (poolErr) {
-        console.error(`⚠️ Error closing PostgreSQL pool:`, poolErr.message);
+        console.error(`⚠️ Error closing shared PostgreSQL test pool:`, poolErr.message);
         cleanupErrorOccurred = true;
       }
     }

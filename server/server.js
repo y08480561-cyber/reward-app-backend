@@ -3692,8 +3692,12 @@ app.use((err, req, res, next) => {
 function setTestPool(customPool) {
   if (pool && pool !== customPool) {
     try {
-      pool.end().catch(() => {});
-    } catch (e) {}
+      pool.end().catch((err) => {
+        console.error('[setTestPool Warning] Failed to close default database pool:', err.message);
+      });
+    } catch (e) {
+      console.error('[setTestPool Warning] Exception closing default database pool:', e.message);
+    }
   }
   pool = customPool;
   isDbConnected = true;
