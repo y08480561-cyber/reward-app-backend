@@ -12,6 +12,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
@@ -24,8 +26,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -656,9 +660,22 @@ fun TicketConversationView(
 ) {
     var replyText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
+    val density = LocalDensity.current
 
-    // Auto scroll to bottom when messages update
-    LaunchedEffect(messages.size) {
+    val imeBottomPx = WindowInsets.ime.getBottom(density)
+    val navBarsBottomPx = WindowInsets.navigationBars.getBottom(density)
+    val isImeVisible = imeBottomPx > 0
+
+    // Height of floating AppBottomNavigation + clearance so reply bar sits cleanly above it
+    val bottomNavHeightPx = with(density) { 92.dp.roundToPx() }
+
+    // When IME is open, pad by IME height. When closed, pad by navigation bars + bottom navigation height.
+    val dynamicBottomPadding = with(density) {
+        maxOf(imeBottomPx, navBarsBottomPx + bottomNavHeightPx).toDp()
+    }
+
+    // Auto scroll to bottom when messages update or keyboard opens
+    LaunchedEffect(messages.size, isImeVisible) {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.size - 1)
         }
@@ -753,7 +770,8 @@ fun TicketConversationView(
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(12.dp),
+                    .padding(bottom = dynamicBottomPadding)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
                 shape = RoundedCornerShape(12.dp),
                 color = Color(0xFFE2E8F0)
             ) {
@@ -772,14 +790,17 @@ fun TicketConversationView(
             }
         } else {
             Surface(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = dynamicBottomPadding),
                 color = Color.White,
-                shadowElevation = 8.dp
+                shadowElevation = 8.dp,
+                shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
             ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(8.dp),
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     OutlinedTextField(
@@ -790,7 +811,19 @@ fun TicketConversationView(
                             .weight(1f)
                             .testTag("input_ticket_reply"),
                         shape = RoundedCornerShape(24.dp),
-                        maxLines = 3
+                        maxLines = 3,
+                        keyboardOptions = KeyboardOptions(
+                            imeAction = ImeAction.Send
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onSend = {
+                                if (replyText.trim().isNotEmpty() && !isSending) {
+                                    val text = replyText.trim()
+                                    replyText = ""
+                                    onSendMessage(text)
+                                }
+                            }
+                        )
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     IconButton(
