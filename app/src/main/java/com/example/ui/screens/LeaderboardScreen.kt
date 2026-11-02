@@ -50,20 +50,28 @@ fun LeaderboardScreen(onBack: () -> Unit) {
 
         Box(modifier = Modifier.fillMaxSize()) {
             AndroidView(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().padding(bottom = 80.dp),
                 factory = { ctx ->
                     WebView(ctx).apply {
                         layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+                        val webView = this
                         settings.apply {
                             javaScriptEnabled = true
                             domStorageEnabled = true
+                            // Ensure cookies are enabled
+                            CookieManager.getInstance().setAcceptCookie(true)
+                            CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true)
                         }
                         webViewClient = object : WebViewClient() {
                             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                                 isLoading = true
                                 hasError = false
                             }
-                            override fun onPageFinished(view: WebView?, url: String?) { isLoading = false }
+                            override fun onPageFinished(view: WebView?, url: String?) {
+                                isLoading = false
+                                // Sync cookies
+                                CookieManager.getInstance().flush()
+                            }
                             override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
                                 if (request?.isForMainFrame == true) { hasError = true; isLoading = false }
                             }
