@@ -22,14 +22,7 @@ data class User(
         get() = panelType.equals("admin", ignoreCase = true)
 
     val maskedName: String
-        get() {
-            val familyMasked = if (lastName.length > 2) {
-                "${lastName.take(2)}***"
-            } else {
-                lastName
-            }
-            return "$firstName $familyMasked"
-        }
+        get() = fullName
 
     val maskedPhone: String
         get() = if (phoneNumber.length >= 11) {

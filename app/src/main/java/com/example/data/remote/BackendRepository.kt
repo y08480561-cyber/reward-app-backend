@@ -605,7 +605,7 @@ class BackendRepository(
     /**
      * Fetch public competition leaderboard from server.
      * Endpoint: GET /api/leaderboard
-     * Only public rank, masked display name, and total score are returned.
+     * Only public rank, full display name, and total score are returned.
      * Returns Result.Success or Result.Error with distinct HTTP error code or network error code.
      */
     suspend fun fetchLeaderboard(currentUserId: String): Result<List<LeaderboardEntry>> = withContext(Dispatchers.IO) {

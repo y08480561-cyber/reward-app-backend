@@ -2150,13 +2150,11 @@ app.get('/api/leaderboard', ensureDatabaseReady, async (req, res) => {
     const leaderboard = result.rows.map((row, index) => {
       const fName = row.first_name || 'کاربر';
       const lName = row.last_name || '';
-      const maskedName = lName.length > 2 
-        ? `${fName} ${lName.substring(0, 2)}***` 
-        : `${fName} ***`;
+      const fullName = `${fName} ${lName}`.trim();
       return {
         rank: index + 1,
         userId: row.user_id,
-        displayName: maskedName.trim(),
+        displayName: fullName || 'کاربر مسابقه',
         totalScore: Number(row.total_score),
         isCurrentUser: row.user_id === currentUserId
       };
@@ -2498,7 +2496,7 @@ app.get('/api/competitions/:id/results', ensureDatabaseReady, async (req, res) =
     const results = archRes.rows.map(r => {
       const fName = r.first_name || 'کاربر';
       const lName = r.last_name || '';
-      const maskedName = lName.length > 2 ? `${fName} ${lName.substring(0, 2)}***` : `${fName} ***`;
+      const fullName = `${fName} ${lName}`.trim();
       const maskedPhone = r.phone_number && r.phone_number.length >= 11
         ? `${r.phone_number.substring(0, 4)}***${r.phone_number.substring(7)}`
         : '***';
@@ -2506,7 +2504,7 @@ app.get('/api/competitions/:id/results', ensureDatabaseReady, async (req, res) =
       return {
         rank: Number(r.final_rank),
         userId: r.user_id,
-        displayName: maskedName.trim(),
+        displayName: fullName || 'کاربر مسابقه',
         phoneNumber: maskedPhone,
         finalScore: Number(r.final_score),
         archivedAt: new Date(r.archived_at).getTime()
