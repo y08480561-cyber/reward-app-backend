@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.components.AppBottomNavigation
+import com.example.ui.components.isNetworkAvailable
 import com.example.ui.screens.*
 import com.example.ui.theme.MyApplicationTheme
 import com.example.viewmodel.AppScreen
@@ -108,6 +109,8 @@ class MainActivity : ComponentActivity() {
                                     }
                                     AppScreen.LEADERBOARD -> {
                                         LeaderboardScreen(
+                                            leaderboard = uiState.leaderboard,
+                                            isLoading = uiState.isLoading,
                                             onBack = { viewModel.navigateTo(AppScreen.SQUARES) }
                                         )
                                     }
@@ -188,7 +191,7 @@ class MainActivity : ComponentActivity() {
                                         currentScreen = uiState.currentScreen,
                                         onScreenSelected = { screen ->
                                             if (screen == AppScreen.LEADERBOARD) {
-                                                if (!com.example.ui.screens.isNetworkAvailable(this@MainActivity)) {
+                                                if (!isNetworkAvailable(this@MainActivity)) {
                                                     android.widget.Toast.makeText(
                                                         this@MainActivity,
                                                         "اتصال اینترنت برقرار نیست. لطفاً اتصال شبکه خود را بررسی کنید.",
