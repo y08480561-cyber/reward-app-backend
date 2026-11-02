@@ -3686,9 +3686,14 @@ app.use((err, req, res, next) => {
   res.status(500).json({ success: false, error: 'خطای داخلی سرور رخ داد.' });
 });
 
-// Startup Server with PostgreSQL Verification
-app.listen(PORT, '0.0.0.0', async () => {
-  console.log(`[Reqabat Va Jayezah Server] Running on http://0.0.0.0:${PORT}`);
-  await testAndInitDatabase();
-});
+// Export Express App for testing and modular usage
+module.exports = app;
+
+// Startup Server with PostgreSQL Verification if run directly
+if (require.main === module) {
+  app.listen(PORT, '0.0.0.0', async () => {
+    console.log(`[Reqabat Va Jayezah Server] Running on http://0.0.0.0:${PORT}`);
+    await testAndInitDatabase();
+  });
+}
 

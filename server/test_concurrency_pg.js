@@ -1,7 +1,8 @@
 const http = require('http');
 const crypto = require('crypto');
-const express = require('express');
 const { Pool } = require('pg');
+const app = require('./server'); // Imports REAL Express production app from server.js
+
 require('dotenv').config();
 
 // PostgreSQL Connection configuration
@@ -50,128 +51,18 @@ async function runRealEndpointConcurrencyTest() {
     console.log(`- Initial 'user_scores' total_score (where user_id = $1): ${initScoreRes.rows[0].total_score}`);
     console.log(`- Initial feedback_reward_claimed: ${initUserRes.rows[0].feedback_reward_claimed}`);
 
-    // 2. Build local Express server mounting exact auth middleware & feedback route handler
-    console.log(`\n2. Mounting Express test server with exact production auth middleware & feedback handler...`);
-    const app = express();
-    app.use(express.json());
-
-    // Production Auth Middleware logic from server.js
-    async function requireUserAuth(req, res, next) {
-      try {
-        const rawAuth = req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/i, '').trim() : '';
-        const token = req.headers['x-auth-token'] || req.headers['x-token'] || rawAuth || req.query.token;
-        const headerUserId = req.headers['x-user-id'] || req.query.userId;
-
-        if (!token && !headerUserId) {
-          return res.status(401).json({ success: false, error: "توکن احراز هویت الزامی است." });
-        }
-
-        let userRow = null;
-        if (token) {
-          const tokenRes = await pool.query(
-            `SELECT id, first_name, last_name, phone_number, status, auth_token FROM public.users WHERE auth_token = $1 LIMIT 1`,
-            [token]
-          );
-          if (tokenRes.rows.length > 0) userRow = tokenRes.rows[0];
-        }
-
-        if (!userRow && headerUserId) {
-          const userRes = await pool.query(
-            `SELECT id, first_name, last_name, phone_number, status, auth_token FROM public.users WHERE id = $1 LIMIT 1`,
-            [headerUserId]
-          );
-          if (userRes.rows.length > 0) userRow = userRes.rows[0];
-        }
-
-        if (!userRow) {
-          return res.status(401).json({ success: false, error: "نشست کاربری نامعتبر است." });
-        }
-
-        req.user = {
-          id: userRow.id,
-          firstName: userRow.first_name || '',
-          lastName: userRow.last_name || '',
-          phoneNumber: userRow.phone_number || ''
-        };
-        next();
-      } catch (err) {
-        return res.status(500).json({ success: false, error: "خطای احراز هویت." });
-      }
-    }
-
-    // Production Feedback Endpoint Handler from server.js
-    app.post('/api/user/feedback', requireUserAuth, async (req, res) => {
-      const client = await pool.connect();
-      try {
-        const userId = req.user.id;
-        const { rating, comment } = req.body;
-
-        if (!rating || rating < 1 || rating > 5) {
-          return res.status(400).json({ error: "امتیاز وارد شده باید بین ۱ تا ۵ باشد." });
-        }
-
-        const REWARD_POINTS = 2;
-        await client.query('BEGIN');
-
-        const updateRes = await client.query(
-          `UPDATE public.users 
-           SET feedback_reward_claimed = true, 
-               total_score = total_score + $1, 
-               updated_at = NOW() 
-           WHERE id = $2 AND feedback_reward_claimed = false
-           RETURNING total_score`,
-          [REWARD_POINTS, userId]
-        );
-
-        if (updateRes.rows.length === 0) {
-          await client.query('ROLLBACK');
-          const checkAgain = await client.query(`SELECT id, feedback_reward_claimed FROM public.users WHERE id = $1`, [userId]);
-          if (checkAgain.rows.length === 0) {
-            return res.status(404).json({ error: "کاربر یافت نشد." });
-          } else {
-            return res.status(409).json({ error: "پاداش بازخورد قبلاً توسط شما دریافت شده است." });
-          }
-        }
-
-        await client.query(
-          `INSERT INTO public.user_feedback (user_id, rating, comment, created_at) VALUES ($1, $2, $3, NOW())`,
-          [userId, rating, comment || null]
-        );
-
-        const scoreUpdate = await client.query(
-          `INSERT INTO public.user_scores (user_id, total_score, updated_at)
-           VALUES ($1, $2, NOW())
-           ON CONFLICT (user_id) 
-           DO UPDATE SET total_score = public.user_scores.total_score + $3, updated_at = NOW()
-           RETURNING total_score`,
-          [userId, REWARD_POINTS, REWARD_POINTS]
-        );
-
-        const finalScore = Number(scoreUpdate.rows[0].total_score);
-        await client.query('COMMIT');
-
-        return res.json({
-          success: true,
-          message: "بازخورد شما با موفقیت ثبت شد و ۲ امتیاز هدیه دریافت کردید.",
-          awardedPoints: REWARD_POINTS,
-          newTotalScore: finalScore
-        });
-      } catch (err) {
-        await client.query('ROLLBACK');
-        return res.status(500).json({ error: "خطا در ثبت بازخورد." });
-      } finally {
-        client.release();
-      }
-    });
-
+    // 2. Start local listener for the imported production Express app on ephemeral test port
+    console.log(`\n2. Starting test listener for the imported production Express app...`);
     const TEST_PORT = 3099;
+
     await new Promise((resolve) => {
       serverInstance = app.listen(TEST_PORT, '127.0.0.1', () => {
-        console.log(`- Test HTTP server listening on http://127.0.0.1:${TEST_PORT}`);
+        console.log(`- Production app test listener running on http://127.0.0.1:${TEST_PORT}`);
         resolve();
       });
     });
 
+    // Helper to send HTTP POST request to the imported production Express app
     const sendFeedbackApiRequest = (taskIndex) => {
       return new Promise((resolve) => {
         const postData = JSON.stringify({
@@ -220,22 +111,22 @@ async function runRealEndpointConcurrencyTest() {
       });
     };
 
-    // 3. Send 5 concurrent requests
-    console.log(`\n3. Sending 5 concurrent HTTP POST requests to /api/user/feedback...`);
+    // 3. Send 5 concurrent HTTP POST requests simultaneously against the real production endpoint
+    console.log(`\n3. Sending 5 concurrent HTTP POST requests to production /api/user/feedback...`);
     const CONCURRENT_COUNT = 5;
     const tasks = Array.from({ length: CONCURRENT_COUNT }, (_, i) => sendFeedbackApiRequest(i + 1));
     const responses = await Promise.all(tasks);
 
-    // Exact HTTP status filtering
+    // Filter exact HTTP status codes
     const successful200List = responses.filter(r => r.statusCode === 200);
     const rejected409List = responses.filter(r => r.statusCode === 409);
     const unexpectedErrors = responses.filter(r => r.statusCode !== 200 && r.statusCode !== 409);
 
-    console.log(`\n4. Concurrency HTTP Status Summary:`);
+    console.log(`\n4. Concurrency Response Summary:`);
     console.log(`- Total Requests Sent: ${CONCURRENT_COUNT}`);
-    console.log(`- HTTP 200 OK (Successful): ${successful200List.length}`);
-    console.log(`- HTTP 409 Conflict (Rejected): ${rejected409List.length}`);
-    console.log(`- Unexpected Errors (500 / Connection Failures): ${unexpectedErrors.length}`);
+    console.log(`- Successful HTTP 200 Responses: ${successful200List.length}`);
+    console.log(`- Rejected HTTP 409 Responses: ${rejected409List.length}`);
+    console.log(`- Unexpected Errors: ${unexpectedErrors.length}`);
 
     responses.forEach(r => {
       console.log(`  Task #${r.taskIndex}: HTTP ${r.statusCode} -> ${JSON.stringify(r.body)}`);
