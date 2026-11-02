@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.LeaderboardEntry
 import com.example.ui.theme.*
+import com.example.ui.components.toPersianDigits
 import com.example.viewmodel.MainUiState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -184,7 +185,7 @@ fun LeaderboardScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "#${currentUserEntry.rank}",
+                                text = "#${currentUserEntry.rank.toPersianDigits()}",
                                 color = LuxuryBlack,
                                 fontWeight = FontWeight.Black,
                                 fontSize = 16.sp
@@ -239,7 +240,7 @@ fun LeaderboardScreen(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "${currentUserEntry.totalScore} امتیاز",
+                                text = "${currentUserEntry.totalScore.toPersianDigits()} امتیاز",
                                 color = GoldLight,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp
@@ -540,7 +541,7 @@ private fun PodiumPillar(
             textAlign = TextAlign.Center
         )
         Text(
-            text = "${entry.totalScore} امتیاز",
+            text = "${entry.totalScore.toPersianDigits()} امتیاز",
             fontSize = 11.sp,
             fontWeight = FontWeight.SemiBold,
             color = rankColor
@@ -557,7 +558,7 @@ private fun PodiumPillar(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "#${entry.rank}",
+                text = "#${entry.rank.toPersianDigits()}",
                 fontWeight = FontWeight.Black,
                 fontSize = 18.sp,
                 color = rankColor
@@ -607,7 +608,7 @@ private fun LeaderboardItemRow(entry: LeaderboardEntry) {
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "${entry.rank}",
+                    text = "${entry.rank.toPersianDigits()}",
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp,
                     color = rankBadgeColor
@@ -669,7 +670,7 @@ private fun LeaderboardItemRow(entry: LeaderboardEntry) {
                         Spacer(modifier = Modifier.width(4.dp))
                     }
                     Text(
-                        text = "${entry.totalScore} امتیاز",
+                        text = "${entry.totalScore.toPersianDigits()} امتیاز",
                         color = if (isTop3) GoldLight else WarmWhite,
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp
