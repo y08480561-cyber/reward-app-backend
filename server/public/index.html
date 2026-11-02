@@ -666,7 +666,6 @@
                 <thead>
                   <tr class="text-secondary small">
                     <th style="width: 60px;">رتبه</th>
-                    <th>شناسه کاربری</th>
                     <th>نام و نام خانوادگی</th>
                     <th>شماره همراه</th>
                     <th>مجموع امتیاز</th>
@@ -674,7 +673,7 @@
                   </tr>
                 </thead>
                 <tbody id="usersTbody">
-                  <tr><td colspan="6" class="text-center py-4 text-secondary">در حال بارگذاری اطلاعات کاربران...</td></tr>
+                  <tr><td colspan="5" class="text-center py-4 text-secondary">در حال بارگذاری اطلاعات کاربران...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -2115,7 +2114,6 @@
       tbody.innerHTML = users.map((u, index) => `
         <tr>
           <td><span class="${index < 3 ? 'badge bg-warning text-dark fw-bold' : 'text-secondary'}">${index + 1}</span></td>
-          <td><code class="text-warning">${u.id.substring(0, 8)}...</code></td>
           <td class="fw-bold">${u.firstName || ''} ${u.lastName || ''}</td>
           <td dir="ltr" class="text-end">${u.phoneNumber || '-'}</td>
           <td><span class="badge badge-gold">${u.score || 0} امتیاز</span></td>
@@ -2157,9 +2155,7 @@
       }
       const filtered = cachedUsers.filter(u => 
         (u.firstName && u.firstName.toLowerCase().includes(q)) ||
-        (u.lastName && u.lastName.toLowerCase().includes(q)) ||
-        (u.phoneNumber && u.phoneNumber.includes(q)) ||
-        (u.id && u.id.toLowerCase().includes(q))
+        (u.lastName && u.lastName.toLowerCase().includes(q))
       );
       renderUsers(filtered);
     }

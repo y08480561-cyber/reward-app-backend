@@ -2298,7 +2298,7 @@ app.get('/api/admin/overview', requireAdminAuth, ensureDatabaseReady, async (req
 // ====================================================================
 // 6.1 Users Ranking Table API (Sanitized Read-Only for Standalone Page)
 // ====================================================================
-app.get('/api/admin/users', ensureDatabaseReady, async (req, res) => {
+app.get('/api/admin/users', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT 
