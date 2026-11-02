@@ -148,9 +148,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun navigateTo(screen: AppScreen) {
         _uiState.update { it.copy(currentScreen = screen, errorMessage = null, infoMessage = null) }
-        if (screen == AppScreen.LEADERBOARD) {
-            loadLeaderboard()
-        } else if (screen == AppScreen.PRIZES) {
+        if (screen == AppScreen.PRIZES) {
             loadRewardsData()
         } else if (screen == AppScreen.MEMBERSHIP) {
             loadMembershipData()
@@ -203,7 +201,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     isLoading = false
                 )
             }
-            loadLeaderboard()
             launch(Dispatchers.IO) {
                 tapsellAdsManager.initializeSdk()
             }
