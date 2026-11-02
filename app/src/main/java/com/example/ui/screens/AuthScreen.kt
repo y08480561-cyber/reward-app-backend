@@ -67,6 +67,7 @@ import com.example.viewmodel.AuthUiState
 @Composable
 fun AuthScreen(
     state: AuthUiState,
+    loginNotification: com.example.model.LoginNotificationConfig = com.example.model.LoginNotificationConfig(),
     onFirstNameChange: (String) -> Unit,
     onLastNameChange: (String) -> Unit,
     onPhoneChange: (String) -> Unit,
@@ -155,149 +156,152 @@ fun AuthScreen(
                     .padding(horizontal = 16.dp, vertical = 14.dp)
             ) {
                 // ==============================================================
-                // Eye-catching & Literary Irancell & Mobile Data Exclusive Card
+                // Eye-catching Dynamic Notification Card (Frosted Glass Style)
                 // ==============================================================
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .shadow(8.dp, RoundedCornerShape(20.dp))
-                        .border(
-                            width = 1.8.dp,
-                            brush = Brush.horizontalGradient(
-                                listOf(GoldAccent, Color(0xFFFDBA74), GoldAccent)
-                            ),
-                            shape = RoundedCornerShape(20.dp)
-                        ),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.Transparent)
-                ) {
-                    Box(
+                if (loginNotification.isVisible) {
+                    Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(
-                                Brush.verticalGradient(
-                                    listOf(
-                                        Color(0xFF0F2542),
-                                        Color(0xFF16325B)
+                            .shadow(10.dp, RoundedCornerShape(22.dp))
+                            .border(
+                                width = 1.5.dp,
+                                brush = Brush.linearGradient(
+                                    listOf(GoldAccent, GoldAccent.copy(alpha = 0.3f), GoldAccent)
+                                ),
+                                shape = RoundedCornerShape(22.dp)
+                            ),
+                        shape = RoundedCornerShape(22.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    Brush.verticalGradient(
+                                        listOf(
+                                            Color(0xFF0F2542).copy(alpha = 0.92f), // Frosted Navy
+                                            Color(0xFF16325B).copy(alpha = 0.96f)
+                                        )
                                     )
                                 )
-                            )
-                            .padding(18.dp)
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.fillMaxWidth()
+                                .padding(18.dp)
                         ) {
-                            // Top Tag: Irancell Exclusive
-                            Row(
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(30.dp))
-                                        .background(
-                                            Brush.horizontalGradient(
-                                                listOf(GoldAccent, Color(0xFFFFA000))
-                                            )
-                                        )
-                                        .padding(horizontal = 14.dp, vertical = 5.dp)
-                                ) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Verified,
-                                            contentDescription = null,
-                                            tint = NavyPrimary,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = stringResource(R.string.irancell_badge_title),
-                                            fontFamily = VazirmatnFontFamily,
-                                            fontSize = 11.5.sp,
-                                            fontWeight = FontWeight.Black,
-                                            color = NavyPrimary
-                                        )
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            // Main Literary Title
-                            Text(
-                                text = stringResource(R.string.irancell_literary_title),
-                                fontFamily = VazirmatnFontFamily,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = GoldAccent,
-                                textAlign = TextAlign.Center,
-                                lineHeight = 25.sp
-                            )
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            // Literary Description
-                            Text(
-                                text = stringResource(R.string.irancell_literary_desc),
-                                fontFamily = VazirmatnFontFamily,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Normal,
-                                color = Color.White.copy(alpha = 0.95f),
-                                textAlign = TextAlign.Center,
-                                lineHeight = 21.sp
-                            )
-
-                            Spacer(modifier = Modifier.height(14.dp))
-
-                            // ==========================================================
-                            // Unmissable Internet Requirement Banner inside card
-                            // ==========================================================
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(14.dp))
-                                    .background(Color(0xFF0A192F))
-                                    .border(1.2.dp, GoldAccent.copy(alpha = 0.5f), RoundedCornerShape(14.dp))
-                                    .padding(12.dp)
-                            ) {
+                                // Top Tag: Irancell Exclusive
                                 Row(
+                                    horizontalArrangement = Arrangement.Center,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .size(36.dp)
-                                            .clip(CircleShape)
-                                            .background(GoldAccent.copy(alpha = 0.2f)),
-                                        contentAlignment = Alignment.Center
+                                            .clip(RoundedCornerShape(30.dp))
+                                            .background(
+                                                Brush.horizontalGradient(
+                                                    listOf(GoldAccent, Color(0xFFFFA000))
+                                                )
+                                            )
+                                            .padding(horizontal = 14.dp, vertical = 5.dp)
                                     ) {
-                                        Icon(
-                                            imageVector = Icons.Default.SignalCellularAlt,
-                                            contentDescription = null,
-                                            tint = GoldAccent,
-                                            modifier = Modifier.size(20.dp)
-                                        )
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = getIconByName(loginNotification.badgeIcon),
+                                                contentDescription = null,
+                                                tint = NavyPrimary,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = loginNotification.badgeText,
+                                                fontFamily = VazirmatnFontFamily,
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Black,
+                                                color = NavyPrimary
+                                            )
+                                        }
                                     }
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = "شرط الزامی: ورود با «اینترنت دیتای ایرانسل»",
-                                            fontFamily = VazirmatnFontFamily,
-                                            fontSize = 12.5.sp,
-                                            fontWeight = FontWeight.ExtraBold,
-                                            color = GoldAccent
-                                        )
-                                        Spacer(modifier = Modifier.height(2.dp))
-                                        Text(
-                                            text = "لطفاً پیش از ورود، وای‌فای و فیلترشکن را خاموش نموده و از طریق اینترنت همراه سیم‌کارت ایرانسل متصل گردید.",
-                                            fontFamily = VazirmatnFontFamily,
-                                            fontSize = 11.sp,
-                                            color = Color(0xFFE2E8F0),
-                                            lineHeight = 17.sp
-                                        )
+                                }
+
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                // Main Title
+                                Text(
+                                    text = loginNotification.mainTitle,
+                                    fontFamily = VazirmatnFontFamily,
+                                    fontSize = 17.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = GoldAccent,
+                                    textAlign = TextAlign.Center,
+                                    lineHeight = 26.sp
+                                )
+
+                                if (loginNotification.mainDescription.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = loginNotification.mainDescription,
+                                        fontFamily = VazirmatnFontFamily,
+                                        fontSize = 12.5.sp,
+                                        fontWeight = FontWeight.Normal,
+                                        color = Color.White.copy(alpha = 0.9f),
+                                        textAlign = TextAlign.Center,
+                                        lineHeight = 21.sp
+                                    )
+                                }
+
+                                // Warning Banner
+                                if (loginNotification.warningIsVisible) {
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(16.dp))
+                                            .background(Color(0xFF0A192F).copy(alpha = 0.8f))
+                                            .border(1.2.dp, GoldAccent.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+                                            .padding(14.dp)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(38.dp)
+                                                    .clip(CircleShape)
+                                                    .background(GoldAccent.copy(alpha = 0.15f)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = getIconByName(loginNotification.warningIcon),
+                                                    contentDescription = null,
+                                                    tint = GoldAccent,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = loginNotification.warningTitle,
+                                                    fontFamily = VazirmatnFontFamily,
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = GoldAccent
+                                                )
+                                                if (loginNotification.warningDescription.isNotBlank()) {
+                                                    Spacer(modifier = Modifier.height(3.dp))
+                                                    Text(
+                                                        text = loginNotification.warningDescription,
+                                                        fontFamily = VazirmatnFontFamily,
+                                                        fontSize = 11.sp,
+                                                        color = Color(0xFFCBD5E1),
+                                                        lineHeight = 18.sp
+                                                    )
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -536,5 +540,21 @@ fun AuthScreen(
                 Spacer(modifier = Modifier.height(24.dp))
             }
         }
+    }
+}
+
+@Composable
+fun getIconByName(name: String): androidx.compose.ui.graphics.vector.ImageVector {
+    return when (name.lowercase()) {
+        "verified" -> Icons.Default.Verified
+        "signal_cellular_alt" -> Icons.Default.SignalCellularAlt
+        "check_circle" -> Icons.Default.CheckCircle
+        "cell_tower" -> Icons.Default.CellTower
+        "wifi_off" -> Icons.Default.WifiOff
+        "stars" -> Icons.Default.Stars
+        "emoji_events" -> Icons.Default.EmojiEvents
+        "person" -> Icons.Default.Person
+        "phone_android" -> Icons.Default.PhoneAndroid
+        else -> Icons.Default.Verified
     }
 }

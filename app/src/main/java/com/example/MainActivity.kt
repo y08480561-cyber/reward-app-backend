@@ -71,6 +71,7 @@ class MainActivity : ComponentActivity() {
                                     AppScreen.AUTH -> {
                                         AuthScreen(
                                             state = authState,
+                                            loginNotification = uiState.loginNotification,
                                             onFirstNameChange = { viewModel.onFirstNameChange(it) },
                                             onLastNameChange = { viewModel.onLastNameChange(it) },
                                             onPhoneChange = { viewModel.onPhoneNumberChange(it) },

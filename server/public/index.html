@@ -478,6 +478,12 @@
             <span>تنظیمات پنل</span>
           </div>
         </a>
+        <a class="sidebar-link" onclick="navigateTo('login_notification')">
+          <div class="sidebar-link-content">
+            <i class="bi bi-megaphone-fill"></i>
+            <span>مدیریت پیام ورود</span>
+          </div>
+        </a>
         <a class="sidebar-link" onclick="navigateTo('support')">
           <div class="sidebar-link-content">
             <i class="bi bi-headset"></i>
@@ -948,6 +954,152 @@
         <!-- ============================================================== -->
         <!-- SECTION 5: پشتیبانی (Support) -->
         <!-- ============================================================== -->
+        <!-- ============================================================== -->
+        <!-- SECTION 6: مدیریت پیام صفحه ورود (Login Notification Management) -->
+        <!-- ============================================================== -->
+        <section id="section-login_notification" class="admin-section">
+          <div class="row g-4">
+            <!-- Form Column -->
+            <div class="col-lg-7">
+              <div class="card p-4 shadow h-100">
+                <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom border-secondary">
+                  <div>
+                    <h4 class="gold-text mb-1"><i class="bi bi-megaphone-fill me-2"></i> تنظیمات محتوای صفحه ورود</h4>
+                    <p class="text-secondary small mb-0">ویرایش متن‌ها، آیکون‌ها و وضعیت نمایش کارت اطلاع‌رسانی ایرانسل</p>
+                  </div>
+                  <button class="btn btn-outline-warning btn-sm" onclick="loadLoginNotification()"><i class="bi bi-arrow-clockwise"></i></button>
+                </div>
+
+                <form id="loginNotifForm" onsubmit="saveLoginNotification(event)">
+                  <div class="row g-3">
+                    <div class="col-12">
+                      <div class="form-check form-switch p-3 rounded bg-dark bg-opacity-25 border border-secondary mb-3">
+                        <input class="form-check-input ms-0 me-2" type="checkbox" id="ln_isVisible" checked onchange="updateLNPreview()">
+                        <label class="form-check-label text-white fw-bold" for="ln_isVisible">نمایش کل کارت اطلاع‌رسانی در اپلیکیشن</label>
+                      </div>
+                    </div>
+
+                    <div class="col-md-8">
+                      <label class="form-label text-secondary small fw-bold">متن برچسب (Badge):</label>
+                      <input type="text" id="ln_badgeText" class="form-control form-control-dark mb-3" placeholder="مثلاً: سرویس اختصاصی مشترکین ایرانسل" oninput="updateLNPreview()">
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label text-secondary small fw-bold">آیکون برچسب:</label>
+                      <select id="ln_badgeIcon" class="form-select form-select-dark mb-3" onchange="updateLNPreview()">
+                        <option value="verified">Verified (تایید شده)</option>
+                        <option value="stars">Stars (ستاره)</option>
+                        <option value="check_circle">Check Circle</option>
+                        <option value="emoji_events">Trophy</option>
+                      </select>
+                    </div>
+
+                    <div class="col-12">
+                      <label class="form-label text-secondary small fw-bold">عنوان اصلی (Literary Title):</label>
+                      <input type="text" id="ln_mainTitle" class="form-control form-control-dark mb-3" oninput="updateLNPreview()">
+                    </div>
+
+                    <div class="col-12">
+                      <label class="form-label text-secondary small fw-bold">متن توضیحات اصلی:</label>
+                      <textarea id="ln_mainDescription" rows="3" class="form-control form-control-dark mb-3" oninput="updateLNPreview()"></textarea>
+                    </div>
+
+                    <div class="col-12">
+                      <div class="p-3 rounded border border-info border-opacity-25 bg-info bg-opacity-10 mb-3">
+                        <div class="form-check form-switch mb-3">
+                          <input class="form-check-input ms-0 me-2" type="checkbox" id="ln_warningIsVisible" checked onchange="updateLNPreview()">
+                          <label class="form-check-label text-info fw-bold" for="ln_warningIsVisible">نمایش کادر هشدار اینترنت</label>
+                        </div>
+                        
+                        <div class="row g-3">
+                          <div class="col-md-8">
+                            <label class="form-label text-secondary small fw-bold">عنوان کادر هشدار:</label>
+                            <input type="text" id="ln_warningTitle" class="form-control form-control-dark mb-2" oninput="updateLNPreview()">
+                          </div>
+                          <div class="col-md-4">
+                            <label class="form-label text-secondary small fw-bold">آیکون هشدار:</label>
+                            <select id="ln_warningIcon" class="form-select form-select-dark mb-2" onchange="updateLNPreview()">
+                              <option value="signal_cellular_alt">Signal (آنتن)</option>
+                              <option value="wifi_off">Wifi Off</option>
+                              <option value="cell_tower">Cell Tower</option>
+                            </select>
+                          </div>
+                          <div class="col-12">
+                            <label class="form-label text-secondary small fw-bold">توضیحات هشدار:</label>
+                            <textarea id="ln_warningDescription" rows="2" class="form-control form-control-dark" oninput="updateLNPreview()"></textarea>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="col-12 d-flex gap-2">
+                      <button type="submit" class="btn btn-gold flex-grow-1 py-2 fw-bold">
+                        <i class="bi bi-save2-fill me-1"></i> ذخیره و انتشار آنی در اپلیکیشن
+                      </button>
+                      <button type="button" class="btn btn-outline-secondary" onclick="resetLoginNotificationDefaults()">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i> بازگشت به پیش‌فرض ایرانسل
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <!-- Preview Column -->
+            <div class="col-lg-5">
+              <div class="card p-4 shadow h-100 bg-black bg-opacity-25" style="border-style: dashed;">
+                <h6 class="text-secondary fw-bold mb-4 text-center"><i class="bi bi-eye-fill me-1"></i> پیش‌نمایش زنده (Live Preview)</h6>
+                
+                <div class="d-flex justify-content-center align-items-center h-100">
+                  <!-- App Screen Mockup -->
+                  <div style="width: 320px; background-color: #F1F5F9; border-radius: 30px; border: 8px solid #334155; padding: 20px; min-height: 500px; box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
+                    <!-- Header Mockup -->
+                    <div style="height: 120px; background: linear-gradient(to bottom, #0B192C, #1E3E62); border-radius: 0 0 20px 20px; margin: -20px -20px 20px -20px; display: flex; align-items: center; justify-content: center;">
+                       <div style="width: 40px; height: 40px; background: #FFB703; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                         <i class="bi bi-trophy-fill" style="color: #0B192C;"></i>
+                       </div>
+                    </div>
+
+                    <!-- Dynamic Card Preview -->
+                    <div id="ln_preview_container" style="display: none;">
+                      <div style="background: linear-gradient(135deg, #0F2542, #16325B); border: 1.5px solid #FFB703; border-radius: 18px; padding: 15px; box-shadow: 0 8px 15px rgba(0,0,0,0.2); text-align: center;">
+                        <!-- Badge -->
+                        <div style="display: inline-block; background: linear-gradient(to right, #FFB703, #FB8500); border-radius: 20px; padding: 4px 12px; margin-bottom: 10px;">
+                          <div style="display: flex; align-items: center; gap: 5px; font-size: 9px; font-weight: 900; color: #0B192C;">
+                            <i id="ln_preview_badgeIcon" class="bi bi-patch-check-fill"></i>
+                            <span id="ln_preview_badgeText">سرویس اختصاصی</span>
+                          </div>
+                        </div>
+                        
+                        <!-- Title -->
+                        <h6 id="ln_preview_mainTitle" style="color: #FFB703; font-weight: 900; font-size: 13px; line-height: 1.4; margin-bottom: 8px;">عنوان اصلی</h6>
+                        
+                        <!-- Desc -->
+                        <p id="ln_preview_mainDescription" style="color: rgba(255,255,255,0.9); font-size: 10px; line-height: 1.5; margin-bottom: 12px;">توضیحات مربوط به سرویس ایرانسل</p>
+                        
+                        <!-- Warning -->
+                        <div id="ln_preview_warningBox" style="background: rgba(10,25,47,0.8); border: 1px solid rgba(255,183,3,0.3); border-radius: 12px; padding: 10px; text-align: right; display: flex; gap: 10px; align-items: flex-start;">
+                          <div style="width: 24px; height: 24px; background: rgba(255,183,3,0.15); border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+                            <i id="ln_preview_warningIcon" class="bi bi-reception-4" style="color: #FFB703; font-size: 12px;"></i>
+                          </div>
+                          <div>
+                            <div id="ln_preview_warningTitle" style="color: #FFB703; font-weight: 800; font-size: 11px; margin-bottom: 2px;">شرط الزامی</div>
+                            <div id="ln_preview_warningDescription" style="color: #CBD5E1; font-size: 9px; line-height: 1.4;">توضیحات هشدار اینترنت</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div id="ln_preview_hidden_msg" style="text-align: center; color: #64748B; font-size: 11px; margin-top: 50px;">
+                       <i class="bi bi-eye-slash-fill d-block fs-3 mb-2"></i>
+                       کارت اطلاع‌رسانی مخفی شده است
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section id="section-support" class="admin-section">
           <!-- Stat Cards Row -->
           <div class="row g-3 mb-4">
@@ -1515,7 +1667,8 @@
       'rewards_management': { title: 'جوایز و بنر هدیه', icon: 'bi-gift-fill' },
       'store': { title: 'فروشگاه و تراکنش‌ها', icon: 'bi-shop' },
       'support': { title: 'پشتیبانی و تیکت‌ها', icon: 'bi-headset' },
-      'settings': { title: 'تنظیمات پنل', icon: 'bi-gear-fill' }
+      'settings': { title: 'تنظیمات پنل', icon: 'bi-gear-fill' },
+      'login_notification': { title: 'مدیریت پیام ورود', icon: 'bi-megaphone-fill' }
     };
 
     function navigateTo(sectionId) {
@@ -1561,6 +1714,8 @@
         loadRewardClaims();
       } else if (sectionId === 'support') {
         loadAdminSupportTickets();
+      } else if (sectionId === 'login_notification') {
+        loadLoginNotification();
       }
 
       // Close mobile sidebar if open
@@ -3334,6 +3489,146 @@
         }
       } catch (err) {
         alert('خطای ارتباط: ' + err.message);
+      }
+    }
+
+    // ====================================================================
+    // LOGIN NOTIFICATION MANAGEMENT
+    // ====================================================================
+    async function loadLoginNotification() {
+      const key = getAdminKey();
+      try {
+        const res = await fetch('/api/admin/login-notification', {
+          headers: { 'x-admin-key': key }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.success && data.settings) {
+          const s = data.settings;
+          document.getElementById('ln_isVisible').checked = s.is_visible;
+          document.getElementById('ln_badgeText').value = s.badge_text || '';
+          document.getElementById('ln_badgeIcon').value = s.badge_icon || 'verified';
+          document.getElementById('ln_mainTitle').value = s.main_title || '';
+          document.getElementById('ln_mainDescription').value = s.main_description || '';
+          document.getElementById('ln_warningIsVisible').checked = s.warning_is_visible;
+          document.getElementById('ln_warningTitle').value = s.warning_title || '';
+          document.getElementById('ln_warningDescription').value = s.warning_description || '';
+          document.getElementById('ln_warningIcon').value = s.warning_icon || 'signal_cellular_alt';
+          
+          updateLNPreview();
+        }
+      } catch (err) {
+        console.error('[Login Notification Load Error]', err);
+      }
+    }
+
+    function updateLNPreview() {
+      const isVisible = document.getElementById('ln_isVisible').checked;
+      const warningIsVisible = document.getElementById('ln_warningIsVisible').checked;
+      
+      const container = document.getElementById('ln_preview_container');
+      const hiddenMsg = document.getElementById('ln_preview_hidden_msg');
+      
+      if (!isVisible) {
+        container.style.display = 'none';
+        hiddenMsg.style.display = 'block';
+        return;
+      }
+      
+      container.style.display = 'block';
+      hiddenMsg.style.display = 'none';
+      
+      setElText('ln_preview_badgeText', document.getElementById('ln_badgeText').value);
+      setElText('ln_preview_mainTitle', document.getElementById('ln_mainTitle').value);
+      setElText('ln_preview_mainDescription', document.getElementById('ln_mainDescription').value);
+      setElText('ln_preview_warningTitle', document.getElementById('ln_warningTitle').value);
+      setElText('ln_preview_warningDescription', document.getElementById('ln_warningDescription').value);
+      
+      // Update Icons
+      const badgeIcon = document.getElementById('ln_badgeIcon').value;
+      const warningIcon = document.getElementById('ln_warningIcon').value;
+      
+      const biMap = {
+        'verified': 'bi-patch-check-fill',
+        'stars': 'bi-stars',
+        'check_circle': 'bi-check-circle-fill',
+        'emoji_events': 'bi-trophy-fill'
+      };
+      const wiMap = {
+        'signal_cellular_alt': 'bi-reception-4',
+        'wifi_off': 'bi-wifi-off',
+        'cell_tower': 'bi-broadcast-pin'
+      };
+      
+      const badgeIconEl = document.getElementById('ln_preview_badgeIcon');
+      if (badgeIconEl) badgeIconEl.className = `bi ${biMap[badgeIcon] || 'bi-patch-check-fill'}`;
+      
+      const warningIconEl = document.getElementById('ln_preview_warningIcon');
+      if (warningIconEl) warningIconEl.className = `bi ${wiMap[warningIcon] || 'bi-reception-4'}`;
+      
+      // Warning visibility
+      document.getElementById('ln_preview_warningBox').style.display = warningIsVisible ? 'flex' : 'none';
+    }
+
+    async function saveLoginNotification(e) {
+      if (e) e.preventDefault();
+      const key = getAdminKey();
+      
+      const payload = {
+        is_visible: document.getElementById('ln_isVisible').checked,
+        badge_text: document.getElementById('ln_badgeText').value,
+        badge_icon: document.getElementById('ln_badgeIcon').value,
+        main_title: document.getElementById('ln_mainTitle').value,
+        main_description: document.getElementById('ln_mainDescription').value,
+        warning_is_visible: document.getElementById('ln_warningIsVisible').checked,
+        warning_title: document.getElementById('ln_warningTitle').value,
+        warning_description: document.getElementById('ln_warningDescription').value,
+        warning_icon: document.getElementById('ln_warningIcon').value
+      };
+      
+      try {
+        const res = await fetch('/api/admin/login-notification', {
+          method: 'POST',
+          headers: { 'x-admin-key': key, 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+          showNotification('تنظیمات صفحه ورود با موفقیت ذخیره و منتشر شد.', 'success');
+        } else {
+          showNotification('خطا در ذخیره‌سازی: ' + (data.message || 'نامشخص'), 'error');
+        }
+      } catch (err) {
+        showNotification('خطای ارتباط با سرور: ' + err.message, 'error');
+      }
+    }
+
+    function resetLoginNotificationDefaults() {
+      if (!confirm('آیا مایل به بازگرداندن تنظیمات به حالت پیش‌فرض (ایرانسل) هستید؟')) return;
+      
+      document.getElementById('ln_isVisible').checked = true;
+      document.getElementById('ln_badgeText').value = 'سرویس اختصاصی مشترکین ایرانسل';
+      document.getElementById('ln_badgeIcon').value = 'verified';
+      document.getElementById('ln_mainTitle').value = 'سامانه منحصرأ ویژه مشترکان ارجمند ایرانسل';
+      document.getElementById('ln_mainDescription').value = 'با کمال احترام و افتخار، این سامانه منحصراً جهت حضور، رقابت و بهره‌مندی مشترکین گرامی و همراهان وفادار اپراتور ایرانسل طراحی گردیده است.';
+      document.getElementById('ln_warningIsVisible').checked = true;
+      document.getElementById('ln_warningTitle').value = 'شرط الزامی: ورود با «اینترنت دیتای ایرانسل»';
+      document.getElementById('ln_warningDescription').value = 'لطفاً پیش از ورود، وای‌فای و فیلترشکن را خاموش نموده و از طریق اینترنت همراه سیم‌کارت ایرانسل متصل گردید.';
+      document.getElementById('ln_warningIcon').value = 'signal_cellular_alt';
+      
+      updateLNPreview();
+    }
+
+    function showNotification(msg, type = 'success') {
+      // Basic fallback if global alert not ready
+      const alertBox = document.getElementById('alertBox');
+      if (alertBox) {
+        alertBox.innerText = msg;
+        alertBox.className = `alert alert-${type === 'success' ? 'success' : 'danger'} shadow-sm mb-4`;
+        alertBox.classList.remove('d-none');
+        setTimeout(() => alertBox.classList.add('d-none'), 5000);
+      } else {
+        alert(msg);
       }
     }
 

@@ -317,3 +317,20 @@ data class UserEntitlements(
     val multiplier: Int = 1
 )
 
+/**
+ * Login notification configuration (Frosted Glass message for Irancell users)
+ */
+data class LoginNotificationConfig(
+    val id: String = "default",
+    val isVisible: Boolean = true,
+    val badgeText: String = "سرویس اختصاصی مشترکین ایرانسل",
+    val badgeIcon: String = "verified",
+    val mainTitle: String = "سامانه منحصرأ ویژه مشترکان ارجمند ایرانسل",
+    val mainDescription: String = "با کمال احترام و افتخار، این سامانه منحصراً جهت حضور، رقابت و بهره‌مندی مشترکین گرامی و همراهان وفادار اپراتور ایرانسل طراحی گردیده است.",
+    val warningIsVisible: Boolean = true,
+    val warningTitle: String = "شرط الزامی: ورود با «اینترنت دیتای ایرانسل»",
+    val warningDescription: String = "لطفاً پیش از ورود، وای‌فای و فیلترشکن را خاموش نموده و از طریق اینترنت همراه سیم‌کارت ایرانسل متصل گردید.",
+    val warningIcon: String = "signal_cellular_alt",
+    val updatedAt: Long = System.currentTimeMillis()
+)
+

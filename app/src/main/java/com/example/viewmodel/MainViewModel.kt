@@ -54,6 +54,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         checkSavedSession()
         observeTapsellAdState()
         startCycleCountdownTicker()
+        fetchLoginNotification()
+    }
+
+    private fun fetchLoginNotification() {
+        viewModelScope.launch {
+            val res = backendRepository.fetchLoginNotificationConfig()
+            if (res is Result.Success) {
+                _uiState.update { it.copy(loginNotification = res.data) }
+            }
+        }
     }
 
     private fun checkSavedSession() {
@@ -84,6 +94,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 activeAnnouncement = cachedAnn,
                 currentScreen = AppScreen.PROFILE
             )
+        }
+        viewModelScope.launch {
+            val res = backendRepository.fetchLoginNotificationConfig()
+            if (res is Result.Success) {
+                _uiState.update { it.copy(loginNotification = res.data) }
+            }
         }
         refreshData()
     }
@@ -165,6 +181,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val annResult = backendRepository.getActiveAnnouncement()
             val activeAnn = if (annResult is Result.Success) annResult.data else _uiState.value.activeAnnouncement
 
+            // Fetch login notification config
+            val loginNotifResult = backendRepository.fetchLoginNotificationConfig()
+            val loginNotif = if (loginNotifResult is Result.Success) loginNotifResult.data else _uiState.value.loginNotification
+
             _uiState.update {
                 it.copy(
                     dailyCycle = cycle,
@@ -172,6 +192,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     prizes = prizes,
                     activeCompetition = activeComp ?: it.activeCompetition,
                     activeAnnouncement = activeAnn,
+                    loginNotification = loginNotif,
                     currentUser = updatedUser,
                     isLoading = false
                 )

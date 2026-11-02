@@ -499,7 +499,22 @@ async function initDatabaseTables() {
     );`,
     `CREATE INDEX IF NOT EXISTS idx_reward_claims_user ON public.reward_claims(user_id, created_at DESC);`,
     `CREATE INDEX IF NOT EXISTS idx_reward_claims_status ON public.reward_claims(status, created_at DESC);`,
-    `CREATE INDEX IF NOT EXISTS idx_reward_claims_tracking ON public.reward_claims(tracking_code);`
+    `CREATE INDEX IF NOT EXISTS idx_reward_claims_tracking ON public.reward_claims(tracking_code);`,
+
+    // 24. Login Notification Settings Table
+    `CREATE TABLE IF NOT EXISTS public.login_notification_settings (
+      id TEXT PRIMARY KEY DEFAULT 'default',
+      is_visible BOOLEAN NOT NULL DEFAULT true,
+      badge_text TEXT NOT NULL DEFAULT 'سرویس اختصاصی مشترکین ایرانسل',
+      badge_icon TEXT NOT NULL DEFAULT 'verified',
+      main_title TEXT NOT NULL DEFAULT 'سامانه منحصرأ ویژه مشترکان ارجمند ایرانسل',
+      main_description TEXT NOT NULL DEFAULT 'با کمال احترام و افتخار، این سامانه منحصراً جهت حضور، رقابت و بهره‌مندی مشترکین گرامی و همراهان وفادار اپراتور ایرانسل طراحی گردیده است.',
+      warning_is_visible BOOLEAN NOT NULL DEFAULT true,
+      warning_title TEXT NOT NULL DEFAULT 'شرط الزامی: ورود با «اینترنت دیتای ایرانسل»',
+      warning_description TEXT NOT NULL DEFAULT 'لطفاً پیش از ورود، وای‌فای و فیلترشکن را خاموش نموده و از طریق اینترنت همراه سیم‌کارت ایرانسل متصل گردید.',
+      warning_icon TEXT NOT NULL DEFAULT 'signal_cellular_alt',
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );`
   ];
 
 
@@ -689,6 +704,19 @@ async function initDatabaseTables() {
     }
   } catch (err) {
     console.warn('[PostgreSQL Init Rewards Warning]', err.message);
+  }
+
+  // 27. Ensure default login notification settings exist
+  try {
+    const loginNotifCheck = await pool.query(`SELECT id FROM public.login_notification_settings WHERE id = 'default' LIMIT 1`);
+    if (loginNotifCheck.rows.length === 0) {
+      await pool.query(
+        `INSERT INTO public.login_notification_settings (id) VALUES ('default') ON CONFLICT DO NOTHING`
+      );
+      console.log('[PostgreSQL] Initial login notification settings seeded.');
+    }
+  } catch (err) {
+    console.warn('[PostgreSQL Init Login Notif Warning]', err.message);
   }
 
   console.log('[PostgreSQL] Database tables and schema verified/initialized.');
@@ -3576,6 +3604,76 @@ app.post('/api/user/feedback', requireUserAuth, ensureDatabaseReady, async (req,
 });
 
 // 404 Fallback for API Routes
+// ====================================================================
+// 12. Login Notification Config APIs (Public & Admin)
+// ====================================================================
+
+// Public API for the App
+app.get('/api/app/login-notification', ensureDatabaseReady, async (req, res) => {
+  try {
+    const result = await pool.query(`SELECT * FROM public.login_notification_settings WHERE id = 'default' LIMIT 1`);
+    if (result.rows.length === 0) {
+      return res.json({ success: true, data: null });
+    }
+    res.json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    console.error('[App Login Notif API Error]', err);
+    res.status(500).json({ success: false, error: "خطا در دریافت تنظیمات اطلاع‌رسانی." });
+  }
+});
+
+// Admin API: Get Current Settings
+app.get('/api/admin/login-notification', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
+  try {
+    const result = await pool.query(`SELECT * FROM public.login_notification_settings WHERE id = 'default' LIMIT 1`);
+    if (result.rows.length === 0) {
+      return res.json({ success: true, data: null });
+    }
+    res.json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    console.error('[Admin Login Notif API Error]', err);
+    res.status(500).json({ success: false, error: "خطا در دریافت تنظیمات مدیریت." });
+  }
+});
+
+// Admin API: Update Settings
+app.post('/api/admin/login-notification', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
+  try {
+    const { 
+      is_visible, badge_text, badge_icon, main_title, main_description, 
+      warning_is_visible, warning_title, warning_description, warning_icon 
+    } = req.body;
+
+    const result = await pool.query(`
+      UPDATE public.login_notification_settings 
+      SET is_visible = $1, badge_text = $2, badge_icon = $3, main_title = $4, main_description = $5, 
+          warning_is_visible = $6, warning_title = $7, warning_description = $8, warning_icon = $9, 
+          updated_at = NOW()
+      WHERE id = 'default'
+      RETURNING *
+    `, [
+      is_visible, badge_text, badge_icon, main_title, main_description, 
+      warning_is_visible, warning_title, warning_description, warning_icon
+    ]);
+
+    if (result.rowCount === 0) {
+      // Create if not exists (should not happen due to seeding)
+      const insertResult = await pool.query(`
+        INSERT INTO public.login_notification_settings 
+        (id, is_visible, badge_text, badge_icon, main_title, main_description, warning_is_visible, warning_title, warning_description, warning_icon)
+        VALUES ('default', $1, $2, $3, $4, $5, $6, $7, $8, $9)
+        RETURNING *
+      `, [is_visible, badge_text, badge_icon, main_title, main_description, warning_is_visible, warning_title, warning_description, warning_icon]);
+      return res.json({ success: true, data: insertResult.rows[0] });
+    }
+
+    res.json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    console.error('[Admin Update Login Notif API Error]', err);
+    res.status(500).json({ success: false, error: "خطا در بروزرسانی تنظیمات اطلاع‌رسانی." });
+  }
+});
+
 app.use('/api', (req, res) => {
   res.status(404).json({ success: false, error: `مسیر مورد نظر یافت نشد: ${req.originalUrl}` });
 });

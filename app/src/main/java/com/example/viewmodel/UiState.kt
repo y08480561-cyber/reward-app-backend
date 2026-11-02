@@ -87,6 +87,8 @@ data class MainUiState(
     // Feedback State
     val showFeedbackDialog: Boolean = false,
     val isSubmittingFeedback: Boolean = false,
-    val feedbackSuccessMessage: String? = null
+    val feedbackSuccessMessage: String? = null,
+    // Login Notification State
+    val loginNotification: com.example.model.LoginNotificationConfig = com.example.model.LoginNotificationConfig()
 )
 

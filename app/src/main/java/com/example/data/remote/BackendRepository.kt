@@ -917,6 +917,73 @@ class BackendRepository(
     }
 
     /**
+     * Fetch the Irancell login notification config from the app public API.
+     */
+    suspend fun fetchLoginNotificationConfig(): Result<com.example.model.LoginNotificationConfig> = withContext(Dispatchers.IO) {
+        val url = "${prefs.serverUrl.trimEnd('/')}/api/app/login-notification"
+        try {
+            val request = Request.Builder().url(url).get().build()
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (response.isSuccessful) {
+                    val json = JSONObject(body)
+                    val settingsObj = json.optJSONObject("settings")
+                    if (settingsObj != null) {
+                        val config = com.example.model.LoginNotificationConfig(
+                            id = settingsObj.optString("id", "default"),
+                            isVisible = settingsObj.optBoolean("is_visible", true),
+                            badgeText = settingsObj.optString("badge_text", "سرویس اختصاصی مشترکین ایرانسل"),
+                            badgeIcon = settingsObj.optString("badge_icon", "verified"),
+                            mainTitle = settingsObj.optString("main_title", "سامانه منحصرأ ویژه مشترکان ارجمند ایرانسل"),
+                            mainDescription = settingsObj.optString("main_description", ""),
+                            warningIsVisible = settingsObj.optBoolean("warning_is_visible", true),
+                            warningTitle = settingsObj.optString("warning_title", "شرط الزامی: ورود با «اینترنت دیتای ایرانسل»"),
+                            warningDescription = settingsObj.optString("warning_description", ""),
+                            warningIcon = settingsObj.optString("warning_icon", "signal_cellular_alt"),
+                            updatedAt = settingsObj.optLong("updated_at", System.currentTimeMillis())
+                        )
+                        prefs.cachedLoginNotificationJson = settingsObj.toString()
+                        Result.Success(config)
+                    } else {
+                        Result.Error("تنظیمات در پاسخ سرور یافت نشد.")
+                    }
+                } else {
+                    val cached = parseCachedLoginNotification()
+                    if (cached != null) Result.Success(cached)
+                    else Result.Error("خطا در دریافت تنظیمات ورود: ${response.code}")
+                }
+            }
+        } catch (e: Exception) {
+            val cached = parseCachedLoginNotification()
+            if (cached != null) Result.Success(cached)
+            else Result.Error("خطای شبکه در دریافت تنظیمات ورود: ${e.message}")
+        }
+    }
+
+    private fun parseCachedLoginNotification(): com.example.model.LoginNotificationConfig? {
+        val raw = prefs.cachedLoginNotificationJson
+        if (raw.isBlank()) return null
+        return try {
+            val settingsObj = JSONObject(raw)
+            com.example.model.LoginNotificationConfig(
+                id = settingsObj.optString("id", "default"),
+                isVisible = settingsObj.optBoolean("is_visible", true),
+                badgeText = settingsObj.optString("badge_text", "سرویس اختصاصی مشترکین ایرانسل"),
+                badgeIcon = settingsObj.optString("badge_icon", "verified"),
+                mainTitle = settingsObj.optString("main_title", "سامانه منحصرأ ویژه مشترکان ارجمند ایرانسل"),
+                mainDescription = settingsObj.optString("main_description", ""),
+                warningIsVisible = settingsObj.optBoolean("warning_is_visible", true),
+                warningTitle = settingsObj.optString("warning_title", "شرط الزامی: ورود با «اینترنت دیتای ایرانسل»"),
+                warningDescription = settingsObj.optString("warning_description", ""),
+                warningIcon = settingsObj.optString("warning_icon", "signal_cellular_alt"),
+                updatedAt = settingsObj.optLong("updated_at", System.currentTimeMillis())
+            )
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
      * Create a new support ticket via POST /api/support/tickets
      */
     suspend fun createSupportTicket(
