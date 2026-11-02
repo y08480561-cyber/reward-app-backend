@@ -471,6 +471,13 @@
             <span>فروشگاه و تراکنش‌ها</span>
           </div>
         </a>
+        <a class="sidebar-link" onclick="navigateTo('support')">
+          <div class="sidebar-link-content">
+            <i class="bi bi-headset"></i>
+            <span>پشتیبانی کاربران</span>
+          </div>
+          <span class="badge bg-danger rounded-pill" id="sidebarSupportBadge" style="display: none;">۰</span>
+        </a>
 
         <div class="nav-category-header">سیستم</div>
         <a class="sidebar-link" onclick="navigateTo('settings')">
@@ -938,6 +945,105 @@
         </section>
 
 
+
+        <!-- ============================================================== -->
+        <!-- SECTION 5: پشتیبانی (Support) -->
+        <!-- ============================================================== -->
+        <section id="section-support" class="admin-section">
+          <!-- Stat Cards Row -->
+          <div class="row g-3 mb-4">
+            <div class="col-sm-6 col-xl-3">
+              <div class="stat-card">
+                <div class="stat-card-icon bg-info bg-opacity-10 text-info">
+                  <i class="bi bi-chat-left-text-fill"></i>
+                </div>
+                <div class="text-secondary small fw-bold mb-1">کل تیکت‌ها</div>
+                <h3 id="supportCountTotal" class="gold-text mb-0">-</h3>
+              </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+              <div class="stat-card">
+                <div class="stat-card-icon bg-danger bg-opacity-10 text-danger">
+                  <i class="bi bi-exclamation-circle-fill"></i>
+                </div>
+                <div class="text-secondary small fw-bold mb-1">جدید / بی‌پاسخ</div>
+                <h3 id="supportCountNew" class="text-danger mb-0">-</h3>
+              </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+              <div class="stat-card">
+                <div class="stat-card-icon bg-warning bg-opacity-10 text-warning">
+                  <i class="bi bi-clock-history"></i>
+                </div>
+                <div class="text-secondary small fw-bold mb-1">در حال بررسی</div>
+                <h3 id="supportCountInProgress" class="text-warning mb-0">-</h3>
+              </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+              <div class="stat-card">
+                <div class="stat-card-icon bg-success bg-opacity-10 text-success">
+                  <i class="bi bi-check-all"></i>
+                </div>
+                <div class="text-secondary small fw-bold mb-1">پاسخ داده شده</div>
+                <h3 id="supportCountAnswered" class="text-success mb-0">-</h3>
+              </div>
+            </div>
+          </div>
+
+          <div class="card p-4 shadow">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4 pb-3 border-bottom border-secondary">
+              <div>
+                <h4 class="gold-text mb-1"><i class="bi bi-headset text-warning me-2"></i> مرکز پشتیبانی و تیکت‌ها</h4>
+                <p class="text-secondary small mb-0">فهرست پیام‌های دریافتی از کاربران و پاسخگویی آنلاین</p>
+              </div>
+              <div class="d-flex gap-2 flex-wrap">
+                <select id="supportStatusFilter" class="form-select form-select-sm form-select-dark" style="width: 140px;" onchange="filterSupportTickets()">
+                  <option value="ALL">همه وضعیت‌ها</option>
+                  <option value="NEW">جدید</option>
+                  <option value="IN_PROGRESS">در حال بررسی</option>
+                  <option value="ANSWERED">پاسخ داده شده</option>
+                  <option value="CLOSED">بسته شده</option>
+                </select>
+                <select id="supportCategoryFilter" class="form-select form-select-sm form-select-dark" style="width: 140px;" onchange="filterSupportTickets()">
+                  <option value="ALL">همه موضوعات</option>
+                  <option value="SCORES">امتیازها</option>
+                  <option value="ADS">تبلیغات</option>
+                  <option value="PRIZES">جوایز</option>
+                  <option value="PURCHASE">خرید</option>
+                  <option value="OTHER">سایر</option>
+                </select>
+                <div style="width: 200px;">
+                  <input type="text" id="supportSearchInput" class="form-control form-control-sm form-control-dark" placeholder="جستجو کد یا شماره..." oninput="filterSupportTickets()">
+                </div>
+                <button class="btn btn-sm btn-outline-warning" onclick="loadAdminSupportTickets()">
+                  <i class="bi bi-arrow-clockwise"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="mb-3 small text-secondary" id="supportFilterSummary">در حال دریافت آمار...</div>
+
+            <div class="table-responsive">
+              <table class="table table-dark table-hover table-striped rounded align-middle">
+                <thead>
+                  <tr class="text-secondary small">
+                    <th style="width: 110px;">کد پیگیری</th>
+                    <th>نام کاربر / موبایل</th>
+                    <th>دسته</th>
+                    <th>موضوع تیکت</th>
+                    <th>وضعیت</th>
+                    <th>آخرین پیام</th>
+                    <th>بروزرسانی</th>
+                    <th style="width: 100px;">عملیات</th>
+                  </tr>
+                </thead>
+                <tbody id="supportTicketsTbody">
+                  <tr><td colspan="8" class="text-center py-4 text-secondary">در حال بارگذاری تیکت‌های پشتیبانی...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
 
         <!-- ============================================================== -->
         <!-- SECTION 9: تنظیمات و دسترسی (Settings) -->
@@ -1409,6 +1515,7 @@
       'users': { title: 'مدیریت کاربران', icon: 'bi-people-fill' },
       'rewards_management': { title: 'جوایز و بنر هدیه', icon: 'bi-gift-fill' },
       'store': { title: 'فروشگاه و تراکنش‌ها', icon: 'bi-shop' },
+      'support': { title: 'پشتیبانی و تیکت‌ها', icon: 'bi-headset' },
       'settings': { title: 'تنظیمات پنل', icon: 'bi-gear-fill' }
     };
 
@@ -1453,6 +1560,8 @@
         loadRewardAppearance();
       } else if (sectionId === 'reward_claims') {
         loadRewardClaims();
+      } else if (sectionId === 'support') {
+        loadAdminSupportTickets();
       }
 
       // Close mobile sidebar if open
