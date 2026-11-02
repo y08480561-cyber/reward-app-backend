@@ -3503,14 +3503,14 @@
         });
         if (!res.ok) return;
         const data = await res.json();
-        if (data.success && data.settings) {
-          const s = data.settings;
-          document.getElementById('ln_isVisible').checked = s.is_visible;
+        const s = data.settings || data.data;
+        if (data.success && s) {
+          document.getElementById('ln_isVisible').checked = (s.is_visible !== false);
           document.getElementById('ln_badgeText').value = s.badge_text || '';
           document.getElementById('ln_badgeIcon').value = s.badge_icon || 'verified';
           document.getElementById('ln_mainTitle').value = s.main_title || '';
           document.getElementById('ln_mainDescription').value = s.main_description || '';
-          document.getElementById('ln_warningIsVisible').checked = s.warning_is_visible;
+          document.getElementById('ln_warningIsVisible').checked = (s.warning_is_visible !== false);
           document.getElementById('ln_warningTitle').value = s.warning_title || '';
           document.getElementById('ln_warningDescription').value = s.warning_description || '';
           document.getElementById('ln_warningIcon').value = s.warning_icon || 'signal_cellular_alt';

@@ -51,6 +51,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
 
     init {
+        val initialCachedLogin = backendRepository.parseCachedLoginNotification()
+        if (initialCachedLogin != null) {
+            _uiState.update { it.copy(loginNotification = initialCachedLogin) }
+        }
         checkSavedSession()
         observeTapsellAdState()
         startCycleCountdownTicker()
@@ -67,13 +71,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun checkSavedSession() {
+        val cachedLogin = backendRepository.parseCachedLoginNotification()
         if (!prefs.isLoggedIn || prefs.userId.isEmpty() || prefs.firstName == "کاربر" || prefs.phoneNumber == "09120000000") {
             // First time entry: clear dummy session and present AuthScreen so user enters their real details
             prefs.clearSession()
             _uiState.update {
                 it.copy(
                     currentUser = null,
-                    currentScreen = AppScreen.AUTH
+                    currentScreen = AppScreen.AUTH,
+                    loginNotification = cachedLogin ?: it.loginNotification
                 )
             }
             return
@@ -631,10 +637,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun logout() {
+        val currentLoginNotif = _uiState.value.loginNotification
+        val cachedLogin = backendRepository.parseCachedLoginNotification()
         prefs.clearSession()
         _uiState.update {
-            MainUiState(currentScreen = AppScreen.AUTH)
+            MainUiState(
+                currentScreen = AppScreen.AUTH,
+                loginNotification = cachedLogin ?: currentLoginNotif
+            )
         }
+        fetchLoginNotification()
     }
 
     private val _healthCheckResult = MutableStateFlow<com.example.data.remote.HealthCheckResult?>(null)

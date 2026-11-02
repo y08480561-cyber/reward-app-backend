@@ -929,7 +929,7 @@ class BackendRepository(
                 Log.d("BackendRepository", "Response code: ${response.code}, Body: $body")
                 if (response.isSuccessful) {
                     val json = JSONObject(body)
-                    val settingsObj = json.optJSONObject("data")
+                    val settingsObj = json.optJSONObject("data") ?: json.optJSONObject("settings")
                     if (settingsObj != null) {
                         val config = com.example.model.LoginNotificationConfig(
                             id = settingsObj.optString("id", "default"),
@@ -965,7 +965,7 @@ class BackendRepository(
         }
     }
 
-    private fun parseCachedLoginNotification(): com.example.model.LoginNotificationConfig? {
+    fun parseCachedLoginNotification(): com.example.model.LoginNotificationConfig? {
         val raw = prefs.cachedLoginNotificationJson
         if (raw.isBlank()) return null
         return try {

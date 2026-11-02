@@ -3613,9 +3613,10 @@ app.get('/api/app/login-notification', ensureDatabaseReady, async (req, res) => 
   try {
     const result = await pool.query(`SELECT * FROM public.login_notification_settings WHERE id = 'default' LIMIT 1`);
     if (result.rows.length === 0) {
-      return res.json({ success: true, data: null });
+      return res.json({ success: true, data: null, settings: null });
     }
-    res.json({ success: true, data: result.rows[0] });
+    const settings = result.rows[0];
+    res.json({ success: true, data: settings, settings });
   } catch (err) {
     console.error('[App Login Notif API Error]', err);
     res.status(500).json({ success: false, error: "خطا در دریافت تنظیمات اطلاع‌رسانی." });
@@ -3627,9 +3628,10 @@ app.get('/api/admin/login-notification', requireAdminAuth, ensureDatabaseReady, 
   try {
     const result = await pool.query(`SELECT * FROM public.login_notification_settings WHERE id = 'default' LIMIT 1`);
     if (result.rows.length === 0) {
-      return res.json({ success: true, data: null });
+      return res.json({ success: true, data: null, settings: null });
     }
-    res.json({ success: true, data: result.rows[0] });
+    const settings = result.rows[0];
+    res.json({ success: true, data: settings, settings });
   } catch (err) {
     console.error('[Admin Login Notif API Error]', err);
     res.status(500).json({ success: false, error: "خطا در دریافت تنظیمات مدیریت." });
@@ -3664,10 +3666,12 @@ app.post('/api/admin/login-notification', requireAdminAuth, ensureDatabaseReady,
         VALUES ('default', $1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING *
       `, [is_visible, badge_text, badge_icon, main_title, main_description, warning_is_visible, warning_title, warning_description, warning_icon]);
-      return res.json({ success: true, data: insertResult.rows[0] });
+      const created = insertResult.rows[0];
+      return res.json({ success: true, data: created, settings: created });
     }
 
-    res.json({ success: true, data: result.rows[0] });
+    const updated = result.rows[0];
+    res.json({ success: true, data: updated, settings: updated });
   } catch (err) {
     console.error('[Admin Update Login Notif API Error]', err);
     res.status(500).json({ success: false, error: "خطا در بروزرسانی تنظیمات اطلاع‌رسانی." });
