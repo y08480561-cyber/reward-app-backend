@@ -451,99 +451,48 @@
           </div>
         </a>
 
-        <div class="nav-category-header">مسابقات و کاربران</div>
+        <div class="nav-category-header">مدیریت محتوا</div>
         <a class="sidebar-link" onclick="navigateTo('users')">
           <div class="sidebar-link-content">
             <i class="bi bi-people-fill"></i>
             <span>مدیریت کاربران</span>
           </div>
         </a>
-        <a class="sidebar-link" onclick="navigateTo('competitions')">
-          <div class="sidebar-link-content">
-            <i class="bi bi-trophy-fill"></i>
-            <span>مسابقات و جوایز</span>
-          </div>
-        </a>
-        <a class="sidebar-link" onclick="navigateTo('announcements')">
-          <div class="sidebar-link-content">
-            <i class="bi bi-megaphone-fill"></i>
-            <span>اعلان‌های صفحه اصلی</span>
-          </div>
-        </a>
-        <a class="sidebar-link" onclick="navigateTo('ads')">
-          <div class="sidebar-link-content">
-            <i class="bi bi-play-circle-fill"></i>
-            <span>تبلیغات و امتیازها</span>
-          </div>
-        </a>
-
-        <div class="nav-category-header">ارتباطات و اعلان‌ها</div>
-        <a class="sidebar-link" onclick="navigateTo('support')">
-          <div class="sidebar-link-content">
-            <i class="bi bi-headset"></i>
-            <span>مرکز پشتیبانی</span>
-          </div>
-          <span class="badge bg-danger rounded-pill" id="sidebarSupportBadge" style="display: none;">۰</span>
-        </a>
-        <a class="sidebar-link" onclick="navigateTo('push')">
-          <div class="sidebar-link-content">
-            <i class="bi bi-bell-fill"></i>
-            <span>اعلان پوش (OneSignal)</span>
-          </div>
-        <div class="nav-category-header">ویترین جوایز و هدایا</div>
-        <a class="sidebar-link" onclick="navigateTo('rewards')">
+        <a class="sidebar-link" onclick="navigateTo('rewards_management')">
           <div class="sidebar-link-content">
             <i class="bi bi-gift-fill"></i>
-            <span>مدیریت جوایز و هدایا</span>
-          </div>
-        </a>
-        <a class="sidebar-link" onclick="navigateTo('rewards_appearance')">
-          <div class="sidebar-link-content">
-            <i class="bi bi-palette-fill"></i>
-            <span>تنظیمات ظاهر جوایز</span>
-          </div>
-        </a>
-        <a class="sidebar-link" onclick="navigateTo('reward_claims')">
-          <div class="sidebar-link-content">
-            <i class="bi bi-inbox-fill"></i>
-            <span>درخواست‌های دریافت جایزه</span>
+            <span>جوایز و بنر هدیه</span>
           </div>
           <span class="badge bg-danger rounded-pill" id="sidebarClaimsBadge">۰</span>
         </a>
-
-        <div class="nav-category-header">فروشگاه و درآمد</div>
         <a class="sidebar-link" onclick="navigateTo('store')">
           <div class="sidebar-link-content">
             <i class="bi bi-shop"></i>
-            <span>مدیریت فروشگاه و بسته‌ها</span>
+            <span>فروشگاه و تراکنش‌ها</span>
           </div>
-          <span class="badge bg-warning text-dark rounded-pill" id="sidebarStoreBadge">۴ بسته</span>
         </a>
 
-        <div class="nav-category-header">سیستم و تنظیمات</div>
-        <a class="sidebar-link" onclick="navigateTo('logs')">
-          <div class="sidebar-link-content">
-            <i class="bi bi-journal-text"></i>
-            <span>گزارش‌ها و سوابق</span>
-          </div>
-        </a>
+        <div class="nav-category-header">سیستم</div>
         <a class="sidebar-link" onclick="navigateTo('settings')">
           <div class="sidebar-link-content">
             <i class="bi bi-gear-fill"></i>
-            <span>تنظیمات و دسترسی</span>
+            <span>تنظیمات پنل</span>
           </div>
         </a>
       </div>
 
       <!-- Sidebar Footer -->
       <div class="sidebar-footer">
-        <div class="d-flex align-items-center justify-content-between">
+        <div class="d-flex align-items-center justify-content-between mb-3">
           <div class="d-flex align-items-center gap-2">
             <i class="bi bi-shield-check text-warning"></i>
             <span class="small text-secondary">وضعیت سرور:</span>
           </div>
           <span id="authStatusBadge" class="badge bg-secondary">در حال بررسی...</span>
         </div>
+        <button class="btn btn-sm btn-outline-danger w-100 fw-bold py-2" onclick="logoutAdmin()">
+          <i class="bi bi-box-arrow-right me-1"></i> خروج امن از پنل
+        </button>
       </div>
     </aside>
 
@@ -565,9 +514,6 @@
         </div>
 
         <div class="topbar-left">
-          <a href="/admin/users" class="btn btn-sm btn-outline-warning fw-bold px-3 py-1.5" title="مشاهده جدول مستقل کاربران">
-            <i class="bi bi-table me-1"></i> جدول کاربران
-          </a>
           <button id="refreshBtn" class="btn btn-sm btn-warning fw-bold px-3 py-1.5" onclick="loadDashboard()">
             <span id="refreshSpinner" class="spinner-border spinner-border-sm d-none me-1" role="status"></span>
             <i class="bi bi-arrow-clockwise me-1"></i> به‌روزرسانی
@@ -581,34 +527,7 @@
         <!-- Irancell Cellular & Tapsell Rewarded Ads System Alert Banner   -->
         <!-- Visible across all 9 dashboard sections                         -->
         <!-- ============================================================== -->
-        <div class="irancell-alert-banner p-3 p-md-3 mb-4">
-          <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3">
-            <div class="d-flex align-items-start gap-3">
-              <div class="rounded-3 p-2 d-flex align-items-center justify-content-center flex-shrink-0" style="background: rgba(255, 183, 3, 0.12); border: 1px solid rgba(255, 183, 3, 0.35); width: 44px; height: 44px;">
-                <i class="bi bi-broadcast text-warning fs-5"></i>
-              </div>
-              <div>
-                <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
-                  <span class="badge bg-warning text-dark fw-bold px-2 py-0.5" style="font-size: 11px;">
-                    <i class="bi bi-shield-lock-fill me-1"></i>الزام فنی شبکه و تبلیغات
-                  </span>
-                  <span class="badge bg-dark border border-secondary text-light px-2 py-0.5" style="font-size: 11px;">
-                    <span class="pulse-dot me-1"></span>شبکه دیتای ایرانسل (Irancell)
-                  </span>
-                  <h6 class="mb-0 text-white fw-bold">اطلاعیه مهم: بهینه‌سازی سرویس و اعتبارسنجی تبلیغات جایزه‌دار تپسل</h6>
-                </div>
-                <p class="mb-0 text-light small opacity-90" style="line-height: 1.7; font-size: 12.5px;">
-                  جهت اطمینان از عملکرد صحیح و پایدار سامانه، اعتبارسنجی دقیق نشست‌های کاربری و دریافت بدون خطای <strong>تبلیغات جایزه‌دار تپسل (Tapsell Rewarded Ads)</strong>، کاربران و اپراتورهای گرامی حتماً باید از <strong>شبکه اینترنت همراه (دیتای سیم‌کارت ایرانسل)</strong> استفاده نمایند و کلیه فیلترشکن‌ها و پروکسی‌ها را خاموش نگه دارند تا آی‌پی (IP) اتصال، منحصراً روی رنج شبکه رسمی ایرانسل ثبت و شناسایی شود.
-                </p>
-              </div>
-            </div>
-            <div class="d-flex align-items-center gap-2 flex-shrink-0 align-self-end align-self-md-center">
-              <span class="badge text-warning bg-black bg-opacity-40 border border-warning border-opacity-25 px-3 py-2 fw-normal" style="font-size: 11px;">
-                <i class="bi bi-reception-4 me-1"></i> IP مجاز: ایرانسل
-              </span>
-            </div>
-          </div>
-        </div>
+
 
         <!-- Global Alert Box -->
         <div id="alertBox" class="alert alert-danger d-none shadow-sm mb-4" role="alert"></div>
@@ -633,99 +552,81 @@
                 <div class="stat-card-icon bg-warning bg-opacity-10 text-warning">
                   <i class="bi bi-star-fill"></i>
                 </div>
-                <div class="text-secondary small fw-bold mb-1">مجموع کل امتیازها</div>
+                <div class="text-secondary small fw-bold mb-1">مجموع امتیازات دوره</div>
                 <h3 id="totalScores" class="gold-text mb-0">-</h3>
               </div>
             </div>
             <div class="col-sm-6 col-xl-3">
               <div class="stat-card">
                 <div class="stat-card-icon bg-success bg-opacity-10 text-success">
-                  <i class="bi bi-play-circle-fill"></i>
+                  <i class="bi bi-cart-check-fill"></i>
                 </div>
-                <div class="text-secondary small fw-bold mb-1">تبلیغات تاییدشده</div>
-                <h3 id="totalAds" class="gold-text mb-0">-</h3>
+                <div class="text-secondary small fw-bold mb-1">تراکنش‌های فروشگاه</div>
+                <h3 id="totalTransactions" class="gold-text mb-0">-</h3>
               </div>
             </div>
             <div class="col-sm-6 col-xl-3">
               <div class="stat-card">
-                <div class="stat-card-icon bg-primary bg-opacity-10 text-primary">
-                  <i class="bi bi-archive-fill"></i>
+                <div class="stat-card-icon bg-danger bg-opacity-10 text-danger">
+                  <i class="bi bi-gift-fill"></i>
                 </div>
-                <div class="text-secondary small fw-bold mb-1">دوره‌های آرشیو شده</div>
-                <h3 id="archivedCompsCount" class="text-white mb-0">-</h3>
+                <div class="text-secondary small fw-bold mb-1">درخواست‌های جایزه</div>
+                <h3 id="totalClaims" class="gold-text mb-0">-</h3>
               </div>
             </div>
           </div>
 
           <!-- Quick Shortcuts Grid -->
-          <h6 class="text-secondary fw-bold mb-3"><i class="bi bi-grid-fill me-1"></i> دسترسی سریع به بخش‌های اصلی</h6>
+          <h6 class="text-secondary fw-bold mb-3"><i class="bi bi-grid-fill me-1"></i> دسترسی سریع</h6>
           <div class="row g-3 mb-4">
-            <div class="col-md-4 col-sm-6">
-              <div class="shortcut-card" onclick="navigateTo('competitions')">
-                <div class="shortcut-icon"><i class="bi bi-trophy-fill"></i></div>
-                <div>
-                  <div class="fw-bold">مدیریت مسابقات</div>
-                  <small class="text-secondary">شروع دوره جدید، جوایز و آرشیو</small>
-                </div>
-              </div>
-            </div>
-            <div class="col-md-4 col-sm-6">
-              <div class="shortcut-card" onclick="navigateTo('announcements')">
-                <div class="shortcut-icon"><i class="bi bi-megaphone-fill"></i></div>
-                <div>
-                  <div class="fw-bold">پیام صفحه اصلی</div>
-                  <small class="text-secondary">ویرایش و انتشار اطلاعیه زنده</small>
-                </div>
-              </div>
-            </div>
-            <div class="col-md-4 col-sm-6">
-              <div class="shortcut-card" onclick="navigateTo('support')">
-                <div class="shortcut-icon"><i class="bi bi-headset"></i></div>
-                <div>
-                  <div class="fw-bold">پشتیبانی کاربران</div>
-                  <small class="text-secondary">مشاهده و پاسخ‌گویی به تیکت‌ها</small>
-                </div>
-              </div>
-            </div>
-            <div class="col-md-4 col-sm-6">
+            <div class="col-md-3 col-sm-6">
               <div class="shortcut-card" onclick="navigateTo('users')">
                 <div class="shortcut-icon"><i class="bi bi-people-fill"></i></div>
                 <div>
-                  <div class="fw-bold">فهرست و امتیاز کاربران</div>
-                  <small class="text-secondary">جستجو، رتبه‌بندی و ریست چرخه</small>
+                  <div class="fw-bold">کاربران</div>
+                  <small class="text-secondary">جستجو و امتیازها</small>
                 </div>
               </div>
             </div>
-            <div class="col-md-4 col-sm-6">
-              <div class="shortcut-card" onclick="navigateTo('push')">
-                <div class="shortcut-icon"><i class="bi bi-bell-fill"></i></div>
+            <div class="col-md-3 col-sm-6">
+              <div class="shortcut-card" onclick="navigateTo('store')">
+                <div class="shortcut-icon"><i class="bi bi-shop"></i></div>
                 <div>
-                  <div class="fw-bold">ارسال اعلان پوش</div>
-                  <small class="text-secondary">ارسال نوتیفیکیشن همگانی وان‌سیگنال</small>
+                  <div class="fw-bold">فروشگاه</div>
+                  <small class="text-secondary">تراکنش‌ها و قیمت</small>
                 </div>
               </div>
             </div>
-            <div class="col-md-4 col-sm-6">
+            <div class="col-md-3 col-sm-6">
+              <div class="shortcut-card" onclick="navigateTo('rewards_management')">
+                <div class="shortcut-icon"><i class="bi bi-gift-fill"></i></div>
+                <div>
+                  <div class="fw-bold">جوایز</div>
+                  <small class="text-secondary">بنر و هدایا</small>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
               <div class="shortcut-card" onclick="navigateTo('settings')">
-                <div class="shortcut-icon"><i class="bi bi-shield-lock-fill"></i></div>
+                <div class="shortcut-icon"><i class="bi bi-gear-fill"></i></div>
                 <div>
-                  <div class="fw-bold">تنظیمات امنیت</div>
-                  <small class="text-secondary">مدیریت کلید احراز هویت ADMIN_KEY</small>
+                  <div class="fw-bold">تنظیمات</div>
+                  <small class="text-secondary">امنیت پنل</small>
                 </div>
               </div>
             </div>
           </div>
 
           <!-- Active Highlights (Competition & Announcement Summary) -->
+          <!-- Active Highlights (Competition Status) -->
           <div class="row g-4">
-            <div class="col-lg-6">
-              <div class="card p-3 h-100 shadow">
+            <div class="col-lg-12">
+              <div class="card p-3 shadow">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                   <div class="d-flex align-items-center gap-2">
                     <i class="bi bi-trophy-fill text-warning fs-5"></i>
-                    <h6 class="gold-text mb-0">وضعیت مسابقه دوره جاری</h6>
+                    <h6 class="gold-text mb-0">وضعیت دوره فعال مسابقه</h6>
                   </div>
-                  <button class="btn btn-sm btn-outline-warning" onclick="navigateTo('competitions')">مدیریت کامل</button>
                 </div>
                 <div class="p-3 rounded mb-2" style="background-color: #0E1E36; border: 1px solid var(--border-color);">
                   <div class="d-flex justify-content-between align-items-center mb-1">
@@ -734,26 +635,6 @@
                   </div>
                   <h5 class="text-white mb-2" id="dashCompTitle">در حال بارگذاری...</h5>
                   <div class="small text-secondary">مهلت پایان: <span class="text-warning fw-bold" id="dashCompEndedAt">-</span></div>
-                </div>
-              </div>
-            </div>
-
-            <div class="col-lg-6">
-              <div class="card p-3 h-100 shadow">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                  <div class="d-flex align-items-center gap-2">
-                    <i class="bi bi-megaphone-fill text-info fs-5"></i>
-                    <h6 class="text-info fw-bold mb-0">اطلاعیه فعال بالای اپلیکیشن</h6>
-                  </div>
-                  <button class="btn btn-sm btn-outline-info" onclick="navigateTo('announcements')">ویرایش پیام</button>
-                </div>
-                <div class="p-3 rounded mb-2" style="background-color: #0E1E36; border: 1px solid var(--border-color);">
-                  <div class="d-flex justify-content-between align-items-center mb-1">
-                    <span class="badge bg-info text-dark fw-bold" id="dashAnnType">اطلاعیه</span>
-                    <span class="badge bg-secondary" id="dashAnnStatus">-</span>
-                  </div>
-                  <h6 class="gold-text mb-1" id="dashAnnTitle">-</h6>
-                  <p class="text-white small mb-0 text-truncate" id="dashAnnContent">-</p>
                 </div>
               </div>
             </div>
@@ -800,241 +681,6 @@
           </div>
         </section>
 
-        <!-- ============================================================== -->
-        <!-- SECTION 3: مسابقات و جوایز (Competitions & Prizes) -->
-        <!-- ============================================================== -->
-        <section id="section-competitions" class="admin-section">
-          <!-- Active Competition Banner -->
-          <div class="card comp-banner p-4 mb-4 shadow">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
-              <div class="d-flex align-items-center gap-3">
-                <div class="bg-warning text-dark rounded-circle p-3 d-flex align-items-center justify-content-center" style="width: 54px; height: 54px;">
-                  <i class="bi bi-trophy-fill fs-3"></i>
-                </div>
-                <div>
-                  <div class="d-flex align-items-center gap-2">
-                    <span class="badge bg-warning text-dark fw-bold" id="activeCompNumber">دوره فعال</span>
-                    <span class="badge bg-success"><i class="bi bi-circle-fill" style="font-size: 8px;"></i> در حال برگزاری</span>
-                  </div>
-                  <h4 class="gold-text mb-0 mt-1" id="activeCompTitle">در حال بارگذاری...</h4>
-                </div>
-              </div>
-              <button class="btn btn-danger fw-bold px-4 py-2" onclick="openStartCompModal()">
-                <i class="bi bi-arrow-repeat me-1"></i> شروع مسابقه جدید و آرشیو دوره
-              </button>
-            </div>
-            <div class="row g-3 pt-3 border-top border-secondary">
-              <div class="col-md-6">
-                <span class="text-secondary small">تاریخ و ساعت آغاز دوره:</span>
-                <div class="fw-bold text-white fs-6" id="activeCompStartedAt">-</div>
-              </div>
-              <div class="col-md-6">
-                <span class="text-secondary small">مهلت پایان مسابقه:</span>
-                <div class="fw-bold text-warning fs-6" id="activeCompEndedAt">-</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Archived Competitions Table -->
-          <div class="card p-4 shadow">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-              <div>
-                <h5 class="gold-text mb-1"><i class="bi bi-award-fill text-warning me-2"></i> آرشیو مسابقات پایان‌یافته</h5>
-                <p class="text-secondary small mb-0">سوابق تاریخی، نتایج رسمی رتبه‌بندی و کارنامه برندگان</p>
-              </div>
-              <span class="badge bg-dark border border-secondary p-2">نتایج رسمی PostgreSQL</span>
-            </div>
-            <div class="table-responsive">
-              <table class="table table-dark table-hover table-striped rounded align-middle">
-                <thead>
-                  <tr class="text-secondary small">
-                    <th>شماره دوره</th>
-                    <th>عنوان مسابقه</th>
-                    <th>تعداد شرکت‌کنندگان</th>
-                    <th>مجموع امتیازات</th>
-                    <th>تاریخ پایان</th>
-                    <th>مشاهده کارنامه</th>
-                  </tr>
-                </thead>
-                <tbody id="archivedCompsTbody">
-                  <tr><td colspan="6" class="text-center py-4 text-secondary">در حال دریافت آرشیو دوره‌ها...</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <!-- ============================================================== -->
-        <!-- SECTION 4: اعلان‌های صفحه اصلی (Home Announcements) -->
-        <!-- ============================================================== -->
-        <section id="section-announcements" class="admin-section">
-          <!-- Active Announcement Card -->
-          <div class="card ann-banner p-4 mb-4 shadow" id="activeAnnCard">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-              <div class="d-flex align-items-center gap-2 flex-wrap">
-                <i class="bi bi-megaphone-fill text-info fs-5"></i>
-                <span class="fw-bold text-white fs-5">پیام و اطلاعیه فعال در بالای صفحه اصلی اپلیکیشن</span>
-                <span id="activeAnnTypeBadge" class="badge bg-info text-dark fw-bold">-</span>
-                <span id="activeAnnStatusBadge" class="badge bg-success">-</span>
-              </div>
-              <div class="d-flex gap-2 flex-wrap">
-                <button id="toggleActiveAnnBtn" class="btn btn-sm btn-outline-danger" onclick="toggleCurrentActiveAnn()">
-                  <i class="bi bi-eye-slash"></i> غیرفعال‌سازی
-                </button>
-                <button class="btn btn-sm btn-outline-warning" onclick="editCurrentActiveAnn()">
-                  <i class="bi bi-pencil-square"></i> ویرایش پیام فعال
-                </button>
-                <button class="btn btn-sm btn-gold" onclick="openAnnouncementModal()">
-                  <i class="bi bi-plus-circle"></i> ایجاد پیام جدید
-                </button>
-              </div>
-            </div>
-            <div class="p-3 rounded mb-3" style="background-color: rgba(11, 25, 44, 0.7); border: 1px solid #2E5077;">
-              <h5 class="gold-text mb-2" id="activeAnnTitle">-</h5>
-              <p class="text-white mb-0" id="activeAnnContent" style="white-space: pre-line;">-</p>
-            </div>
-            <div class="row g-2 text-secondary small">
-              <div class="col-md-6">آخرین به‌روزرسانی: <span class="text-white" id="activeAnnStartsAt">-</span></div>
-              <div class="col-md-6">مهلت پایان اعلام‌شده: <span class="text-warning" id="activeAnnEndsAt">-</span></div>
-            </div>
-          </div>
-
-          <!-- Announcements History Table -->
-          <div class="card p-4 shadow">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-              <h5 class="gold-text mb-0"><i class="bi bi-collection-fill me-2"></i> سوابق تمام پیام‌های ثبت‌شده</h5>
-              <button class="btn btn-sm btn-outline-warning" onclick="openAnnouncementModal()">
-                <i class="bi bi-plus-lg me-1"></i> پیام جدید
-              </button>
-            </div>
-            <div class="table-responsive">
-              <table class="table table-dark table-hover table-striped rounded align-middle">
-                <thead>
-                  <tr class="text-secondary small">
-                    <th>عنوان پیام</th>
-                    <th>نوع پیام</th>
-                    <th>وضعیت انتشار</th>
-                    <th>مهلت پایان</th>
-                    <th>تاریخ ویرایش</th>
-                    <th>عملیات</th>
-                  </tr>
-                </thead>
-                <tbody id="announcementsTbody">
-                  <tr><td colspan="6" class="text-center py-3 text-secondary">در حال بارگذاری پیام‌ها...</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <!-- ============================================================== -->
-        <!-- SECTION 5: تبلیغات و امتیازها (Ads & Points) -->
-        <!-- ============================================================== -->
-        <section id="section-ads" class="admin-section">
-          <div class="card p-4 mb-4 shadow">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
-              <div>
-                <h4 class="gold-text mb-1"><i class="bi bi-play-circle-fill text-success me-2"></i> نشست‌های زنده تماشای تبلیغ</h4>
-                <p class="text-secondary small mb-0">رویدادهای تاییدشده سرور با توکن‌های ضدتقلب (Nonce) و اختصاص امتیاز</p>
-              </div>
-              <span class="badge bg-success bg-opacity-25 text-success border border-success p-2">
-                <i class="bi bi-shield-check me-1"></i> ضد تقلب فعال
-              </span>
-            </div>
-
-            <div class="table-responsive">
-              <table class="table table-dark table-hover table-striped rounded align-middle">
-                <thead>
-                  <tr class="text-secondary small">
-                    <th>شناسه نشست</th>
-                    <th>شماره مربع</th>
-                    <th>کاربر</th>
-                    <th>مدت زمان</th>
-                    <th>وضعیت تایید</th>
-                    <th>توکن یکتا (Token)</th>
-                  </tr>
-                </thead>
-                <tbody id="sessionsTbody">
-                  <tr><td colspan="6" class="text-center py-4 text-secondary">در حال دریافت رویدادها...</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <!-- ============================================================== -->
-        <!-- SECTION 6: پشتیبانی (Support Tickets) -->
-        <!-- ============================================================== -->
-        <section id="section-support" class="admin-section">
-          <div class="card p-4 shadow" style="border: 1px solid #0284C7; background-color: #12253B;">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-              <div>
-                <h4 class="text-info fw-bold mb-1"><i class="bi bi-headset me-2"></i> مرکز پشتیبانی و گفت‌وگو با کاربران</h4>
-                <p class="text-secondary small mb-0">بررسی، اولویت‌بندی و ارسال پاسخ مستقیم مدیریت به تیکت‌ها</p>
-              </div>
-              <div class="d-flex align-items-center gap-2 flex-wrap">
-                <span class="badge bg-secondary p-2">کل: <strong id="supportCountTotal">0</strong></span>
-                <span class="badge bg-danger p-2">جدید: <strong id="supportCountNew">0</strong></span>
-                <span class="badge bg-warning text-dark p-2">در بررسی: <strong id="supportCountInProgress">0</strong></span>
-                <span class="badge bg-success p-2">پاسخ داده شد: <strong id="supportCountAnswered">0</strong></span>
-              </div>
-            </div>
-
-            <!-- Filters & Search -->
-            <div class="row g-2 mb-3">
-              <div class="col-md-5">
-                <input type="text" id="supportSearchInput" class="form-control form-control-sm form-control-dark" placeholder="جستجوی کد پیگیری، شماره موبایل، نام یا متن..." oninput="filterSupportTickets()">
-              </div>
-              <div class="col-md-3">
-                <select id="supportStatusFilter" class="form-select form-select-sm form-select-dark" onchange="filterSupportTickets()">
-                  <option value="ALL">همه وضعیت‌ها</option>
-                  <option value="NEW">جدید / بی‌پاسخ</option>
-                  <option value="IN_PROGRESS">در حال بررسی</option>
-                  <option value="ANSWERED">پاسخ داده شد</option>
-                  <option value="CLOSED">بسته شده</option>
-                </select>
-              </div>
-              <div class="col-md-2">
-                <select id="supportCategoryFilter" class="form-select form-select-sm form-select-dark" onchange="filterSupportTickets()">
-                  <option value="ALL">همه دسته‌ها</option>
-                  <option value="SCORES">امتیازها</option>
-                  <option value="ADS">تبلیغات</option>
-                  <option value="PRIZES">جوایز</option>
-                  <option value="MEMBERSHIP">عضویت</option>
-                  <option value="PURCHASE">خرید</option>
-                  <option value="LOGIN">مشکل ورود</option>
-                  <option value="OTHER">سایر</option>
-                </select>
-              </div>
-              <div class="col-md-2 d-flex align-items-center justify-content-end">
-                <span class="text-secondary small" id="supportFilterSummary">-</span>
-              </div>
-            </div>
-
-            <div class="table-responsive">
-              <table class="table table-dark table-hover table-striped rounded align-middle">
-                <thead>
-                  <tr class="text-secondary small">
-                    <th>کد پیگیری</th>
-                    <th>کاربر</th>
-                    <th>دسته‌بندی</th>
-                    <th>موضوع تیکت</th>
-                    <th>وضعیت</th>
-                    <th>آخرین پیام</th>
-                    <th>تاریخ به‌روزرسانی</th>
-                    <th>عملیات</th>
-                  </tr>
-                </thead>
-                <tbody id="supportTicketsTbody">
-                  <tr><td colspan="8" class="text-center py-4 text-secondary">در حال دریافت تیکت‌ها...</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <!-- ============================================================== -->
-        <!-- SECTION: فروشگاه و بسته‌های بازگشایی مایکت (In-App Store) -->
         <!-- ============================================================== -->
         <section id="section-store" class="admin-section">
           <!-- Overview Metric Cards -->
@@ -1153,271 +799,146 @@
         </section>
 
         <!-- ============================================================== -->
-        <!-- SECTION: ویترین و مدیریت جوایز (Rewards Management) -->
+        <!-- Unified Rewards Management Section -->
         <!-- ============================================================== -->
-        <section id="section-rewards" class="admin-section">
-          <!-- Card 1: Gift Banner Quick Overview -->
-          <div class="card p-3 shadow mb-4" style="border: 1px solid var(--border-color); background-color: #12253B;">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
-              <div class="d-flex align-items-center gap-3">
-                <div class="p-2 rounded bg-dark border border-secondary text-warning fs-3">
-                  <i class="bi bi-gift-fill"></i>
+        <section id="section-rewards_management" class="admin-section">
+          <div class="card p-0 shadow mb-4" style="border: 1px solid var(--border-color); background-color: #12253B; overflow: hidden;">
+            <!-- Custom Navigation Tabs -->
+            <ul class="nav nav-tabs nav-justified border-0 bg-dark bg-opacity-25" id="rewardsTabs" role="tablist">
+              <li class="nav-item" role="presentation">
+                <button class="nav-link active text-white py-3 fw-bold" id="tab-rewards-list" data-bs-toggle="tab" data-bs-target="#panel-rewards-list" type="button" role="tab" onclick="loadRewardsData()">
+                  <i class="bi bi-list-stars me-1"></i> فهرست هدایا
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link text-white py-3 fw-bold" id="tab-rewards-banner" data-bs-toggle="tab" data-bs-target="#panel-rewards-banner" type="button" role="tab" onclick="loadRewardAppearance()">
+                  <i class="bi bi-palette-fill me-1"></i> بنر و ظاهر ویترین
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link text-white py-3 fw-bold" id="tab-rewards-claims" data-bs-toggle="tab" data-bs-target="#panel-rewards-claims" type="button" role="tab" onclick="loadRewardClaims()">
+                  <i class="bi bi-inbox-fill me-1"></i> درخواست‌های دریافتی
+                  <span class="badge bg-danger rounded-pill ms-1" id="tabClaimsBadge">۰</span>
+                </button>
+              </li>
+            </ul>
+
+            <div class="tab-content p-4" id="rewardsTabsContent">
+              <!-- Tab 1: Rewards List -->
+              <div class="tab-pane fade show active" id="panel-rewards-list" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                  <div>
+                    <h5 class="gold-text mb-1">تعریف و مدیریت کالاهای جایزه</h5>
+                    <p class="text-secondary small mb-0">تعیین امتیاز لازم، موجودی انبار و تصویر جوایز برای نمایش در اپلیکیشن</p>
+                  </div>
+                  <div class="d-flex gap-2">
+                    <button class="btn btn-outline-info btn-sm" onclick="loadRewardsData()"><i class="bi bi-arrow-clockwise me-1"></i> بروزرسانی</button>
+                    <button class="btn btn-warning btn-sm fw-bold" onclick="openAddRewardModal()"><i class="bi bi-plus-circle-fill me-1"></i> افزودن جایزه جدید</button>
+                  </div>
                 </div>
-                <div>
-                  <h5 class="gold-text mb-1">تنظیمات و بارگذاری بنر هدیه جوایز</h5>
-                  <p class="text-secondary small mb-0">برای بارگذاری تصویر بنر جدید از کامپیوتر یا تغییر عنوان و توضیحات، به بخش تنظیمات ظاهر مراجعه کنید.</p>
+                <div class="table-responsive">
+                  <table class="table table-hover align-middle mb-0 text-white">
+                    <thead class="table-dark">
+                      <tr class="small text-secondary">
+                        <th>تصویر & عنوان جایزه</th>
+                        <th>دسته‌بندی</th>
+                        <th>امتیاز لازم</th>
+                        <th>موجودی</th>
+                        <th>ویژه</th>
+                        <th>وضعیت</th>
+                        <th>عملیات</th>
+                      </tr>
+                    </thead>
+                    <tbody id="rewardsTbody"></tbody>
+                  </table>
                 </div>
               </div>
-              <button class="btn btn-gold btn-sm fw-bold px-3 py-2" onclick="navigateTo('rewards_appearance')">
-                <i class="bi bi-palette-fill me-1"></i> ورود به بخش بارگذاری و تنظیمات بنر
-              </button>
-            </div>
-          </div>
 
-          <!-- Card 2: Rewards List -->
-          <div class="card p-4 shadow mb-4" style="border: 1px solid var(--border-color); background-color: #12253B;">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-              <div>
-                <h4 class="gold-text mb-1"><i class="bi bi-list-stars me-2"></i> فهرست جوایز تعریفی</h4>
-                <p class="text-secondary small mb-0">تعریف جوایز، تعیین امتیاز لازم، موجودی انبار، تصویر و دسته‌بندی جوایز</p>
-              </div>
-              <div class="d-flex gap-2">
-                <button class="btn btn-outline-info btn-sm" onclick="loadRewardsData()"><i class="bi bi-arrow-clockwise me-1"></i> بروزرسانی</button>
-                <button class="btn btn-warning btn-sm fw-bold" onclick="openAddRewardModal()"><i class="bi bi-plus-circle-fill me-1"></i> افزودن جایزه جدید</button>
-              </div>
-            </div>
-
-            <div class="table-responsive">
-              <table class="table table-hover align-middle mb-0 text-white">
-                <thead class="table-dark" style="border-bottom: 2px solid var(--border-color);">
-                  <tr class="small text-secondary">
-                    <th>تصویر & عنوان جایزه</th>
-                    <th>دسته‌بندی</th>
-                    <th>امتیاز لازم</th>
-                    <th>موجودی انبار</th>
-                    <th>ویژه (Featured)</th>
-                    <th>وضعیت نمایش</th>
-                    <th>عملیات</th>
-                  </tr>
-                </thead>
-                <tbody id="rewardsTbody">
-                  <tr><td colspan="7" class="text-center text-secondary py-4"><span class="spinner-border spinner-border-sm me-2"></span> در حال بارگذاری جوایز...</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <!-- ============================================================== -->
-        <!-- SECTION: تنظیمات ظاهر ویترین جوایز (Rewards Appearance) -->
-        <!-- ============================================================== -->
-        <section id="section-rewards_appearance" class="admin-section">
-          <div class="card p-4 shadow" style="border: 1px solid var(--gold-primary); background-color: #12253B;">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-              <div>
-                <h4 class="gold-text mb-1"><i class="bi bi-gift-fill me-2"></i> مدیریت بنر هدیه و ظاهر بخش جوایز</h4>
-                <p class="text-secondary small mb-0">بارگذاری مستقیم تصویر بنر از کامپیوتر، تنظیم عنوان، زیرعنوان، رنگ تم و وضعیت فعال‌بودن بنر در اپلیکیشن</p>
-              </div>
-              <button class="btn btn-outline-info btn-sm" onclick="loadRewardAppearance()"><i class="bi bi-arrow-clockwise me-1"></i> خواندن مجدد اطلاعات</button>
-            </div>
-
-            <form onsubmit="saveRewardAppearance(event)">
-              <div class="row g-3">
-                <div class="col-md-6">
-                  <label class="form-label text-secondary small fw-bold">عنوان بنر هدیه (Hero Title):</label>
-                  <input type="text" id="rewAppHeroTitle" class="form-control form-control-dark" placeholder="مثال: اینترنت ۲۰ گیگ برنده شو!" required>
-                </div>
-                <div class="col-md-6">
-                  <label class="form-label text-secondary small fw-bold">رنگ تم اصلی (Primary Accent Color):</label>
-                  <input type="color" id="rewAppColor" class="form-control form-control-color w-100 bg-dark border-secondary" style="height: 38px;" value="#10B981">
-                </div>
-                <div class="col-12">
-                  <label class="form-label text-secondary small fw-bold">زیرعنوان و توضیحات بنر هدیه:</label>
-                  <input type="text" id="rewAppHeroSubtitle" class="form-control form-control-dark" placeholder="توضیحات کوتاه هدیه ویژه...">
-                </div>
-                <div class="col-12">
-                  <label class="form-label text-secondary small fw-bold">تصویر بنر هدیه (بارگذاری مستقیم از کامپیوتر):</label>
-                  <div class="d-flex flex-column gap-3 p-3 rounded-3" style="background: rgba(15, 23, 42, 0.6); border: 1px dashed var(--border-color);">
-                    <!-- Hidden file input & stored image url -->
-                    <input type="file" id="rewAppImageFile" accept="image/jpeg,image/png,image/webp" class="d-none" onchange="handleBannerImageSelect(event)">
-                    <input type="hidden" id="rewAppBannerUrl" value="">
-                    
-                    <!-- Preview Box with exact 3:2 aspect ratio -->
-                    <div id="rewAppPreviewContainer" class="position-relative rounded-3 overflow-hidden d-none mx-auto" style="width: 100%; max-width: 520px; aspect-ratio: 3/2; background: #0b1329; border: 1.5px solid var(--gold-primary);">
-                      <img id="rewAppPreviewImg" src="" alt="پیش‌نمایش بنر هدیه" class="w-100 h-100" style="object-fit: cover;">
-                      <div class="position-absolute top-0 end-0 p-2 d-flex gap-2">
-                        <button type="button" class="btn btn-warning btn-sm rounded-pill shadow px-3 fw-bold" onclick="document.getElementById('rewAppImageFile').click()" title="تغییر تصویر">
-                          <i class="bi bi-arrow-repeat me-1"></i> تغییر تصویر
-                        </button>
-                        <button type="button" class="btn btn-danger btn-sm rounded-circle shadow" onclick="removeBannerImage()" title="حذف تصویر">
-                          <i class="bi bi-trash-fill"></i>
-                        </button>
-                      </div>
+              <!-- Tab 2: Banner Settings -->
+              <div class="tab-pane fade" id="panel-rewards-banner" role="tabpanel">
+                <h5 class="gold-text mb-3">تنظیمات بصری و بنر اصلی جوایز</h5>
+                <form onsubmit="saveRewardAppearance(event)">
+                  <div class="row g-3">
+                    <div class="col-md-8">
+                      <label class="form-label text-secondary small fw-bold">عنوان بنر هدیه (Hero Title):</label>
+                      <input type="text" id="rewAppHeroTitle" class="form-control form-control-dark mb-3" required>
+                      <label class="form-label text-secondary small fw-bold">زیرعنوان بنر:</label>
+                      <input type="text" id="rewAppHeroSubtitle" class="form-control form-control-dark mb-3">
+                      <label class="form-label text-secondary small fw-bold">متن راهنما و قوانین:</label>
+                      <textarea id="rewAppTermsText" rows="3" class="form-control form-control-dark"></textarea>
                     </div>
+                    <div class="col-md-4">
+                      <label class="form-label text-secondary small fw-bold">رنگ تم اصلی:</label>
+                      <input type="color" id="rewAppColor" class="form-control form-control-color w-100 bg-dark mb-3" style="height: 38px;">
+                      
+                      <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="rewAppIsActive" checked>
+                        <label class="form-check-label text-white small" for="rewAppIsActive">نمایش بنر در اپلیکیشن</label>
+                      </div>
 
-                    <!-- Upload Placeholder / Actions -->
-                    <div id="rewAppUploadPrompt" class="text-center py-4">
-                      <i class="bi bi-cloud-arrow-up text-warning fs-1 mb-2 d-block"></i>
-                      <p class="text-light small mb-2">تصویر بنر هدیه را انتخاب کنید (نسبت ۳:۲ - فرمت JPG, PNG, WebP - حداکثر ۵ مگابایت)</p>
-                      <button type="button" class="btn btn-warning fw-bold px-4 py-2" onclick="document.getElementById('rewAppImageFile').click()">
-                        <i class="bi bi-folder2-open me-2"></i> انتخاب و بارگذاری تصویر از کامپیوتر
+                      <button type="submit" class="btn btn-gold w-100 fw-bold">
+                        <i class="bi bi-save me-1"></i> ذخیره تنظیمات
                       </button>
                     </div>
-
-                    <!-- Progress Bar -->
-                    <div id="rewAppUploadProgressWrapper" class="d-none">
-                      <div class="d-flex justify-content-between small text-secondary mb-1">
-                        <span id="rewAppUploadStatusText">در حال ارسال و ذخیره تصویر در سرور...</span>
-                        <span id="rewAppUploadPercent">۰٪</span>
-                      </div>
-                      <div class="progress" style="height: 6px; background: #1e293b;">
-                        <div id="rewAppUploadProgressBar" class="progress-bar bg-warning" role="progressbar" style="width: 0%;"></div>
+                    <div class="col-12 mt-3">
+                      <label class="form-label text-secondary small fw-bold">تصویر بنر (بارگذاری مستقیم):</label>
+                      <div class="p-3 rounded bg-dark bg-opacity-50 border border-secondary text-center">
+                        <input type="file" id="rewAppImageFile" accept="image/*" class="d-none" onchange="handleBannerImageSelect(event)">
+                        <input type="hidden" id="rewAppBannerUrl">
+                        <div id="rewAppPreviewContainer" class="mb-3 d-none">
+                          <img id="rewAppPreviewImg" class="rounded shadow border border-warning" style="max-height: 200px; max-width: 100%;">
+                          <div class="mt-2">
+                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeBannerImage()">حذف تصویر</button>
+                          </div>
+                        </div>
+                        <div id="rewAppUploadPrompt">
+                          <button type="button" class="btn btn-outline-warning" onclick="document.getElementById('rewAppImageFile').click()">
+                            <i class="bi bi-upload me-1"></i> انتخاب تصویر جدید
+                          </button>
+                        </div>
+                        <div id="rewAppUploadProgressWrapper" class="mt-3 d-none">
+                          <div class="progress" style="height: 8px;">
+                            <div id="rewAppUploadProgressBar" class="progress-bar bg-warning" style="width: 0%"></div>
+                          </div>
+                          <small id="rewAppUploadStatusText" class="text-secondary mt-1 d-block">در حال آپلود...</small>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-                <div class="col-12">
-                  <label class="form-label text-secondary small fw-bold">متن راهنما و شرایط دریافت هدیه:</label>
-                  <textarea id="rewAppTermsText" rows="3" class="form-control form-control-dark" placeholder="شرح قوانین یا توضیحات تکمیلی..."></textarea>
-                </div>
-                <div class="col-12">
-                  <div class="form-check form-switch mt-2">
-                    <input class="form-check-input" type="checkbox" id="rewAppIsActive" checked>
-                    <label class="form-check-label text-white fw-bold small me-2" for="rewAppIsActive">
-                      بنر هدیه در اپلیکیشن فعال و قابل نمایش باشد
-                    </label>
+                </form>
+              </div>
+
+              <!-- Tab 3: Claims Management -->
+              <div class="tab-pane fade" id="panel-rewards-claims" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                  <div>
+                    <h5 class="gold-text mb-1">درخواست‌های ثبت‌شده توسط کاربران</h5>
+                    <p class="text-secondary small mb-0">مدیریت وضعیت ارسال هدایا و تایید نهایی</p>
                   </div>
+                  <button class="btn btn-outline-info btn-sm" onclick="loadRewardClaims()"><i class="bi bi-arrow-clockwise me-1"></i> بروزرسانی لیست</button>
                 </div>
-                <div class="col-12 mt-3">
-                  <button type="submit" class="btn btn-gold px-4 fw-bold">
-                    <i class="bi bi-check-circle-fill me-1"></i> ذخیره و اعمال تغییرات ظاهر ویترین در دیتابیس
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </section>
-
-        <!-- ============================================================== -->
-        <!-- SECTION: درخواست‌های دریافت جایزه (Reward Claims) -->
-        <!-- ============================================================== -->
-        <section id="section-reward_claims" class="admin-section">
-          <div class="card p-4 shadow" style="border: 1px solid var(--border-color); background-color: #12253B;">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-              <div>
-                <h4 class="gold-text mb-1"><i class="bi bi-inbox-fill me-2"></i> مدیریت درخواست‌های دریافت جایزه</h4>
-                <p class="text-secondary small mb-0">مشاهده درخواست‌های کاربران، تغییر وضعیت (تایید/ارسال/تکمیل)، ثبت کد رهگیری پستی و توضیحات ادمین</p>
-              </div>
-              <button class="btn btn-outline-warning btn-sm" onclick="loadRewardClaims()"><i class="bi bi-arrow-clockwise me-1"></i> بروزرسانی درخواست‌ها</button>
-            </div>
-
-            <div class="table-responsive">
-              <table class="table table-hover align-middle mb-0 text-white">
-                <thead class="table-dark" style="border-bottom: 2px solid var(--border-color);">
-                  <tr class="small text-secondary">
-                    <th>کد پیگیری</th>
-                    <th>کاربر & شماره</th>
-                    <th>جایزه درخواستی</th>
-                    <th>امتیاز مصرفی</th>
-                    <th>اطلاعات گیرنده & آدرس</th>
-                    <th>وضعیت درخواست</th>
-                    <th>تاریخ ثبت</th>
-                    <th>مدیریت</th>
-                  </tr>
-                </thead>
-                <tbody id="rewardClaimsTbody">
-                  <tr><td colspan="8" class="text-center text-secondary py-4"><span class="spinner-border spinner-border-sm me-2"></span> در حال بارگذاری درخواست‌ها...</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <!-- ============================================================== -->
-        <!-- SECTION 7: اعلان‌های پوش و OneSignal -->
-        <!-- ============================================================== -->
-        <section id="section-push" class="admin-section">
-          <div class="row g-4">
-            <div class="col-lg-7">
-              <div class="card p-4 shadow">
-                <h4 class="gold-text mb-3"><i class="bi bi-send-fill me-2"></i> ارسال اعلان پوش همگانی (Push Notification)</h4>
-                <p class="text-secondary small mb-4">
-                  ارسال پیام فوری به دستگاه کاربران از طریق سرویس ابری OneSignal. این پیام مستقیماً در نوار اعلان گوشی کاربران نمایش داده می‌شود.
-                </p>
-
-                <div class="mb-3">
-                  <label class="form-label text-secondary small fw-bold">عنوان اعلان:</label>
-                  <input type="text" id="pushTitle" class="form-control form-control-dark" placeholder="مثلاً: دوره جدید مسابقه آغاز شد!">
-                </div>
-
-                <div class="mb-3">
-                  <label class="form-label text-secondary small fw-bold">متن کامل پیام اعلان:</label>
-                  <textarea id="pushMessage" rows="3" class="form-control form-control-dark" placeholder="متن اعلان را اینجا بنویسید..."></textarea>
-                </div>
-
-                <div class="mb-4">
-                  <label class="form-label text-secondary small fw-bold">مخاطبان هدف:</label>
-                  <select id="pushAudience" class="form-select form-select-dark">
-                    <option value="ALL">همه کاربران فعال (All Subscribed Users)</option>
-                  </select>
-                </div>
-
-                <button id="sendPushBtn" class="btn btn-gold px-4 py-2" onclick="sendPushNotification()">
-                  <span id="pushSpinner" class="spinner-border spinner-border-sm d-none me-1" role="status"></span>
-                  <i class="bi bi-send-fill me-1"></i> ارسال فوری اعلان
-                </button>
-              </div>
-            </div>
-
-            <div class="col-lg-5">
-              <div class="card p-4 shadow h-100">
-                <h5 class="text-info mb-3"><i class="bi bi-shield-check me-2"></i> وضعیت سرویس OneSignal</h5>
-                <div id="onesignalStatusCard" class="p-3 rounded mb-3" style="background-color: #0E1E36; border: 1px solid var(--border-color);">
-                  <div class="d-flex align-items-center gap-2 mb-2">
-                    <span id="onesignalBadge" class="badge bg-secondary">در حال بررسی...</span>
-                  </div>
-                  <small class="text-secondary d-block">
-                    کلیدهای ارتباطی OneSignal به دلایل امنیتی در متغیرهای محیطی Render سرور نگهداری می‌شوند و هرگز در مرورگر کاربر فاش نمی‌شوند.
-                  </small>
-                </div>
-
-                <div class="alert alert-info border-0 small mb-0">
-                  <i class="bi bi-info-circle-fill me-1"></i>
-                  برای ارسال اعلان به کاربران واقعی، شناسه <code>ONESIGNAL_APP_ID</code> و <code>ONESIGNAL_REST_API_KEY</code> در پنل مدیریت متغیرهای محیطی سرویس Render قرار داده می‌شوند.
+                <div class="table-responsive">
+                  <table class="table table-hover align-middle mb-0 text-white">
+                    <thead class="table-dark">
+                      <tr class="small text-secondary">
+                        <th>کد پیگیری</th>
+                        <th>کاربر</th>
+                        <th>جایزه</th>
+                        <th>امتیاز</th>
+                        <th>گیرنده & آدرس</th>
+                        <th>وضعیت</th>
+                        <th>مدیریت</th>
+                      </tr>
+                    </thead>
+                    <tbody id="rewardClaimsTbody"></tbody>
+                  </table>
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        <!-- ============================================================== -->
-        <!-- SECTION 8: گزارش‌ها و سوابق (Reports & Logs) -->
-        <!-- ============================================================== -->
-        <section id="section-logs" class="admin-section">
-          <div class="card p-4 shadow">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-              <div>
-                <h4 class="gold-text mb-1"><i class="bi bi-journal-text text-info me-2"></i> لاگ تغییرات و رویدادهای سیستم</h4>
-                <p class="text-secondary small mb-0">ثبت امن رویدادهای شروع مسابقه، انتشار اطلاعیه‌ها و جابه‌جایی دوره‌ها</p>
-              </div>
-              <span class="badge bg-secondary">Audit Trail</span>
-            </div>
-            <div class="table-responsive">
-              <table class="table table-dark table-hover table-striped rounded align-middle">
-                <thead>
-                  <tr class="text-secondary small">
-                    <th style="width: 180px;">زمان ثبت رویداد</th>
-                    <th style="width: 160px;">نوع عملیات</th>
-                    <th>جزئیات تغییرات</th>
-                  </tr>
-                </thead>
-                <tbody id="logsTbody">
-                  <tr><td colspan="3" class="text-center py-4 text-secondary">در حال بارگذاری لاگ‌ها...</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
+
 
         <!-- ============================================================== -->
         <!-- SECTION 9: تنظیمات و دسترسی (Settings) -->
@@ -1887,17 +1408,9 @@
     const SECTION_TITLES = {
       'dashboard': { title: 'داشبورد اصلی', icon: 'bi-speedometer2' },
       'users': { title: 'مدیریت کاربران', icon: 'bi-people-fill' },
-      'competitions': { title: 'مسابقات و جوایز', icon: 'bi-trophy-fill' },
-      'rewards': { title: 'ویترین و مدیریت جوایز', icon: 'bi-gift-fill' },
-      'rewards_appearance': { title: 'تنظیمات ظاهر جوایز', icon: 'bi-palette-fill' },
-      'reward_claims': { title: 'درخواست‌های دریافت جایزه', icon: 'bi-inbox-fill' },
-      'announcements': { title: 'اعلان‌های صفحه اصلی', icon: 'bi-megaphone-fill' },
-      'ads': { title: 'تبلیغات و امتیازها', icon: 'bi-play-circle-fill' },
-      'support': { title: 'مرکز پشتیبانی', icon: 'bi-headset' },
-      'store': { title: 'مدیریت فروشگاه و بسته‌ها', icon: 'bi-shop' },
-      'push': { title: 'اعلان‌های پوش و OneSignal', icon: 'bi-bell-fill' },
-      'logs': { title: 'گزارش‌ها و سوابق', icon: 'bi-journal-text' },
-      'settings': { title: 'تنظیمات و دسترسی', icon: 'bi-gear-fill' }
+      'rewards_management': { title: 'جوایز و بنر هدیه', icon: 'bi-gift-fill' },
+      'store': { title: 'فروشگاه و تراکنش‌ها', icon: 'bi-shop' },
+      'settings': { title: 'تنظیمات پنل', icon: 'bi-gear-fill' }
     };
 
     function navigateTo(sectionId) {
@@ -2005,6 +1518,12 @@
         alert('کلید مدیریت با موفقیت در مرورگر شما ذخیره شد.');
         loadDashboard();
       }
+    }
+
+    function logoutAdmin() {
+      if (!confirm('آیا برای خروج امن از پنل اطمینان دارید؟')) return;
+      localStorage.removeItem('reqabat_admin_key');
+      window.location.reload();
     }
 
     // Initialize key field
@@ -2273,7 +1792,15 @@
         // Stats
         setElText('totalUsers', (data.totalUsers || 0) + ' نفر');
         setElText('totalScores', (data.totalScoresSum || 0) + ' امتیاز');
-        setElText('totalAds', (data.totalAdSessions || 0) + ' رویداد');
+
+        // Fetch additional stats in background
+        await Promise.allSettled([loadStorePurchases(), loadRewardClaims()]);
+        
+        const successCount = cachedStorePurchases.filter(p => p.status === 'SUCCESS').length;
+        setElText('totalTransactions', successCount + ' موفق');
+        
+        const pendingCount = cachedClaims.filter(c => c.status === 'PENDING').length;
+        setElText('totalClaims', pendingCount + ' جدید');
 
         // Active Competition
         if (data.activeCompetition) {
