@@ -1358,7 +1358,8 @@ class BackendRepository(
         heroSubtitle: String,
         heroBannerUrl: String,
         isActive: Boolean,
-        termsText: String = ""
+        termsText: String = "",
+        adminKey: String = ""
     ): Result<com.example.model.RewardAppearanceConfig> = withContext(Dispatchers.IO) {
         val url = "$baseApiUrl/rewards/admin/appearance"
         val payload = JSONObject().apply {
@@ -1371,11 +1372,14 @@ class BackendRepository(
         }
 
         try {
-            val request = Request.Builder()
+            val requestBuilder = Request.Builder()
                 .url(url)
                 .header("Content-Type", "application/json")
-                .header("x-admin-key", "ReqabatAdmin2026")
-                .header("Authorization", "Bearer ReqabatAdmin2026")
+            if (adminKey.isNotBlank()) {
+                requestBuilder.header("x-admin-key", adminKey)
+                requestBuilder.header("Authorization", "Bearer $adminKey")
+            }
+            val request = requestBuilder
                 .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
                 .build()
 

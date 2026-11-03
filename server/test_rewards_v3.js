@@ -2,6 +2,9 @@ const assert = require('assert');
 const http = require('http');
 const crypto = require('crypto');
 const { app, setPool } = require('./rewards-service/server.js');
+require('dotenv').config();
+
+const ADMIN_KEY = process.env.ADMIN_KEY;
 
 // --- Advanced Mock Database ---
 let mockUsers = {
@@ -145,6 +148,11 @@ function request(options, postData) {
 }
 
 async function runTests() {
+  if (!ADMIN_KEY) {
+    console.error('ERROR: ADMIN_KEY environment variable is not set. Aborting test.');
+    process.exit(1);
+  }
+
   server = app.listen(PORT);
   console.log('--- Rewards Module V2/V3 Advanced Logic Tests ---');
 
@@ -184,11 +192,11 @@ async function runTests() {
     const initialStock = mockRewards['rew_1'].stock_quantity;
     
     // First Reject
-    await request({ path: `/api/rewards/admin/claims/${claimId}`, method: 'PATCH', headers: { 'x-admin-key': 'ReqabatAdmin2026' }}, { status: 'REJECTED' });
+    await request({ path: `/api/rewards/admin/claims/${claimId}`, method: 'PATCH', headers: { 'x-admin-key': ADMIN_KEY }}, { status: 'REJECTED' });
     assert.strictEqual(mockUsers['user_1'].total_score, initialScore + 100);
     
     // Second Reject
-    await request({ path: `/api/rewards/admin/claims/${claimId}`, method: 'PATCH', headers: { 'x-admin-key': 'ReqabatAdmin2026' }}, { status: 'REJECTED' });
+    await request({ path: `/api/rewards/admin/claims/${claimId}`, method: 'PATCH', headers: { 'x-admin-key': ADMIN_KEY }}, { status: 'REJECTED' });
     assert.strictEqual(mockUsers['user_1'].total_score, initialScore + 100, 'Score should not increase again');
     console.log('✓ Success (Double refund prevented)');
 

@@ -1,4 +1,5 @@
 const assert = require('assert');
+require('dotenv').config();
 
 // Test 1: Confirmation Phrase Validation
 function validateConfirmationPhrase(phrase) {
@@ -20,7 +21,11 @@ assert.strictEqual(validateConfirmationPhrase('شروع مسابقه جدید').
 console.log('  ✓ Confirmation phrase correctly rejects incomplete text and accepts exact phrase.');
 
 // Test 2: Admin Auth Check
-const ADMIN_API_KEY = "ReqabatAdmin2026";
+const ADMIN_API_KEY = process.env.ADMIN_KEY;
+if (!ADMIN_API_KEY) {
+  console.error('ERROR: ADMIN_KEY environment variable is not set. Aborting test.');
+  process.exit(1);
+}
 function checkAdminAuth(headers, query) {
   const provided = headers['x-admin-key'] || query.adminKey || '';
   return provided === ADMIN_API_KEY;
@@ -29,8 +34,8 @@ function checkAdminAuth(headers, query) {
 console.log('[Test 2] Testing admin auth validation...');
 assert.strictEqual(checkAdminAuth({}, {}), false);
 assert.strictEqual(checkAdminAuth({ 'x-admin-key': 'WrongKey' }, {}), false);
-assert.strictEqual(checkAdminAuth({ 'x-admin-key': 'ReqabatAdmin2026' }, {}), true);
-assert.strictEqual(checkAdminAuth({}, { adminKey: 'ReqabatAdmin2026' }), true);
+assert.strictEqual(checkAdminAuth({ 'x-admin-key': ADMIN_API_KEY }, {}), true);
+assert.strictEqual(checkAdminAuth({}, { adminKey: ADMIN_API_KEY }), true);
 console.log('  ✓ Admin auth strictly rejects missing/wrong keys.');
 
 // Test 3: Simulation of Atomic Competition Archive and Score Zeroing Logic
@@ -137,7 +142,7 @@ function startNewCompetitionSim(confirmationPhrase, newTitle, adminKey) {
 }
 
 // Perform simulation
-const res = startNewCompetitionSim('شروع مسابقه جدید', 'مسابقه شماره ۲ (جایزه پلی‌استیشن ۵)', 'ReqabatAdmin2026');
+const res = startNewCompetitionSim('شروع مسابقه جدید', 'مسابقه شماره ۲ (جایزه پلی‌استیشن ۵)', ADMIN_API_KEY);
 assert.strictEqual(res.success, true);
 assert.strictEqual(state.activeCompetition.competitionNumber, 2);
 assert.strictEqual(state.activeCompetition.title, 'مسابقه شماره ۲ (جایزه پلی‌استیشن ۵)');

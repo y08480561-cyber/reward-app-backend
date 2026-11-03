@@ -1,4 +1,11 @@
 const assert = require('assert');
+require('dotenv').config();
+
+const ADMIN_KEY = process.env.ADMIN_KEY;
+if (!ADMIN_KEY) {
+  console.error('ERROR: ADMIN_KEY environment variable is not set. Aborting test.');
+  process.exit(1);
+}
 
 console.log('====================================================');
 console.log('[Announcement Tests] Starting tests for Home Announcement APIs...');
@@ -32,7 +39,7 @@ const db = {
 };
 
 function createOrUpdateAnnouncement(data, adminKey) {
-  if (adminKey !== 'ReqabatAdmin2026') {
+  if (adminKey !== ADMIN_KEY) {
     throw new Error('401 Unauthorized');
   }
   const v = validateAnnouncement(data);
@@ -79,7 +86,7 @@ function getActiveAnnouncement() {
 }
 
 function toggleAnnouncement(id, adminKey) {
-  if (adminKey !== 'ReqabatAdmin2026') throw new Error('401 Unauthorized');
+  if (adminKey !== ADMIN_KEY) throw new Error('401 Unauthorized');
   const ann = db.announcements.find(a => a.id === id);
   if (!ann) throw new Error('404 Not Found');
   const newStatus = !ann.isActive;
@@ -104,7 +111,7 @@ const ann1 = createOrUpdateAnnouncement({
   type: 'COMPETITION_START',
   isActive: true,
   endsAt: Date.now() + (7 * 24 * 3600 * 1000)
-}, 'ReqabatAdmin2026');
+}, ADMIN_KEY);
 
 assert.strictEqual(ann1.title, 'آغاز مسابقه بزرگ بهاره');
 assert.strictEqual(ann1.isActive, true);
@@ -121,7 +128,7 @@ const ann2 = createOrUpdateAnnouncement({
   content: 'مهلت مسابقه به مدت ۴۸ ساعت تمدید شد.',
   type: 'COMPETITION_END',
   isActive: true
-}, 'ReqabatAdmin2026');
+}, ADMIN_KEY);
 
 assert.strictEqual(ann2.isActive, true);
 assert.strictEqual(ann1.isActive, false); // ann1 automatically deactivated
@@ -129,20 +136,20 @@ assert.strictEqual(getActiveAnnouncement().id, ann2.id);
 console.log('  ✓ Test 2.4 Passed: Setting new announcement deactivates previous one cleanly.');
 
 // Test 2.5: Toggle active state to false -> getActiveAnnouncement returns null
-toggleAnnouncement(ann2.id, 'ReqabatAdmin2026');
+toggleAnnouncement(ann2.id, ADMIN_KEY);
 assert.strictEqual(ann2.isActive, false);
 assert.strictEqual(getActiveAnnouncement(), null);
 console.log('  ✓ Test 2.5 Passed: Deactivating announcement hides it from active endpoint.');
 
 // Test 2.6: Toggle past announcement ann1 back to active
-toggleAnnouncement(ann1.id, 'ReqabatAdmin2026');
+toggleAnnouncement(ann1.id, ADMIN_KEY);
 assert.strictEqual(ann1.isActive, true);
 assert.strictEqual(getActiveAnnouncement().id, ann1.id);
 console.log('  ✓ Test 2.6 Passed: Past announcement restored and active.');
 
 // Test 3: Integrated Start New Competition with Automatic Linked Announcement
 function startNewCompetitionWithAnn(newTitle, endDate, annContent, adminKey) {
-  if (adminKey !== 'ReqabatAdmin2026') throw new Error('401');
+  if (adminKey !== ADMIN_KEY) throw new Error('401');
 
   // Archive previous competition
   const prevComp = db.competitions.find(c => c.status === 'ACTIVE');
@@ -181,7 +188,7 @@ const compSimResult = startNewCompetitionWithAnn(
   'مسابقه دوره دوم (پلی‌استیشن ۵)',
   Date.now() + 14 * 24 * 3600 * 1000,
   'مسابقه دوره دوم با ۵۰ مربع جایزه‌دار رسماً آغاز گردید!',
-  'ReqabatAdmin2026'
+  ADMIN_KEY
 );
 
 assert.strictEqual(compSimResult.newComp.competitionNumber, 2);

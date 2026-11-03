@@ -2,9 +2,15 @@ const assert = require('assert');
 const http = require('http');
 const { app, rewardsRouter, pool } = require('./rewards-service/server.js');
 
+require('dotenv').config();
+
 let server;
 const PORT = 3099;
-const ADMIN_KEY = process.env.ADMIN_KEY || 'ReqabatAdmin2026';
+const ADMIN_KEY = process.env.ADMIN_KEY;
+if (!ADMIN_KEY) {
+  console.error('ERROR: ADMIN_KEY environment variable is not set. Aborting tests.');
+  process.exit(1);
+}
 
 function request(options, postData) {
   return new Promise((resolve, reject) => {

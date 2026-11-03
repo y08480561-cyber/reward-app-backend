@@ -27,15 +27,25 @@
 
 ---
 
-## ۲. متغیرهای محیطی کامل سرور (.env در Render)
+## ۲. متغیرهای محیطی کامل سرور (.env)
 ```env
 PORT=3000
-ADMIN_KEY=ReqabatAdmin2026
-AUTH_PIN=2026
-DATABASE_URL=postgresql://postgres.xxx:password@aws-0-eu-central-1.pooler.supabase.com:6543/postgres
-TAPSELL_APP_KEY=sgedhqdbofphgpajkrqtahjkedbkokdlqiesotcmfqcklbamjaaiddqsqnihdtmobfidcb
-TAPSELL_ZONE_ID=6ad231b89140ba2215e772db
+ADMIN_KEY=your_very_secure_random_admin_key_here # کلید امن مدیریت (الزامی)
+AUTH_PIN=your_custom_auth_pin_here
+DATABASE_URL=postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres
+TAPSELL_APP_KEY=your_tapsell_app_key_here
+TAPSELL_ZONE_ID=your_tapsell_zone_id_here
 KAVENEGAR_API_KEY=your_kavenegar_api_key_here
+```
+
+### راهنمای تولید کلید امن و تصادفی برای `ADMIN_KEY`:
+برای امنیت کامل پنل مدیریت، هرگز از مقادیر پیش‌فرض یا ساده استفاده نکنید. می‌توانید با اجرای یکی از دستورات زیر یک کلید تصادفی ۶۴ کاراکتری ایمن تولید کنید:
+```bash
+# روش اول با OpenSSL:
+openssl rand -hex 32
+
+# روش دوم با Node.js:
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
 ---

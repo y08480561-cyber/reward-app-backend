@@ -1,4 +1,5 @@
 const assert = require('assert');
+require('dotenv').config();
 
 console.log('====================================================');
 console.log('[Support System Test] Running Comprehensive Verification...');
@@ -162,7 +163,11 @@ assert.strictEqual(user2Caught, true, 'User 2 MUST NOT be able to view User 1 ti
 console.log('  ✓ Cross-user ticket viewing strictly blocked and isolated.');
 
 // Test 5: Admin Management & Response Flow
-const ADMIN_API_KEY = "ReqabatAdmin2026";
+const ADMIN_API_KEY = process.env.ADMIN_KEY;
+if (!ADMIN_API_KEY) {
+  console.error('ERROR: ADMIN_KEY environment variable is not set. Aborting test.');
+  process.exit(1);
+}
 
 function adminReplyTicket(adminKey, ticketId, messageText, newStatus = 'ANSWERED') {
   if (adminKey !== ADMIN_API_KEY) throw { status: 401, error: "دسترسی غیرمجاز" };
