@@ -2,25 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
 const crypto = require('crypto');
-const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
-
-const APPEARANCE_FILE = path.join(__dirname, '../public/uploads/appearance.json');
-async function loadPersistedAppearance(targetPool = pool) {
-  if (!targetPool) {
-    console.warn('[Appearance Warning] No database pool available for loading settings.');
-    return null;
-  }
-
-  try {
-    const result = await targetPool.query('SELECT * FROM public.reward_appearance WHERE id = $1', ['default']);
-    if (result.rows.length > 0) return result.rows[0];
-  } catch (e) {
-    console.error('[Appearance DB Load Error]', e.message);
-  }
-  return null;
-}
 
 const rewardsRouter = express.Router();
 rewardsRouter.use(cors());
@@ -46,33 +29,10 @@ const memoryDb = {
     { id: 'cat_recharge', name: 'کارت شارژ', slug: 'recharge-cards', icon: 'smartphone', sort_order: 1, is_active: true },
     { id: 'cat_internet', name: 'بسته‌های اینترنت', slug: 'internet-packages', icon: 'wifi', sort_order: 2, is_active: true },
     { id: 'cat_cash', name: 'جوایز نقدی و هدیه', slug: 'cash-gifts', icon: 'credit-card', sort_order: 3, is_active: true },
-    { id: 'cat_digital', name: 'گیفت کارت دیجیتال', slug: 'digital-giftcards', icon: 'gift', sort_order: 4, is_active: true }
   ],
-  appearance: {
-    id: 'default',
-    hero_title: 'اینترنت ۲۰ گیگ برنده شو!',
-    hero_subtitle: 'هدیه ویژه دوره جاری مسابقه رقابت کن، جایزه ببر',
-    hero_banner_url: '/uploads/banner_gift_20gb.jpg',
-    primary_color: '#10B981',
-    active_sections: { featured: true, categories: true, history: true, banners: true },
-    terms_text: 'این بخش صرفاً برای معرفی هدیه است و نیازی به خرید یا ثبت درخواست ندارد.'
-  },
-  rewards: [
-    { id: 'rew_irancell_10k', title: 'کارت شارژ ۱۰ هزار تومانی ایرانسل', description: 'کد شارژ مستقیم ۱۰,۰۰۰ تومانی برای سیم‌کارت‌های اعتباری ایرانسل ارسال از طریق پیامک.', category_id: 'cat_recharge', cost_points: 100, stock_quantity: 50, image_url: 'https://images.unsplash.com/photo-1556742049-0a67568d0d9f?w=600&q=80', is_featured: true, is_active: true, sort_order: 1 },
-    { id: 'rew_mci_10k', title: 'کارت شارژ ۱۰ هزار تومانی همراه اول', description: 'کد شارژ مستقیم ۱۰,۰۰۰ تومانی برای سیم‌کارت‌های اعتباری همراه اول.', category_id: 'cat_recharge', cost_points: 100, stock_quantity: 50, image_url: 'https://images.unsplash.com/photo-1556742049-0a67568d0d9f?w=600&q=80', is_featured: false, is_active: true, sort_order: 2 },
-    { id: 'rew_irancell_net_5gb', title: 'بسته اینترنت ۵ گیگابایت یک‌ماهه', description: 'فعالسازی مستقیم بسته اینترنت ۵ گیگابایت یک‌ماهه بر روی شماره ایرانسل ثبت‌شده شما.', category_id: 'cat_internet', cost_points: 250, stock_quantity: 30, image_url: 'https://images.unsplash.com/photo-1544717297-fa95b6ee9643?w=600&q=80', is_featured: true, is_active: true, sort_order: 3 },
-    { id: 'rew_cash_50k', title: 'جایزه نقدی ۵۰,۰۰۰ تومانی', description: 'واریز پایا مستقیم به کارت بانکی متصل به شماره همراه شما.', category_id: 'cat_cash', cost_points: 500, stock_quantity: 20, image_url: 'https://images.unsplash.com/photo-1580519542036-c47de6196ba5?w=600&q=80', is_featured: true, is_active: true, sort_order: 4 }
-  ],
+  rewards: [],
   claims: []
 };
-
-// Initial load will happen inside setPool or during server startup if pool is ready
-(async () => {
-  const savedInitialApp = await loadPersistedAppearance();
-  if (savedInitialApp) {
-    memoryDb.appearance = { ...memoryDb.appearance, ...savedInitialApp };
-  }
-})();
 
 function requireAdminAuth(req, res, next) {
   const adminKey = req.headers['x-admin-key'] || req.query.admin_key || req.query.adminKey || req.query.key || (req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/i, '').trim() : '');
@@ -143,14 +103,19 @@ rewardsRouter.get('/categories', async (req, res) => {
 });
 
 rewardsRouter.get('/appearance', async (req, res) => {
+  if (!pool) {
+    return res.status(503).json({ success: false, message: 'اتصال به پایگاه داده برقرار نیست.' });
+  }
+
   try {
-    const data = await loadPersistedAppearance();
-    if (data) {
-      return res.json({ success: true, appearance: data });
+    const result = await pool.query('SELECT * FROM public.reward_appearance WHERE id = $1 LIMIT 1', ['default']);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'تنظیمات ظاهری در پایگاه داده یافت نشد.' });
     }
-    return res.json({ success: true, appearance: memoryDb.appearance });
+    return res.json({ success: true, appearance: result.rows[0] });
   } catch (err) {
-    return res.status(500).json({ success: false, message: 'خطا در دریافت تنظیمات ظاهر' });
+    console.error('[Rewards Error] Failed to fetch appearance from PostgreSQL:', err.message);
+    return res.status(500).json({ success: false, message: 'خطا در دریافت تنظیمات ظاهر از پایگاه داده.' });
   }
 });
 
@@ -475,6 +440,10 @@ rewardsRouter.patch('/admin/claims/:id', requireAdminAuth, async (req, res) => {
 });
 
 const saveAppearanceHandler = async (req, res) => {
+  if (!pool) {
+    return res.status(503).json({ success: false, message: 'اتصال به پایگاه داده برقرار نیست. ذخیره تنظیمات امکان‌پذیر نمی‌باشد.' });
+  }
+
   try {
     const { hero_title, hero_subtitle, hero_banner_url, primary_color, active_sections, is_active, terms_text } = req.body;
     
@@ -486,46 +455,35 @@ const saveAppearanceHandler = async (req, res) => {
     }
     const activeSecStr = JSON.stringify(activeSecObj);
 
-    // Update in-memory state
-    memoryDb.appearance = {
-      ...memoryDb.appearance,
-      hero_title: hero_title !== undefined ? hero_title : memoryDb.appearance.hero_title,
-      hero_subtitle: hero_subtitle !== undefined ? hero_subtitle : memoryDb.appearance.hero_subtitle,
-      hero_banner_url: hero_banner_url !== undefined ? hero_banner_url : memoryDb.appearance.hero_banner_url,
-      primary_color: primary_color || memoryDb.appearance.primary_color,
-      active_sections: activeSecObj,
-      terms_text: terms_text !== undefined ? terms_text : memoryDb.appearance.terms_text
-    };
+    const result = await pool.query(`
+      INSERT INTO public.reward_appearance (id, hero_title, hero_subtitle, hero_banner_url, primary_color, active_sections, terms_text, updated_at)
+      VALUES ('default', $1, $2, $3, $4, $5, $6, NOW())
+      ON CONFLICT (id) DO UPDATE SET 
+        hero_title = COALESCE(EXCLUDED.hero_title, public.reward_appearance.hero_title),
+        hero_subtitle = COALESCE(EXCLUDED.hero_subtitle, public.reward_appearance.hero_subtitle),
+        hero_banner_url = COALESCE(EXCLUDED.hero_banner_url, public.reward_appearance.hero_banner_url),
+        primary_color = COALESCE(EXCLUDED.primary_color, public.reward_appearance.primary_color),
+        active_sections = COALESCE(EXCLUDED.active_sections, public.reward_appearance.active_sections),
+        terms_text = COALESCE(EXCLUDED.terms_text, public.reward_appearance.terms_text),
+        updated_at = NOW()
+      RETURNING *
+    `, [
+      hero_title !== undefined ? hero_title : null,
+      hero_subtitle !== undefined ? hero_subtitle : null,
+      hero_banner_url !== undefined ? hero_banner_url : null,
+      primary_color || null,
+      activeSecStr,
+      terms_text !== undefined ? terms_text : null
+    ]);
 
-    // Always persist to local storage file for durability across restarts
-    try {
-      const uploadsDir = path.join(__dirname, '../public/uploads');
-      if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-      fs.writeFileSync(APPEARANCE_FILE, JSON.stringify(memoryDb.appearance, null, 2), 'utf8');
-    } catch (saveErr) {
-      console.warn('[Appearance Local File Save Warning]', saveErr.message);
+    if (result.rows.length === 0) {
+      return res.status(500).json({ success: false, message: 'خطا در ثبت تنظیمات در پایگاه داده.' });
     }
 
-    if (!pool) {
-      return res.status(503).json({ success: false, message: 'اتصال به پایگاه داده برقرار نیست. ذخیره تنظیمات امکان‌پذیر نمی‌باشد.' });
-    }
-
-    try {
-      const result = await pool.query(`
-        INSERT INTO public.reward_appearance (id, hero_title, hero_subtitle, hero_banner_url, primary_color, active_sections, terms_text, updated_at)
-        VALUES ('default', $1, $2, $3, $4, $5, $6, NOW())
-        ON CONFLICT (id) DO UPDATE SET hero_title = EXCLUDED.hero_title, hero_subtitle = EXCLUDED.hero_subtitle, hero_banner_url = EXCLUDED.hero_banner_url, primary_color = EXCLUDED.primary_color, active_sections = EXCLUDED.active_sections, terms_text = EXCLUDED.terms_text, updated_at = NOW()
-        RETURNING *
-      `, [memoryDb.appearance.hero_title, memoryDb.appearance.hero_subtitle, memoryDb.appearance.hero_banner_url, memoryDb.appearance.primary_color, activeSecStr, memoryDb.appearance.terms_text]);
-      
-      return res.json({ success: true, appearance: result.rows[0] });
-    } catch (dbErr) {
-      console.error('[Rewards DB Error] Save appearance to PostgreSQL failed:', dbErr.message);
-      return res.status(500).json({ success: false, message: 'خطا در ثبت تنظیمات در پایگاه داده اصلی.' });
-    }
+    return res.json({ success: true, appearance: result.rows[0] });
   } catch (err) {
     console.error('[Rewards Admin Error] Save appearance failed:', err.message);
-    return res.status(500).json({ success: false, message: 'خطا در ذخیره ظاهر و بنر هدیه' });
+    return res.status(500).json({ success: false, message: 'خطا در ذخیره ظاهر و بنر هدیه در پایگاه داده: ' + err.message });
   }
 };
 
@@ -604,11 +562,8 @@ rewardsRouter.post('/admin/upload-banner', requireAdminAuth, upload.single('bann
   }
 });
 
-async function setPool(newPool) {
+function setPool(newPool) {
   pool = newPool;
-  // Refresh appearance from DB once pool is available
-  const dbApp = await loadPersistedAppearance(pool);
-  if (dbApp) memoryDb.appearance = { ...memoryDb.appearance, ...dbApp };
 }
 
 const app = express();
