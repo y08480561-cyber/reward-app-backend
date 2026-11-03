@@ -8,27 +8,16 @@ require('dotenv').config();
 
 const APPEARANCE_FILE = path.join(__dirname, '../public/uploads/appearance.json');
 async function loadPersistedAppearance(targetPool = pool) {
-  // 1. Try Database first for permanent storage
-  if (targetPool) {
-    try {
-      const result = await targetPool.query('SELECT * FROM public.reward_appearance WHERE id = $1', ['default']);
-      if (result.rows.length > 0) return result.rows[0];
-    } catch (e) {
-      console.warn('[Appearance DB Load Warning]', e.message);
-    }
+  if (!targetPool) {
+    console.warn('[Appearance Warning] No database pool available for loading settings.');
+    return null;
   }
 
-  // 2. Fallback to local file
   try {
-    if (fs.existsSync(APPEARANCE_FILE)) {
-      const content = fs.readFileSync(APPEARANCE_FILE, 'utf8');
-      const data = JSON.parse(content);
-      if (data && (data.hero_title || data.hero_banner_url)) {
-        return data;
-      }
-    }
+    const result = await targetPool.query('SELECT * FROM public.reward_appearance WHERE id = $1', ['default']);
+    if (result.rows.length > 0) return result.rows[0];
   } catch (e) {
-    console.warn('[Appearance File Load Warning]', e.message);
+    console.error('[Appearance DB Load Error]', e.message);
   }
   return null;
 }
@@ -517,21 +506,23 @@ const saveAppearanceHandler = async (req, res) => {
       console.warn('[Appearance Local File Save Warning]', saveErr.message);
     }
 
-    if (pool) {
-      try {
-        const result = await pool.query(`
-          INSERT INTO public.reward_appearance (id, hero_title, hero_subtitle, hero_banner_url, primary_color, active_sections, terms_text, updated_at)
-          VALUES ('default', $1, $2, $3, $4, $5, $6, NOW())
-          ON CONFLICT (id) DO UPDATE SET hero_title = EXCLUDED.hero_title, hero_subtitle = EXCLUDED.hero_subtitle, hero_banner_url = EXCLUDED.hero_banner_url, primary_color = EXCLUDED.primary_color, active_sections = EXCLUDED.active_sections, terms_text = EXCLUDED.terms_text, updated_at = NOW()
-          RETURNING *
-        `, [memoryDb.appearance.hero_title, memoryDb.appearance.hero_subtitle, memoryDb.appearance.hero_banner_url, memoryDb.appearance.primary_color, activeSecStr, memoryDb.appearance.terms_text]);
-        return res.json({ success: true, appearance: result.rows[0] });
-      } catch (dbErr) {
-        console.warn('[Rewards DB Warning] Save to PostgreSQL failed, persisted locally:', dbErr.message);
-      }
+    if (!pool) {
+      return res.status(503).json({ success: false, message: 'اتصال به پایگاه داده برقرار نیست. ذخیره تنظیمات امکان‌پذیر نمی‌باشد.' });
     }
 
-    return res.json({ success: true, appearance: memoryDb.appearance });
+    try {
+      const result = await pool.query(`
+        INSERT INTO public.reward_appearance (id, hero_title, hero_subtitle, hero_banner_url, primary_color, active_sections, terms_text, updated_at)
+        VALUES ('default', $1, $2, $3, $4, $5, $6, NOW())
+        ON CONFLICT (id) DO UPDATE SET hero_title = EXCLUDED.hero_title, hero_subtitle = EXCLUDED.hero_subtitle, hero_banner_url = EXCLUDED.hero_banner_url, primary_color = EXCLUDED.primary_color, active_sections = EXCLUDED.active_sections, terms_text = EXCLUDED.terms_text, updated_at = NOW()
+        RETURNING *
+      `, [memoryDb.appearance.hero_title, memoryDb.appearance.hero_subtitle, memoryDb.appearance.hero_banner_url, memoryDb.appearance.primary_color, activeSecStr, memoryDb.appearance.terms_text]);
+      
+      return res.json({ success: true, appearance: result.rows[0] });
+    } catch (dbErr) {
+      console.error('[Rewards DB Error] Save appearance to PostgreSQL failed:', dbErr.message);
+      return res.status(500).json({ success: false, message: 'خطا در ثبت تنظیمات در پایگاه داده اصلی.' });
+    }
   } catch (err) {
     console.error('[Rewards Admin Error] Save appearance failed:', err.message);
     return res.status(500).json({ success: false, message: 'خطا در ذخیره ظاهر و بنر هدیه' });
@@ -566,61 +557,50 @@ rewardsRouter.post('/admin/upload-banner', requireAdminAuth, upload.single('bann
     const ext = req.file.originalname.split('.').pop() || 'jpg';
     const fileName = `banner_${Date.now()}_${crypto.randomBytes(4).toString('hex')}.${ext}`;
 
-    // Ensure uploads directory exists and physically write file to disk
-    const uploadsDir = path.join(__dirname, '../public/uploads');
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
-    }
-    const localFilePath = path.join(uploadsDir, fileName);
-    fs.writeFileSync(localFilePath, fileBuffer);
-    const localPublicUrl = `/uploads/${fileName}`;
-
-    // Try Supabase Storage Upload (MANDATORY if credentials are set)
+    // Supabase Storage Upload is now MANDATORY for banners
     const supabaseUrl = process.env.SUPABASE_URL;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY; // Only use service role key
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    if (supabaseUrl && serviceRoleKey) {
-      try {
-        const bucketName = 'gift-banners';
-        const uploadUrl = `${supabaseUrl}/storage/v1/object/${bucketName}/${fileName}`;
-        
-        const uploadRes = await fetch(uploadUrl, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${serviceRoleKey}`,
-            'Content-Type': fileMime,
-            'x-upsert': 'true'
-          },
-          body: fileBuffer
-        });
-
-        if (uploadRes.ok) {
-          const publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucketName}/${fileName}`;
-          return res.json({ success: true, url: publicUrl, message: 'تصویر با موفقیت در فضای ابری ذخیره شد.' });
-        } else {
-          const errText = await uploadRes.text();
-          console.error('[Supabase Storage Error] Upload failed:', uploadRes.status, errText);
-          return res.status(502).json({ 
-            success: false, 
-            message: `خطای سرویس ابری (${uploadRes.status}): آپلود فایل در Supabase با شکست مواجه شد. لطفاً پیکربندی Bucket را بررسی کنید.` 
-          });
-        }
-      } catch (supErr) {
-        console.error('[Supabase Storage Error] Exception:', supErr.message);
-        return res.status(500).json({ success: false, message: 'خطای سیستمی در ارتباط با فضای ابری Supabase.' });
-      }
+    if (!supabaseUrl || !serviceRoleKey) {
+      return res.status(501).json({ 
+        success: false, 
+        message: 'سرویس ذخیره‌سازی ابری (Supabase Storage) پیکربندی نشده است. آپلود بنر در این محیط غیرمجاز می‌باشد.' 
+      });
     }
 
-    // Only allow local fallback if credentials are NOT configured at all
-    return res.json({
-      success: true,
-      url: localPublicUrl,
-      message: 'تصویر در فضای محلی سرور ذخیره شد (هشدار: در صورت ریستارت هاست ممکن است حذف شود).'
-    });
+    try {
+      const bucketName = 'gift-banners';
+      const uploadUrl = `${supabaseUrl}/storage/v1/object/${bucketName}/${fileName}`;
+      
+      const uploadRes = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${serviceRoleKey}`,
+          'Content-Type': fileMime,
+          'x-upsert': 'true'
+        },
+        body: fileBuffer
+      });
+
+      if (uploadRes.ok) {
+        const publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucketName}/${fileName}`;
+        return res.json({ success: true, url: publicUrl, message: 'تصویر با موفقیت در فضای ابری ذخیره شد.' });
+      } else {
+        const errText = await uploadRes.text();
+        console.error('[Supabase Storage Error] Upload failed:', uploadRes.status, errText);
+        return res.status(502).json({ 
+          success: false, 
+          message: `خطای سرویس ابری (${uploadRes.status}): آپلود فایل با شکست مواجه شد. لطفاً وضعیت Bucket و دسترسی Key را بررسی کنید.` 
+        });
+      }
+    } catch (supErr) {
+      console.error('[Supabase Storage Error] Exception:', supErr.message);
+      return res.status(500).json({ success: false, message: 'خطای ارتباطی در زمان آپلود به فضای ابری.' });
+    }
 
   } catch (err) {
     console.error('[Upload Banner Error]:', err);
-    return res.status(500).json({ success: false, message: 'خطا در پردازش و بارگذاری تصویر.' });
+    return res.status(500).json({ success: false, message: 'خطای داخلی در پردازش تصویر.' });
   }
 });
 
