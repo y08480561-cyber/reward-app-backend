@@ -3,7 +3,8 @@ module.exports = {
     {
       name: "reqabat-backend",
       script: "./server.js",
-      instances: 1,
+      cwd: "./",
+      instances: 1, // Main server and rewards router run in a single process
       autorestart: true,
       watch: false,
       max_memory_restart: "1G",
@@ -11,12 +12,10 @@ module.exports = {
         NODE_ENV: "production",
         PORT: 3000
       },
-      env_production: {
-        NODE_ENV: "production"
-      },
       error_file: "./logs/err.log",
       out_file: "./logs/out.log",
-      log_date_format: "YYYY-MM-DD HH:mm:ss Z"
+      log_date_format: "YYYY-MM-DD HH:mm:ss Z",
+      merge_logs: true
     }
   ]
 };

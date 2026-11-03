@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -6,8 +7,8 @@ const fs = require('fs');
 const { Pool } = require('pg');
 
 const app = express();
-const PORT = (process.env.PORT && process.env.PORT !== '8080') ? process.env.PORT : 3000;
-const ADMIN_API_KEY = process.env.ADMIN_KEY || "ReqabatAdmin2026";
+const PORT = process.env.PORT || 3000;
+const ADMIN_API_KEY = process.env.ADMIN_KEY;
 const DATABASE_URL = process.env.DATABASE_URL;
 
 app.use(cors());
@@ -128,9 +129,13 @@ async function testAndInitDatabase() {
   console.log('====================================================');
   console.log('[PostgreSQL] Initializing database subsystem...');
 
-  if (!DATABASE_URL || !pool) {
-    console.error('[PostgreSQL CRITICAL] DATABASE_URL is NOT set in environment variables!');
-    console.error('[PostgreSQL] Go to Render Dashboard -> Environment -> Add DATABASE_URL.');
+  if (!DATABASE_URL || !pool || !process.env.ADMIN_KEY) {
+    if (!process.env.ADMIN_KEY) {
+      console.error('[PostgreSQL CRITICAL] ADMIN_KEY is NOT set! Admin panel will be inaccessible.');
+    }
+    if (!DATABASE_URL || !pool) {
+      console.error('[PostgreSQL CRITICAL] DATABASE_URL is NOT set in environment variables!');
+    }
     console.log('====================================================');
     isDbConnected = false;
     return false;
@@ -888,8 +893,8 @@ function requireAdminAuth(req, res, next) {
                    req.query.key ||
                    (req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/i, '').trim() : '');
 
-  if (!provided || provided !== ADMIN_API_KEY) {
-    return res.status(401).json({ error: "دسترسی غیرمجاز. کلید امنیتی مدیریت نامعتبر است." });
+  if (!ADMIN_API_KEY || !provided || provided !== ADMIN_API_KEY) {
+    return res.status(401).json({ error: "دسترسی غیرمجاز. کلید امنیتی مدیریت تنظیم نشده یا نامعتبر است." });
   }
   next();
 }
