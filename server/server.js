@@ -2346,7 +2346,6 @@ app.get('/api/admin/users', requireAdminAuth, ensureDatabaseReady, async (req, r
     `);
 
     const users = result.rows.map(row => ({
-      id: row.id,
       firstName: row.first_name || '',
       lastName: row.last_name || '',
       registeredAt: new Date(row.created_at).getTime() || 0,

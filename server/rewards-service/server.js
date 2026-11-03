@@ -7,7 +7,18 @@ const path = require('path');
 require('dotenv').config();
 
 const APPEARANCE_FILE = path.join(__dirname, '../public/uploads/appearance.json');
-function loadPersistedAppearance() {
+async function loadPersistedAppearance(targetPool = pool) {
+  // 1. Try Database first for permanent storage
+  if (targetPool) {
+    try {
+      const result = await targetPool.query('SELECT * FROM public.reward_appearance WHERE id = $1', ['default']);
+      if (result.rows.length > 0) return result.rows[0];
+    } catch (e) {
+      console.warn('[Appearance DB Load Warning]', e.message);
+    }
+  }
+
+  // 2. Fallback to local file
   try {
     if (fs.existsSync(APPEARANCE_FILE)) {
       const content = fs.readFileSync(APPEARANCE_FILE, 'utf8');
@@ -17,7 +28,7 @@ function loadPersistedAppearance() {
       }
     }
   } catch (e) {
-    console.warn('[Appearance Load Warning]', e.message);
+    console.warn('[Appearance File Load Warning]', e.message);
   }
   return null;
 }
@@ -66,10 +77,13 @@ const memoryDb = {
   claims: []
 };
 
-const savedInitialApp = loadPersistedAppearance();
-if (savedInitialApp) {
-  memoryDb.appearance = { ...memoryDb.appearance, ...savedInitialApp };
-}
+// Initial load will happen inside setPool or during server startup if pool is ready
+(async () => {
+  const savedInitialApp = await loadPersistedAppearance();
+  if (savedInitialApp) {
+    memoryDb.appearance = { ...memoryDb.appearance, ...savedInitialApp };
+  }
+})();
 
 function requireAdminAuth(req, res, next) {
   const adminKey = req.headers['x-admin-key'] || req.query.admin_key || req.query.adminKey || req.query.key || (req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/i, '').trim() : '');
@@ -141,17 +155,9 @@ rewardsRouter.get('/categories', async (req, res) => {
 
 rewardsRouter.get('/appearance', async (req, res) => {
   try {
-    if (pool) {
-      try {
-        const result = await pool.query('SELECT * FROM public.reward_appearance WHERE id = $1', ['default']);
-        if (result.rows.length > 0) return res.json({ success: true, appearance: result.rows[0] });
-      } catch (dbErr) {
-        console.warn('[Rewards DB Warning] SELECT reward_appearance failed, falling back:', dbErr.message);
-      }
-    }
-    const persisted = loadPersistedAppearance();
-    if (persisted) {
-      memoryDb.appearance = { ...memoryDb.appearance, ...persisted };
+    const data = await loadPersistedAppearance();
+    if (data) {
+      return res.json({ success: true, appearance: data });
     }
     return res.json({ success: true, appearance: memoryDb.appearance });
   } catch (err) {
@@ -569,9 +575,9 @@ rewardsRouter.post('/admin/upload-banner', requireAdminAuth, upload.single('bann
     fs.writeFileSync(localFilePath, fileBuffer);
     const localPublicUrl = `/uploads/${fileName}`;
 
-    // Also try Supabase Storage Upload via REST API if configured
+    // Try Supabase Storage Upload (MANDATORY if credentials are set)
     const supabaseUrl = process.env.SUPABASE_URL;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY; // Only use service role key
 
     if (supabaseUrl && serviceRoleKey) {
       try {
@@ -590,30 +596,39 @@ rewardsRouter.post('/admin/upload-banner', requireAdminAuth, upload.single('bann
 
         if (uploadRes.ok) {
           const publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucketName}/${fileName}`;
-          return res.json({ success: true, url: publicUrl, message: 'تصویر با موفقیت در فضای ابری و سرور آپلود شد.' });
+          return res.json({ success: true, url: publicUrl, message: 'تصویر با موفقیت در فضای ابری ذخیره شد.' });
         } else {
           const errText = await uploadRes.text();
-          console.warn('[Supabase Storage Warning] Upload returned status:', uploadRes.status, errText);
+          console.error('[Supabase Storage Error] Upload failed:', uploadRes.status, errText);
+          return res.status(502).json({ 
+            success: false, 
+            message: `خطای سرویس ابری (${uploadRes.status}): آپلود فایل در Supabase با شکست مواجه شد. لطفاً پیکربندی Bucket را بررسی کنید.` 
+          });
         }
       } catch (supErr) {
-        console.warn('[Supabase Storage Warning] Error communicating with Supabase:', supErr.message);
+        console.error('[Supabase Storage Error] Exception:', supErr.message);
+        return res.status(500).json({ success: false, message: 'خطای سیستمی در ارتباط با فضای ابری Supabase.' });
       }
     }
 
+    // Only allow local fallback if credentials are NOT configured at all
     return res.json({
       success: true,
       url: localPublicUrl,
-      message: 'تصویر با موفقیت در فضای ذخیره‌سازی سرور بارگذاری گردید.'
+      message: 'تصویر در فضای محلی سرور ذخیره شد (هشدار: در صورت ریستارت هاست ممکن است حذف شود).'
     });
 
   } catch (err) {
     console.error('[Upload Banner Error]:', err);
-    return res.status(500).json({ success: false, message: err.message || 'خطا در پردازش و آپلود تصویر بنر.' });
+    return res.status(500).json({ success: false, message: 'خطا در پردازش و بارگذاری تصویر.' });
   }
 });
 
-function setPool(newPool) {
+async function setPool(newPool) {
   pool = newPool;
+  // Refresh appearance from DB once pool is available
+  const dbApp = await loadPersistedAppearance(pool);
+  if (dbApp) memoryDb.appearance = { ...memoryDb.appearance, ...dbApp };
 }
 
 const app = express();
