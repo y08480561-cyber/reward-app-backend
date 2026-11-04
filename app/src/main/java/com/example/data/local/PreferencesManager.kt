@@ -26,11 +26,11 @@ class PreferencesManager(context: Context) {
         const val KEY_FEEDBACK_SHOWN = "feedback_dialog_shown"
         const val KEY_FEEDBACK_REWARDED = "feedback_reward_claimed"
 
-        // Real Tapsell Plus credentials provided by user
-        const val DEFAULT_TAPSELL_KEY = "sgedhqdbofphgpajkrqtahjkedbkokdlqiesotcmfqcklbamjaaiddqsqnihdtmobfidcb"
-        const val DEFAULT_REWARDED_ZONE = "6ad231b89140ba2215e772db"
+        // Default credentials placeholder (managed via build configuration and settings)
+        const val DEFAULT_TAPSELL_KEY = ""
+        const val DEFAULT_REWARDED_ZONE = ""
         const val DEFAULT_SERVER_URL = "https://reward-app-backend-a9ze.onrender.com"
-        const val DEFAULT_ADMIN_PIN = "1234"
+        const val DEFAULT_ADMIN_PIN = ""
         const val DEFAULT_SUPABASE_URL = ""
         const val DEFAULT_SUPABASE_ANON_KEY = ""
     }

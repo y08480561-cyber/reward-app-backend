@@ -181,7 +181,7 @@ class BackendRepository(
         firstName: String,
         lastName: String,
         phoneNumber: String,
-        password: String = "2026"
+        password: String = ""
     ): Result<User> = withContext(Dispatchers.IO) {
         val cleanPhone = phoneNumber.trim()
         if (!cleanPhone.matches(Regex("^09[0-9]{9}\$"))) {
@@ -193,7 +193,9 @@ class BackendRepository(
             put("firstName", firstName.trim())
             put("lastName", lastName.trim())
             put("phoneNumber", cleanPhone)
-            put("password", password.trim().ifEmpty { "2026" })
+            if (password.isNotBlank()) {
+                put("password", password.trim())
+            }
         }
 
         try {
@@ -264,7 +266,7 @@ class BackendRepository(
         firstName: String,
         lastName: String,
         phoneNumber: String
-    ): Result<User> = loginDirectly(firstName, lastName, phoneNumber, "2026")
+    ): Result<User> = loginDirectly(firstName, lastName, phoneNumber, "")
 
     /**
      * Verify SMS OTP and complete user registration or login via Render backend POST /api/auth/otp/verify.

@@ -197,6 +197,8 @@ async function initDatabaseTables() {
     `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS total_score INTEGER NOT NULL DEFAULT 0;`,
     `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';`,
     `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS auth_method TEXT DEFAULT 'DIRECT_CREDENTIALS';`,
+    `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS password_hash TEXT;`,
+    `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS auth_token TEXT;`,
     `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();`,
     `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();`,
     `CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone_unique ON public.users(phone_number);`,
@@ -886,14 +888,13 @@ app.get('/health', async (req, res) => {
   });
 });
 
-// Admin Authentication Middleware
+// Admin Authentication Middleware (Strict header-based, no query strings, unified)
 function requireAdminAuth(req, res, next) {
-  const provided = req.headers['x-admin-key'] ||
-                   req.query.adminKey ||
-                   req.query.key ||
+  const expectedKey = process.env.ADMIN_KEY;
+  const adminKey = req.headers['x-admin-key'] ||
                    (req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/i, '').trim() : '');
 
-  if (!ADMIN_API_KEY || !provided || provided !== ADMIN_API_KEY) {
+  if (!expectedKey || !adminKey || adminKey !== expectedKey) {
     return res.status(401).json({ error: "دسترسی غیرمجاز. کلید امنیتی مدیریت تنظیم نشده یا نامعتبر است." });
   }
   next();
@@ -1126,6 +1127,10 @@ async function sendSmsViaKavenegar(phoneNumber, otp) {
   }
 }
 
+function hashUserPassword(pass) {
+  return crypto.createHash('sha256').update(pass + "_reqabat_secure_salt_2026").digest('hex');
+}
+
 // ====================================================================
 // 1. Direct Secure Authentication (Stored in PostgreSQL public.users)
 // ====================================================================
@@ -1136,17 +1141,11 @@ app.post('/api/auth/login', ensureDatabaseReady, async (req, res) => {
       return res.status(400).json({ error: "شماره موبایل وارد شده باید ۱۱ رقمی و با 09 شروع شود." });
     }
 
-    // Server-side credential validation
-    const allowedPins = [process.env.AUTH_PIN || "2026", "123456", ADMIN_API_KEY];
     const inputPass = (password || "").trim();
-    if (!inputPass || !allowedPins.includes(inputPass)) {
-      return res.status(401).json({ error: "رمز عبور یا پین ورود نامعتبر است. رمز پیش‌فرض آزمایشی سرور: 2026" });
-    }
 
     // 1. Check if user already exists in public.users by phone_number
-    // (Only query guaranteed existing columns: id, first_name, last_name, phone_number, created_at, status)
     const userLookup = await pool.query(
-      `SELECT id, first_name, last_name, phone_number, created_at, status
+      `SELECT id, first_name, last_name, phone_number, password_hash, created_at, status
        FROM public.users WHERE phone_number = $1 LIMIT 1`,
       [phoneNumber]
     );
@@ -1158,6 +1157,28 @@ app.post('/api/auth/login', ensureDatabaseReady, async (req, res) => {
 
       if (existing.status && existing.status !== 'active') {
         return res.status(403).json({ error: "حساب کاربری شما مسدود یا غیرفعال است." });
+      }
+
+      // Secure Credential Validation:
+      // If user has a stored password_hash, verify against it
+      if (existing.password_hash) {
+        const inputHash = inputPass ? hashUserPassword(inputPass) : '';
+        const envPinMatch = process.env.AUTH_PIN && inputPass === process.env.AUTH_PIN;
+        if (!envPinMatch && inputHash !== existing.password_hash) {
+          return res.status(401).json({ error: "شماره موبایل یا رمز عبور وارد شده نامعتبر است." });
+        }
+      } else {
+        // Legacy account without password_hash: check environment AUTH_PIN if configured
+        if (process.env.AUTH_PIN && inputPass) {
+          if (inputPass !== process.env.AUTH_PIN) {
+            return res.status(401).json({ error: "شماره موبایل یا رمز عبور نامعتبر است." });
+          }
+        }
+        // Save password hash to upgrade security if password provided
+        if (inputPass) {
+          const newHash = hashUserPassword(inputPass);
+          await pool.query(`UPDATE public.users SET password_hash = $1, updated_at = NOW() WHERE id = $2`, [newHash, existing.id]);
+        }
       }
 
       const newFName = (firstName && firstName.trim()) ? firstName.trim() : existing.first_name;
@@ -1182,15 +1203,22 @@ app.post('/api/auth/login', ensureDatabaseReady, async (req, res) => {
       };
       console.log(`[PostgreSQL Auth] Logged in existing user: ${user.id} (${phoneNumber})`);
     } else {
-      // New user registration -> Generate standard UUID and insert into public.users
+      // New user registration
+      if (process.env.AUTH_PIN && inputPass) {
+        if (inputPass !== process.env.AUTH_PIN) {
+          return res.status(401).json({ error: "پین احراز هویت سرور نامعتبر است." });
+        }
+      }
+
       const userId = crypto.randomUUID();
       const fName = (firstName || "کاربر").trim();
       const lName = (lastName || "مسابقه").trim();
+      const passHash = inputPass ? hashUserPassword(inputPass) : null;
 
       await pool.query(
-        `INSERT INTO public.users (id, first_name, last_name, phone_number, total_score, status, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, 0, 'active', NOW(), NOW())`,
-        [userId, fName, lName, phoneNumber]
+        `INSERT INTO public.users (id, first_name, last_name, phone_number, password_hash, total_score, status, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, 0, 'active', NOW(), NOW())`,
+        [userId, fName, lName, phoneNumber, passHash]
       );
 
       // Initialize row in public.user_scores
@@ -2200,7 +2228,7 @@ app.get('/api/admin/overview', requireAdminAuth, ensureDatabaseReady, async (req
     `);
 
     const countRes = await pool.query(`SELECT COUNT(*) AS total_sessions FROM public.ad_sessions`);
-    const totalAdSessions = Number(countRes.rows[0].total_sessions);
+    const totalAdSessions = Number(countRes.rows[0]?.total_sessions || 0);
 
     const users = usersRes.rows.map(u => ({
       id: u.id,
@@ -2305,8 +2333,8 @@ app.get('/api/admin/overview', requireAdminAuth, ensureDatabaseReady, async (req
         createdAt: new Date(l.created_at).getTime()
       })),
       settings: {
-        tapsellAppKey: process.env.TAPSELL_APP_KEY || "sgedhqdbofphgpajkrqtahjkedbkokdlqiesotcmfqcklbamjaaiddqsqnihdtmobfidcb",
-        tapsellZoneId: process.env.TAPSELL_ZONE_ID || "6ad231b89140ba2215e772db",
+        tapsellAppKey: process.env.TAPSELL_APP_KEY || "",
+        tapsellZoneId: process.env.TAPSELL_ZONE_ID || "",
         cycleHours: 24,
         pointsPerAd: 1
       },
@@ -3712,11 +3740,37 @@ module.exports.app = app;
 module.exports.getPool = () => pool;
 module.exports.setTestPool = setTestPool;
 
+// Global process error handlers for stable execution on shared Node.js hosting
+process.on('uncaughtException', (err) => {
+  console.error('[Reqabat Server CRITICAL] Uncaught Exception:', err);
+});
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[Reqabat Server CRITICAL] Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
 // Startup Server with PostgreSQL Verification if run directly
 if (require.main === module) {
-  app.listen(PORT, '0.0.0.0', async () => {
-    console.log(`[Reqabat Va Jayezah Server] Running on http://0.0.0.0:${PORT}`);
+  const server = app.listen(PORT, '0.0.0.0', async () => {
+    console.log(`[Reqabat Va Jayezah Server] Running on http://0.0.0.0:${PORT} (Node.js ${process.version})`);
     await testAndInitDatabase();
   });
+
+  const shutdown = (signal) => {
+    console.log(`[Reqabat Server] Received ${signal}, closing server gracefully...`);
+    server.close(() => {
+      console.log('[Reqabat Server] HTTP server closed.');
+      if (pool) {
+        pool.end().then(() => {
+          console.log('[Reqabat Server] PostgreSQL pool closed.');
+          process.exit(0);
+        }).catch(() => process.exit(0));
+      } else {
+        process.exit(0);
+      }
+    });
+  };
+
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }
 

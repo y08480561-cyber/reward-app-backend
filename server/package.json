@@ -4,10 +4,11 @@
   "description": "Real backend server and admin dashboard for 'رقابت کن، جایزه ببر'",
   "main": "server.js",
   "engines": {
-    "node": "22.x"
+    "node": ">=20.0.0 <=22.x"
   },
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node test_hosting_readiness.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

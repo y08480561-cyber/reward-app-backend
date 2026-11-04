@@ -197,6 +197,19 @@
       </div>
     </div>
 
+    <!-- Auth Prompt Card -->
+    <div id="authPromptCard" class="card p-3 mb-3 d-none" style="background-color: #152A44; border: 1px solid #FFB703; border-radius: 12px;">
+      <div class="d-flex flex-column flex-sm-row gap-2 align-items-center justify-content-between">
+        <div class="text-warning small fw-bold">
+          <i class="bi bi-shield-lock-fill me-1"></i> احراز هویت الزامی است. لطفاً کلید مدیریت را وارد نمایید:
+        </div>
+        <div class="d-flex gap-2 w-100" style="max-width: 340px;">
+          <input type="password" id="adminKeyInput" class="form-control-dark" placeholder="کلید مدیریت (ADMIN_KEY)...">
+          <button class="btn btn-warning fw-bold text-dark px-3" onclick="submitAdminKey()">ورود</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Alert Box -->
     <div id="alertBox" class="alert alert-danger d-none shadow-sm py-2 px-3 small mb-3" role="alert"></div>
 
@@ -227,23 +240,20 @@
   <script>
     let cachedUsers = [];
 
-    // Optional query parameter handling (?key=... or ?adminKey=...)
-    (function handleUrlKey() {
-      try {
-        const params = new URLSearchParams(window.location.search);
-        const urlKey = params.get('key') || params.get('adminKey');
-        if (urlKey && urlKey.trim()) {
-          localStorage.setItem('reqabat_admin_key', urlKey.trim());
-          const cleanUrl = window.location.pathname;
-          window.history.replaceState({}, document.title, cleanUrl);
-        }
-      } catch (e) {
-        console.error('URL parse error:', e);
-      }
-    })();
-
     function getSavedKey() {
       return (localStorage.getItem('reqabat_admin_key') || '').trim();
+    }
+
+    function submitAdminKey() {
+      const input = document.getElementById('adminKeyInput')?.value.trim();
+      if (!input) {
+        showAlert('لطفاً کلید مدیریت را وارد کنید.');
+        return;
+      }
+      localStorage.setItem('reqabat_admin_key', input);
+      document.getElementById('authPromptCard')?.classList.add('d-none');
+      hideAlert();
+      loadUsers();
     }
 
     function showAlert(msg) {
@@ -271,26 +281,44 @@
         if (timeA !== timeB) {
           return timeA - timeB;
         }
-        return String(a.id || '').localeCompare(String(b.id || ''));
+        return (a.firstName || '').localeCompare(b.firstName || '');
       });
     }
 
     async function loadUsers() {
       hideAlert();
 
-      const headers = {};
       const key = getSavedKey();
-      if (key) {
-        headers['x-admin-key'] = key;
+      const authCard = document.getElementById('authPromptCard');
+
+      if (!key) {
+        if (authCard) authCard.classList.remove('d-none');
+        showAlert('برای مشاهده فهرست کاربران، لطفاً کلید مدیریت را وارد کنید.');
+        const tbody = document.getElementById('usersTbody');
+        if (tbody) {
+          tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-warning small"><i class="bi bi-shield-lock me-1"></i> دسترسی نیازمند ورود کلید مدیریت است.</td></tr>';
+        }
+        return;
       }
 
       try {
-        const res = await fetch('/api/admin/users', { headers });
+        const res = await fetch('/api/admin/users', {
+          headers: {
+            'x-admin-key': key
+          }
+        });
+
+        if (res.status === 401) {
+          if (authCard) authCard.classList.remove('d-none');
+          localStorage.removeItem('reqabat_admin_key');
+          throw new Error('کلید امنیتی مدیریت نامعتبر است. لطفاً کلید صحیح را وارد کنید.');
+        }
 
         if (!res.ok) {
           throw new Error('خطا در دریافت اطلاعات از سرور (کد ' + res.status + ')');
         }
 
+        if (authCard) authCard.classList.add('d-none');
         const data = await res.json();
         cachedUsers = sortUsersList(data.users || []);
         renderUsers(cachedUsers);

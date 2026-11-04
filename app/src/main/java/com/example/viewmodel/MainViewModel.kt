@@ -550,7 +550,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _authUiState.update { it.copy(errorMessage = "شماره موبایل وارد شده باید ۱۱ رقم و با 09 آغاز شود.") }
             return
         }
-        val pin = state.password.trim().ifEmpty { "2026" }
+        val pin = state.password.trim()
 
         viewModelScope.launch {
             _authUiState.update { it.copy(isLoading = true, errorMessage = null) }
