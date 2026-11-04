@@ -964,21 +964,20 @@ class BackendRepository(
                         prefs.cachedLoginNotificationJson = settingsObj.toString()
                         Result.Success(config)
                     } else {
-                        Log.e("BackendRepository", "Settings object not found in response")
-                        Result.Error("تنظیمات در پاسخ سرور یافت نشد.")
+                        Log.w("BackendRepository", "Settings object not found in response, using cached or default")
+                        val fallback = parseCachedLoginNotification() ?: com.example.model.LoginNotificationConfig()
+                        Result.Success(fallback)
                     }
                 } else {
-                    Log.e("BackendRepository", "Response not successful")
-                    val cached = parseCachedLoginNotification()
-                    if (cached != null) Result.Success(cached)
-                    else Result.Error("خطا در دریافت تنظیمات ورود: ${response.code}")
+                    Log.w("BackendRepository", "Login notification server response code: ${response.code}, using cached or default")
+                    val fallback = parseCachedLoginNotification() ?: com.example.model.LoginNotificationConfig()
+                    Result.Success(fallback)
                 }
             }
         } catch (e: Exception) {
-            Log.e("BackendRepository", "Network error: ${e.message}")
-            val cached = parseCachedLoginNotification()
-            if (cached != null) Result.Success(cached)
-            else Result.Error("خطای شبکه در دریافت تنظیمات ورود: ${e.message}")
+            Log.w("BackendRepository", "Login notification notice: ${e.message}, using cached or default")
+            val fallback = parseCachedLoginNotification() ?: com.example.model.LoginNotificationConfig()
+            Result.Success(fallback)
         }
     }
 

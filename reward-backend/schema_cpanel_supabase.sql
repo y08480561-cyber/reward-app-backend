@@ -110,9 +110,30 @@ CREATE TABLE IF NOT EXISTS public.announcements (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- ۱۱. جدول تنظیمات اطلاع‌رسانی ورود (ایرانسل)
+CREATE TABLE IF NOT EXISTS public.login_notification_settings (
+    id TEXT PRIMARY KEY DEFAULT 'default',
+    is_visible BOOLEAN NOT NULL DEFAULT true,
+    badge_text TEXT NOT NULL DEFAULT 'سرویس اختصاصی مشترکین ایرانسل',
+    badge_icon TEXT NOT NULL DEFAULT 'verified',
+    main_title TEXT NOT NULL DEFAULT 'سامانه منحصرأ ویژه مشترکان ارجمند ایرانسل',
+    main_description TEXT NOT NULL DEFAULT 'با کمال احترام و افتخار، این سامانه منحصراً جهت حضور، رقابت و بهره‌مندی مشترکین گرامی و همراهان وفادار اپراتور ایرانسل طراحی گردیده است.',
+    warning_is_visible BOOLEAN NOT NULL DEFAULT true,
+    warning_title TEXT NOT NULL DEFAULT 'شرط الزامی: ورود با «اینترنت دیتای ایرانسل»',
+    warning_description TEXT NOT NULL DEFAULT 'لطفاً پیش از ورود، وای‌فای و فیلترشکن را خاموش نموده و از طریق اینترنت همراه سیم‌کارت ایرانسل متصل گردید.',
+    warning_icon TEXT NOT NULL DEFAULT 'signal_cellular_alt',
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- مقداردهی اولیه تنظیمات ورود در صورت عدم وجود
+INSERT INTO public.login_notification_settings (id)
+VALUES ('default')
+ON CONFLICT (id) DO NOTHING;
+
 -- ایندکس‌های پیشنهادی برای افزایش سرعت کوئری‌ها
 CREATE INDEX IF NOT EXISTS idx_users_phone ON public.users(phone);
 CREATE INDEX IF NOT EXISTS idx_user_sessions_token ON public.user_sessions(token);
 CREATE INDEX IF NOT EXISTS idx_reward_claims_user ON public.reward_claims(user_id);
 CREATE INDEX IF NOT EXISTS idx_transactions_user ON public.transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_support_tickets_user ON public.support_tickets(user_id);
+

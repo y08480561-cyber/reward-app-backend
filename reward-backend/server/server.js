@@ -3683,17 +3683,35 @@ app.post('/api/user/feedback', requireUserAuth, ensureDatabaseReady, async (req,
 // ====================================================================
 
 // Public API for the App
-app.get('/api/app/login-notification', ensureDatabaseReady, async (req, res) => {
+app.get('/api/app/login-notification', async (req, res) => {
+  const defaultSettings = {
+    id: 'default',
+    is_visible: true,
+    badge_text: 'سرویس اختصاصی مشترکین ایرانسل',
+    badge_icon: 'verified',
+    main_title: 'سامانه منحصرأ ویژه مشترکان ارجمند ایرانسل',
+    main_description: 'با کمال احترام و افتخار، این سامانه منحصراً جهت حضور، رقابت و بهره‌مندی مشترکین گرامی و همراهان وفادار اپراتور ایرانسل طراحی گردیده است.',
+    warning_is_visible: true,
+    warning_title: 'شرط الزامی: ورود با «اینترنت دیتای ایرانسل»',
+    warning_description: 'لطفاً پیش از ورود، وای‌فای و فیلترشکن را خاموش نموده و از طریق اینترنت همراه سیم‌کارت ایرانسل متصل گردید.',
+    warning_icon: 'signal_cellular_alt',
+    updated_at: new Date()
+  };
+
+  if (!pool || !isDbConnected) {
+    return res.json({ success: true, data: defaultSettings, settings: defaultSettings, fallback: true });
+  }
+
   try {
     const result = await pool.query(`SELECT * FROM public.login_notification_settings WHERE id = 'default' LIMIT 1`);
     if (result.rows.length === 0) {
-      return res.json({ success: true, data: null, settings: null });
+      return res.json({ success: true, data: defaultSettings, settings: defaultSettings });
     }
     const settings = result.rows[0];
     res.json({ success: true, data: settings, settings });
   } catch (err) {
     console.error('[App Login Notif API Error]', err);
-    res.status(500).json({ success: false, error: "خطا در دریافت تنظیمات اطلاع‌رسانی." });
+    res.json({ success: true, data: defaultSettings, settings: defaultSettings, fallback: true });
   }
 });
 
