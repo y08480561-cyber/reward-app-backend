@@ -123,7 +123,7 @@ fun classifyNetworkException(e: Throwable): ClassifiedNetworkError {
             category = NetworkErrorCategory.TLS_HANDSHAKE_FAILURE,
             technicalMessage = "TLS/SSL Handshake failure: ${e.message?.take(60)}",
             userFacingMessage = "خطا در برقراری ارتباط امن با سرور (TLS Handshake).",
-            recommendedAction = "اپراتور همراه اول ممکن است پروتکل امن به دامنه onrender.com را مختل کرده باشد. فعال‌سازی یک فیلترشکن/VPN با پروتکل استاندارد این مشکل را برطرف می‌کند."
+            recommendedAction = "ارتباط امن TLS با سرور api.kalametgame.ir با خطا مواجه شد. لطفاً پایداری اینترنت را بررسی نموده یا از اتصال مطمئن استفاده کنید."
         )
         is ConnectException -> ClassifiedNetworkError(
             category = NetworkErrorCategory.TCP_CONNECT_FAILURE,

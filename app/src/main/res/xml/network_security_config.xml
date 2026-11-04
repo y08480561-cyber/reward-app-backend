@@ -7,8 +7,10 @@
         </trust-anchors>
     </base-config>
 
-    <!-- Specific configuration for Render backend domains -->
+    <!-- Specific configuration for production backend domains -->
     <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">api.kalametgame.ir</domain>
+        <domain includeSubdomains="true">kalametgame.ir</domain>
         <domain includeSubdomains="true">onrender.com</domain>
         <domain includeSubdomains="true">reward-app-backend-a9ze.onrender.com</domain>
         <trust-anchors>

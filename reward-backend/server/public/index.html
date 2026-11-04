@@ -1,0 +1,3640 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <title>پنل مدیریت حرفه‌ای | رقابت کن، جایزه ببر</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    :root {
+      --bg-main: #0B192C;
+      --bg-card: #152A44;
+      --bg-card-hover: #1E3E62;
+      --border-color: #2E5077;
+      --gold-primary: #FFB703;
+      --gold-gradient: linear-gradient(135deg, #FFB703 0%, #FB8500 100%);
+      --text-muted: #94A3B8;
+      --sidebar-width: 270px;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Vazirmatn", Tahoma, sans-serif;
+      background-color: var(--bg-main);
+      color: #F8FAFC;
+      min-height: 100vh;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+    }
+
+    /* Layout Structure */
+    .admin-wrapper {
+      display: flex;
+      min-height: 100vh;
+      width: 100%;
+    }
+
+    /* Right Sidebar */
+    .admin-sidebar {
+      width: var(--sidebar-width);
+      background-color: #0E1E36;
+      border-left: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 1040;
+      transition: transform 0.25s ease-in-out;
+      box-shadow: -4px 0 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .sidebar-brand {
+      padding: 20px 18px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .sidebar-brand-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: var(--gold-gradient);
+      color: #0B192C;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      font-weight: 900;
+      box-shadow: 0 4px 12px rgba(255, 183, 3, 0.3);
+    }
+    .sidebar-brand-title {
+      font-size: 16px;
+      font-weight: 800;
+      color: #fff;
+      line-height: 1.25;
+      margin: 0;
+    }
+    .sidebar-brand-subtitle {
+      font-size: 11px;
+      color: var(--gold-primary);
+      margin: 0;
+    }
+
+    .sidebar-menu {
+      padding: 16px 10px;
+      overflow-y: auto;
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .nav-category-header {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      padding: 12px 14px 4px 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .sidebar-link {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 11px 14px;
+      border-radius: 12px;
+      color: #CBD5E1;
+      text-decoration: none;
+      font-size: 13.5px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .sidebar-link-content {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .sidebar-link i {
+      font-size: 17px;
+      color: var(--text-muted);
+      transition: color 0.2s;
+    }
+    .sidebar-link:hover {
+      background-color: rgba(255, 183, 3, 0.08);
+      color: #fff;
+    }
+    .sidebar-link:hover i {
+      color: var(--gold-primary);
+    }
+    .sidebar-link.active {
+      background: linear-gradient(135deg, rgba(255, 183, 3, 0.16) 0%, rgba(251, 133, 0, 0.16) 100%);
+      color: var(--gold-primary);
+      border-color: rgba(255, 183, 3, 0.35);
+      font-weight: 700;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+    .sidebar-link.active i {
+      color: var(--gold-primary);
+    }
+
+    .sidebar-footer {
+      padding: 14px;
+      border-top: 1px solid var(--border-color);
+      background-color: #0B1728;
+    }
+
+    /* Main Content Area */
+    .admin-main {
+      flex-grow: 1;
+      margin-right: var(--sidebar-width);
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      transition: margin-right 0.25s ease-in-out;
+    }
+
+    /* Top Navbar */
+    .admin-topbar {
+      height: 70px;
+      background-color: #0E1E36;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      position: sticky;
+      top: 0;
+      z-index: 1020;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .menu-toggle-btn {
+      display: none;
+      background: none;
+      border: 1px solid var(--border-color);
+      color: #fff;
+      font-size: 20px;
+      border-radius: 8px;
+      padding: 6px 10px;
+    }
+
+    /* Main Container Content */
+    .admin-content {
+      padding: 24px;
+      flex-grow: 1;
+    }
+
+    /* Section Visibility Controller */
+    .admin-section {
+      display: none;
+      animation: fadeIn 0.2s ease-in-out;
+    }
+    .admin-section.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Custom Theme Cards */
+    .card {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      color: #fff;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+    }
+    .gold-text { color: var(--gold-primary); font-weight: bold; }
+    .badge-gold {
+      background: var(--gold-gradient);
+      color: #0B192C;
+      font-weight: 800;
+      padding: 6px 12px;
+      border-radius: 20px;
+    }
+    .btn-gold {
+      background: var(--gold-gradient);
+      color: #0B192C;
+      font-weight: 700;
+      border: none;
+      box-shadow: 0 4px 12px rgba(255, 183, 3, 0.25);
+      transition: all 0.2s;
+    }
+    .btn-gold:hover {
+      background: linear-gradient(135deg, #FB8500 0%, #FFB703 100%);
+      color: #0B192C;
+      box-shadow: 0 6px 16px rgba(255, 183, 3, 0.4);
+      transform: translateY(-1px);
+    }
+
+    .form-control-dark, .form-select-dark {
+      background-color: #0E1E36;
+      border: 1px solid var(--border-color);
+      color: #fff;
+      border-radius: 10px;
+    }
+    .form-control-dark:focus, .form-select-dark:focus {
+      background-color: #152A44;
+      border-color: var(--gold-primary);
+      color: #fff;
+      box-shadow: 0 0 0 0.25rem rgba(255, 183, 3, 0.25);
+    }
+
+    .comp-banner {
+      background: linear-gradient(135deg, #152A44 0%, #1E3E62 100%);
+      border: 2px solid var(--gold-primary);
+      border-radius: 18px;
+    }
+    .ann-banner {
+      background: linear-gradient(135deg, #182C47 0%, #224263 100%);
+      border: 1.5px solid #38BDF8;
+      border-radius: 18px;
+    }
+
+    /* Irancell & Tapsell Network Notice Banner */
+    .irancell-alert-banner {
+      background: linear-gradient(135deg, rgba(17, 34, 58, 0.95) 0%, rgba(11, 25, 44, 0.98) 100%);
+      border: 1.5px solid rgba(255, 183, 3, 0.45);
+      border-right: 5px solid #FFB703;
+      border-radius: 16px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+      position: relative;
+      overflow: hidden;
+    }
+    .irancell-alert-banner::before {
+      content: '';
+      position: absolute;
+      top: -30px;
+      left: -30px;
+      width: 100px;
+      height: 100px;
+      background: radial-gradient(circle, rgba(255, 183, 3, 0.12) 0%, transparent 70%);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+    .pulse-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background-color: #10B981;
+      border-radius: 50%;
+      animation: pulseAnimation 2s infinite;
+    }
+    @keyframes pulseAnimation {
+      0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+      70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
+    /* Stat Cards */
+    .stat-card {
+      padding: 20px;
+      border-radius: 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      transition: transform 0.2s, box-shadow 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+    .stat-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+      border-color: rgba(255, 183, 3, 0.4);
+    }
+    .stat-card-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      margin-bottom: 12px;
+    }
+
+    /* Shortcut cards in dashboard */
+    .shortcut-card {
+      background: #11223A;
+      border: 1px solid var(--border-color);
+      border-radius: 14px;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      cursor: pointer;
+      text-decoration: none;
+      color: #fff;
+      transition: all 0.2s;
+    }
+    .shortcut-card:hover {
+      background: #193354;
+      border-color: var(--gold-primary);
+      color: var(--gold-primary);
+      transform: translateY(-2px);
+    }
+    .shortcut-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      background: rgba(255, 183, 3, 0.12);
+      color: var(--gold-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    /* Tables */
+    .table-dark {
+      background-color: var(--bg-card);
+    }
+    .table th {
+      border-color: var(--border-color);
+      font-weight: 700;
+      color: var(--text-muted);
+      font-size: 12.5px;
+      padding: 12px 14px;
+    }
+    .table td {
+      border-color: rgba(46, 80, 119, 0.45);
+      padding: 12px 14px;
+      vertical-align: middle;
+      font-size: 13.5px;
+    }
+
+    /* Mobile Backdrop */
+    .sidebar-backdrop {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.65);
+      z-index: 1030;
+      backdrop-filter: blur(2px);
+    }
+
+    /* Responsive */
+    @media (max-width: 991.98px) {
+      .admin-sidebar {
+        transform: translateX(100%);
+      }
+      .admin-sidebar.show {
+        transform: translateX(0);
+      }
+      .admin-main {
+        margin-right: 0;
+      }
+      .menu-toggle-btn {
+        display: block;
+      }
+      .sidebar-backdrop.show {
+        display: block;
+      }
+      .admin-content {
+        padding: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Mobile Backdrop -->
+  <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()"></div>
+
+  <div class="admin-wrapper">
+
+    <!-- 1. Right Sidebar Navigation -->
+    <aside class="admin-sidebar" id="adminSidebar">
+      <!-- Brand Header -->
+      <div class="sidebar-brand">
+        <div class="sidebar-brand-icon">
+          <i class="bi bi-trophy-fill"></i>
+        </div>
+        <div>
+          <h1 class="sidebar-brand-title">رقابت کن، جایزه ببر</h1>
+          <p class="sidebar-brand-subtitle">پنل مدیریت یکپارچه</p>
+        </div>
+      </div>
+
+      <!-- Navigation Menu -->
+      <div class="sidebar-menu">
+        <div class="nav-category-header">بخش اصلی</div>
+        <a class="sidebar-link active" onclick="navigateTo('dashboard')">
+          <div class="sidebar-link-content">
+            <i class="bi bi-speedometer2"></i>
+            <span>داشبورد اصلی</span>
+          </div>
+        </a>
+
+        <div class="nav-category-header">مدیریت محتوا</div>
+        <a class="sidebar-link" onclick="navigateTo('users')">
+          <div class="sidebar-link-content">
+            <i class="bi bi-people-fill"></i>
+            <span>مدیریت کاربران</span>
+          </div>
+        </a>
+        <a class="sidebar-link" onclick="navigateTo('rewards_management')">
+          <div class="sidebar-link-content">
+            <i class="bi bi-gift-fill"></i>
+            <span>جوایز و بنر هدیه</span>
+          </div>
+          <span class="badge bg-danger rounded-pill" id="sidebarClaimsBadge">۰</span>
+        </a>
+        <a class="sidebar-link" onclick="navigateTo('store')">
+          <div class="sidebar-link-content">
+            <i class="bi bi-shop"></i>
+            <span>فروشگاه و تراکنش‌ها</span>
+          </div>
+        </a>
+        <div class="nav-category-header">سیستم</div>
+        <a class="sidebar-link" onclick="navigateTo('settings')">
+          <div class="sidebar-link-content">
+            <i class="bi bi-gear-fill"></i>
+            <span>تنظیمات پنل</span>
+          </div>
+        </a>
+        <a class="sidebar-link" onclick="navigateTo('login_notification')">
+          <div class="sidebar-link-content">
+            <i class="bi bi-megaphone-fill"></i>
+            <span>مدیریت پیام ورود</span>
+          </div>
+        </a>
+        <a class="sidebar-link" onclick="navigateTo('support')">
+          <div class="sidebar-link-content">
+            <i class="bi bi-headset"></i>
+            <span>پشتیبانی کاربران</span>
+          </div>
+          <span class="badge bg-danger rounded-pill" id="sidebarSupportBadge" style="display: none;">۰</span>
+        </a>
+      </div>
+
+      <!-- Sidebar Footer -->
+      <div class="sidebar-footer">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-shield-check text-warning"></i>
+            <span class="small text-secondary">وضعیت سرور:</span>
+          </div>
+          <span id="authStatusBadge" class="badge bg-secondary">در حال بررسی...</span>
+        </div>
+        <button class="btn btn-sm btn-outline-danger w-100 fw-bold py-2" onclick="logoutAdmin()">
+          <i class="bi bi-box-arrow-right me-1"></i> خروج امن از پنل
+        </button>
+      </div>
+    </aside>
+
+    <!-- 2. Main Content Area -->
+    <div class="admin-main">
+      
+      <!-- Topbar Header -->
+      <header class="admin-topbar">
+        <div class="topbar-right">
+          <button class="menu-toggle-btn" onclick="toggleSidebar()" aria-label="منو">
+            <i class="bi bi-list"></i>
+          </button>
+          <div>
+            <h2 class="h5 gold-text mb-0 d-flex align-items-center gap-2" id="currentSectionTitle">
+              <i class="bi bi-speedometer2"></i> داشبورد اصلی
+            </h2>
+            <small class="text-secondary d-none d-sm-block">پایش آنلاین رویدادها، مسابقات دوره‌ای و پیام‌های کاربران</small>
+          </div>
+        </div>
+
+        <div class="topbar-left">
+          <button id="refreshBtn" class="btn btn-sm btn-warning fw-bold px-3 py-1.5" onclick="loadDashboard()">
+            <span id="refreshSpinner" class="spinner-border spinner-border-sm d-none me-1" role="status"></span>
+            <i class="bi bi-arrow-clockwise me-1"></i> به‌روزرسانی
+          </button>
+        </div>
+      </header>
+
+      <!-- Main Body Content -->
+      <main class="admin-content">
+        <!-- ============================================================== -->
+        <!-- Irancell Cellular & Tapsell Rewarded Ads System Alert Banner   -->
+        <!-- Visible across all 9 dashboard sections                         -->
+        <!-- ============================================================== -->
+
+
+        <!-- Global Alert Box -->
+        <div id="alertBox" class="alert alert-danger d-none shadow-sm mb-4" role="alert"></div>
+
+        <!-- ============================================================== -->
+        <!-- SECTION 1: داشبورد اصلی (Dashboard Overview) -->
+        <!-- ============================================================== -->
+        <section id="section-dashboard" class="admin-section active">
+          <!-- Stat Cards Row -->
+          <div class="row g-3 mb-4">
+            <div class="col-sm-6 col-xl-3">
+              <div class="stat-card">
+                <div class="stat-card-icon bg-info bg-opacity-10 text-info">
+                  <i class="bi bi-people-fill"></i>
+                </div>
+                <div class="text-secondary small fw-bold mb-1">کل کاربران ثبت‌شده</div>
+                <h3 id="totalUsers" class="gold-text mb-0">-</h3>
+              </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+              <div class="stat-card">
+                <div class="stat-card-icon bg-warning bg-opacity-10 text-warning">
+                  <i class="bi bi-star-fill"></i>
+                </div>
+                <div class="text-secondary small fw-bold mb-1">مجموع امتیازات دوره</div>
+                <h3 id="totalScores" class="gold-text mb-0">-</h3>
+              </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+              <div class="stat-card">
+                <div class="stat-card-icon bg-success bg-opacity-10 text-success">
+                  <i class="bi bi-cart-check-fill"></i>
+                </div>
+                <div class="text-secondary small fw-bold mb-1">تراکنش‌های فروشگاه</div>
+                <h3 id="totalTransactions" class="gold-text mb-0">-</h3>
+              </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+              <div class="stat-card">
+                <div class="stat-card-icon bg-danger bg-opacity-10 text-danger">
+                  <i class="bi bi-gift-fill"></i>
+                </div>
+                <div class="text-secondary small fw-bold mb-1">درخواست‌های جایزه</div>
+                <h3 id="totalClaims" class="gold-text mb-0">-</h3>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Shortcuts Grid -->
+          <h6 class="text-secondary fw-bold mb-3"><i class="bi bi-grid-fill me-1"></i> دسترسی سریع</h6>
+          <div class="row g-3 mb-4">
+            <div class="col-md-3 col-sm-6">
+              <div class="shortcut-card" onclick="navigateTo('users')">
+                <div class="shortcut-icon"><i class="bi bi-people-fill"></i></div>
+                <div>
+                  <div class="fw-bold">کاربران</div>
+                  <small class="text-secondary">جستجو و امتیازها</small>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+              <div class="shortcut-card" onclick="navigateTo('store')">
+                <div class="shortcut-icon"><i class="bi bi-shop"></i></div>
+                <div>
+                  <div class="fw-bold">فروشگاه</div>
+                  <small class="text-secondary">تراکنش‌ها و قیمت</small>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+              <div class="shortcut-card" onclick="navigateTo('rewards_management')">
+                <div class="shortcut-icon"><i class="bi bi-gift-fill"></i></div>
+                <div>
+                  <div class="fw-bold">جوایز</div>
+                  <small class="text-secondary">بنر و هدایا</small>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-3 col-sm-6">
+              <div class="shortcut-card" onclick="navigateTo('settings')">
+                <div class="shortcut-icon"><i class="bi bi-gear-fill"></i></div>
+                <div>
+                  <div class="fw-bold">تنظیمات</div>
+                  <small class="text-secondary">امنیت پنل</small>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Active Highlights (Competition & Announcement Summary) -->
+          <!-- Active Highlights (Competition Status) -->
+          <div class="row g-4">
+            <div class="col-lg-12">
+              <div class="card p-3 shadow">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-trophy-fill text-warning fs-5"></i>
+                    <h6 class="gold-text mb-0">وضعیت دوره فعال مسابقه</h6>
+                  </div>
+                </div>
+                <div class="p-3 rounded mb-2" style="background-color: #0E1E36; border: 1px solid var(--border-color);">
+                  <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="badge bg-warning text-dark fw-bold" id="dashCompNumber">دوره فعال</span>
+                    <span class="badge bg-success">در حال برگزاری</span>
+                  </div>
+                  <h5 class="text-white mb-2" id="dashCompTitle">در حال بارگذاری...</h5>
+                  <div class="small text-secondary">مهلت پایان: <span class="text-warning fw-bold" id="dashCompEndedAt">-</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================== -->
+        <!-- SECTION 2: مدیریت کاربران (Users Management) -->
+        <!-- ============================================================== -->
+        <section id="section-users" class="admin-section">
+          <div class="card p-4 shadow">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4 pb-3 border-bottom border-secondary">
+              <div>
+                <h4 class="gold-text mb-1"><i class="bi bi-people-fill text-warning me-2"></i> شرکت‌کنندگان دوره مسابقه فعلی</h4>
+                <p class="text-secondary small mb-0">فهرست زنده کاربران، شماره موبایل، رتبه فعلی و امتیازها</p>
+              </div>
+              <div class="d-flex gap-2">
+                <div style="width: 250px;">
+                  <input type="text" id="userSearchInput" class="form-control form-control-sm form-control-dark" placeholder="جستجو بر اساس نام و نام خانوادگی..." oninput="filterUsers()">
+                </div>
+                <a href="/admin/users" class="btn btn-sm btn-outline-warning" target="_blank">
+                  <i class="bi bi-box-arrow-up-right me-1"></i> صفحه جداگانه
+                </a>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="table table-dark table-hover table-striped rounded align-middle">
+                <thead>
+                  <tr class="text-secondary small">
+                    <th style="width: 60px;">رتبه</th>
+                    <th>نام و نام خانوادگی</th>
+                    <th>شماره همراه</th>
+                    <th>مجموع امتیاز</th>
+                    <th style="width: 140px;">عملیات</th>
+                  </tr>
+                </thead>
+                <tbody id="usersTbody">
+                  <tr><td colspan="5" class="text-center py-4 text-secondary">در حال بارگذاری اطلاعات کاربران...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================== -->
+        <section id="section-store" class="admin-section">
+          <!-- Overview Metric Cards -->
+          <div class="row g-3 mb-4">
+            <div class="col-md-3 col-6">
+              <div class="stat-card">
+                <div class="stat-card-header">
+                  <span class="stat-label">تعداد بسته‌های فروشگاه</span>
+                  <div class="stat-icon-wrap" style="color: #FFB703; background: rgba(255,183,3,0.15);">
+                    <i class="bi bi-box-seam-fill"></i>
+                  </div>
+                </div>
+                <div class="stat-value" id="storePackagesCount">۴ بسته</div>
+                <div class="stat-subtext text-warning"><i class="bi bi-check-circle me-1"></i> فعال و قابل ارتقا</div>
+              </div>
+            </div>
+            <div class="col-md-3 col-6">
+              <div class="stat-card">
+                <div class="stat-card-header">
+                  <span class="stat-label">تعداد خریدهای موفق</span>
+                  <div class="stat-icon-wrap" style="color: #10B981; background: rgba(16,185,129,0.15);">
+                    <i class="bi bi-bag-check-fill"></i>
+                  </div>
+                </div>
+                <div class="stat-value text-success" id="storeTotalPurchases">۰ تراکنش</div>
+                <div class="stat-subtext text-secondary">ثبت شده در سرور</div>
+              </div>
+            </div>
+            <div class="col-md-3 col-6">
+              <div class="stat-card">
+                <div class="stat-card-header">
+                  <span class="stat-label">مجموع فروش فروشگاه</span>
+                  <div class="stat-icon-wrap" style="color: #38BDF8; background: rgba(56,189,248,0.15);">
+                    <i class="bi bi-cash-stack"></i>
+                  </div>
+                </div>
+                <div class="stat-value text-info" id="storeTotalRevenue">۰ تومان</div>
+                <div class="stat-subtext text-secondary">درآمد ناخالص بسته‌ها</div>
+              </div>
+            </div>
+            <div class="col-md-3 col-6">
+              <div class="stat-card">
+                <div class="stat-card-header">
+                  <span class="stat-label">اتصال پرداخت مایکت</span>
+                  <div class="stat-icon-wrap" style="color: #A855F7; background: rgba(168,85,247,0.15);">
+                    <i class="bi bi-shield-check"></i>
+                  </div>
+                </div>
+                <div class="stat-value text-warning" style="font-size: 16px;" id="storeMyketStatus">آماده‌سازی کنسول</div>
+                <div class="stat-subtext text-secondary">IAB رسمی نسخه ۳ مایکت</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Product Management Card -->
+          <div class="card p-4 shadow mb-4" style="border: 1px solid #FFB703; background-color: #12253B;">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+              <div>
+                <h4 class="gold-text fw-bold mb-1"><i class="bi bi-shop me-2"></i> مدیریت قیمت‌های فروشگاه (۴ بسته اصلی)</h4>
+                <p class="text-secondary small mb-0">امکان تغییر قیمت ۴ بسته ثابت (دو بسته مربع و دو سطح ارتقای نقره‌ای و طلایی). نام، تعداد، ضرایب و مشخصات ثابت هستند.</p>
+              </div>
+              <div class="d-flex gap-2">
+                <button class="btn btn-outline-warning btn-sm" onclick="loadStoreProducts()"><i class="bi bi-arrow-clockwise me-1"></i> بروزرسانی</button>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="table table-hover align-middle mb-0 text-white">
+                <thead class="table-dark" style="border-bottom: 2px solid var(--border-color);">
+                  <tr class="small text-secondary">
+                    <th>عنوان بسته</th>
+                    <th>نوع محصول</th>
+                    <th>محتوا / سهمیه</th>
+                    <th>قیمت (تومان) - قابل ویرایش</th>
+                    <th>شناسه مایکت (SKU)</th>
+                    <th>وضعیت نمایش</th>
+                    <th>عملیات ویرایش قیمت</th>
+                  </tr>
+                </thead>
+                <tbody id="storeProductsTbody">
+                  <tr><td colspan="7" class="text-center text-secondary py-4"><span class="spinner-border spinner-border-sm me-2"></span> در حال بارگذاری بسته‌ها...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Purchase Orders & Transactions Audit Card -->
+          <div class="card p-4 shadow" style="border: 1px solid var(--border-color); background-color: #12253B;">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+              <div>
+                <h4 class="text-info fw-bold mb-1"><i class="bi bi-receipt-cutoff me-2"></i> گزارش تراکنش‌ها و سفارش‌های خرید مایکت</h4>
+                <p class="text-secondary small mb-0">سوابق اعتبارسنجی توکن، سفارش‌های تکمیل‌شده و لاگ خطاهای پرداخت</p>
+              </div>
+              <button class="btn btn-outline-info btn-sm" onclick="loadStorePurchases()"><i class="bi bi-arrow-clockwise me-1"></i> بروزرسانی لاگ</button>
+            </div>
+
+            <div class="table-responsive">
+              <table class="table table-hover align-middle mb-0 text-white">
+                <thead class="table-dark" style="border-bottom: 2px solid var(--border-color);">
+                  <tr class="small text-secondary">
+                    <th>شناسه سفارش</th>
+                    <th>کاربر / موبایل</th>
+                    <th>بسته خریداری‌شده</th>
+                    <th>مبلغ پرداختی</th>
+                    <th>توکن خرید مایکت</th>
+                    <th>وضعیت وریفای</th>
+                    <th>تاریخ ثبت</th>
+                  </tr>
+                </thead>
+                <tbody id="storePurchasesTbody">
+                  <tr><td colspan="7" class="text-center text-secondary py-4">در حال بارگذاری تراکنش‌ها...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================== -->
+        <!-- Unified Rewards Management Section -->
+        <!-- ============================================================== -->
+        <section id="section-rewards_management" class="admin-section">
+          <div class="card p-0 shadow mb-4" style="border: 1px solid var(--border-color); background-color: #12253B; overflow: hidden;">
+            <!-- Custom Navigation Tabs -->
+            <ul class="nav nav-tabs nav-justified border-0 bg-dark bg-opacity-25" id="rewardsTabs" role="tablist">
+              <li class="nav-item" role="presentation">
+                <button class="nav-link active text-white py-3 fw-bold" id="tab-rewards-list" data-bs-toggle="tab" data-bs-target="#panel-rewards-list" type="button" role="tab" onclick="loadRewardsData()">
+                  <i class="bi bi-list-stars me-1"></i> فهرست هدایا
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link text-white py-3 fw-bold" id="tab-rewards-banner" data-bs-toggle="tab" data-bs-target="#panel-rewards-banner" type="button" role="tab" onclick="loadRewardAppearance()">
+                  <i class="bi bi-palette-fill me-1"></i> بنر و ظاهر ویترین
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link text-white py-3 fw-bold" id="tab-rewards-claims" data-bs-toggle="tab" data-bs-target="#panel-rewards-claims" type="button" role="tab" onclick="loadRewardClaims()">
+                  <i class="bi bi-inbox-fill me-1"></i> درخواست‌های دریافتی
+                  <span class="badge bg-danger rounded-pill ms-1" id="tabClaimsBadge">۰</span>
+                </button>
+              </li>
+            </ul>
+
+            <div class="tab-content p-4" id="rewardsTabsContent">
+              <!-- Tab 1: Rewards List -->
+              <div class="tab-pane fade show active" id="panel-rewards-list" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                  <div>
+                    <h5 class="gold-text mb-1">تعریف و مدیریت کالاهای جایزه</h5>
+                    <p class="text-secondary small mb-0">تعیین امتیاز لازم، موجودی انبار و تصویر جوایز برای نمایش در اپلیکیشن</p>
+                  </div>
+                  <div class="d-flex gap-2">
+                    <button class="btn btn-outline-info btn-sm" onclick="loadRewardsData()"><i class="bi bi-arrow-clockwise me-1"></i> بروزرسانی</button>
+                    <button class="btn btn-warning btn-sm fw-bold" onclick="openAddRewardModal()"><i class="bi bi-plus-circle-fill me-1"></i> افزودن جایزه جدید</button>
+                  </div>
+                </div>
+                <div class="table-responsive">
+                  <table class="table table-hover align-middle mb-0 text-white">
+                    <thead class="table-dark">
+                      <tr class="small text-secondary">
+                        <th>تصویر & عنوان جایزه</th>
+                        <th>دسته‌بندی</th>
+                        <th>امتیاز لازم</th>
+                        <th>موجودی</th>
+                        <th>ویژه</th>
+                        <th>وضعیت</th>
+                        <th>عملیات</th>
+                      </tr>
+                    </thead>
+                    <tbody id="rewardsTbody"></tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Tab 2: Banner Settings -->
+              <div class="tab-pane fade" id="panel-rewards-banner" role="tabpanel">
+                <h5 class="gold-text mb-3">تنظیمات بصری و بنر اصلی جوایز</h5>
+                <form onsubmit="saveRewardAppearance(event)">
+                  <div class="row g-3">
+                    <div class="col-md-8">
+                      <label class="form-label text-secondary small fw-bold">عنوان بنر هدیه (Hero Title):</label>
+                      <input type="text" id="rewAppHeroTitle" class="form-control form-control-dark mb-3" required>
+                      <label class="form-label text-secondary small fw-bold">زیرعنوان بنر:</label>
+                      <input type="text" id="rewAppHeroSubtitle" class="form-control form-control-dark mb-3">
+                      <label class="form-label text-secondary small fw-bold">متن راهنما و قوانین:</label>
+                      <textarea id="rewAppTermsText" rows="3" class="form-control form-control-dark"></textarea>
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label text-secondary small fw-bold">رنگ تم اصلی:</label>
+                      <input type="color" id="rewAppColor" class="form-control form-control-color w-100 bg-dark mb-3" style="height: 38px;">
+                      
+                      <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="rewAppIsActive" checked>
+                        <label class="form-check-label text-white small" for="rewAppIsActive">نمایش بنر در اپلیکیشن</label>
+                      </div>
+
+                      <button type="submit" class="btn btn-gold w-100 fw-bold">
+                        <i class="bi bi-save me-1"></i> ذخیره تنظیمات
+                      </button>
+                    </div>
+                    <div class="col-12 mt-3">
+                      <label class="form-label text-secondary small fw-bold">تصویر بنر (بارگذاری مستقیم):</label>
+                      <div class="p-3 rounded bg-dark bg-opacity-50 border border-secondary text-center">
+                        <input type="file" id="rewAppImageFile" accept="image/*" class="d-none" onchange="handleBannerImageSelect(event)">
+                        <input type="hidden" id="rewAppBannerUrl">
+                        <div id="rewAppPreviewContainer" class="mb-3 d-none">
+                          <img id="rewAppPreviewImg" class="rounded shadow border border-warning" style="max-height: 200px; max-width: 100%;">
+                          <div class="mt-2">
+                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeBannerImage()">حذف تصویر</button>
+                          </div>
+                        </div>
+                        <div id="rewAppUploadPrompt">
+                          <button type="button" class="btn btn-outline-warning" onclick="document.getElementById('rewAppImageFile').click()">
+                            <i class="bi bi-upload me-1"></i> انتخاب تصویر جدید
+                          </button>
+                        </div>
+                        <div id="rewAppUploadProgressWrapper" class="mt-3 d-none">
+                          <div class="progress" style="height: 8px;">
+                            <div id="rewAppUploadProgressBar" class="progress-bar bg-warning" style="width: 0%"></div>
+                          </div>
+                          <small id="rewAppUploadStatusText" class="text-secondary mt-1 d-block">در حال آپلود...</small>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </form>
+              </div>
+
+              <!-- Tab 3: Claims Management -->
+              <div class="tab-pane fade" id="panel-rewards-claims" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                  <div>
+                    <h5 class="gold-text mb-1">درخواست‌های ثبت‌شده توسط کاربران</h5>
+                    <p class="text-secondary small mb-0">مدیریت وضعیت ارسال هدایا و تایید نهایی</p>
+                  </div>
+                  <button class="btn btn-outline-info btn-sm" onclick="loadRewardClaims()"><i class="bi bi-arrow-clockwise me-1"></i> بروزرسانی لیست</button>
+                </div>
+                <div class="table-responsive">
+                  <table class="table table-hover align-middle mb-0 text-white">
+                    <thead class="table-dark">
+                      <tr class="small text-secondary">
+                        <th>کد پیگیری</th>
+                        <th>کاربر</th>
+                        <th>جایزه</th>
+                        <th>امتیاز</th>
+                        <th>گیرنده & آدرس</th>
+                        <th>وضعیت</th>
+                        <th>مدیریت</th>
+                      </tr>
+                    </thead>
+                    <tbody id="rewardClaimsTbody"></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+
+
+        <!-- ============================================================== -->
+        <!-- SECTION 5: پشتیبانی (Support) -->
+        <!-- ============================================================== -->
+        <!-- ============================================================== -->
+        <!-- SECTION 6: مدیریت پیام صفحه ورود (Login Notification Management) -->
+        <!-- ============================================================== -->
+        <section id="section-login_notification" class="admin-section">
+          <div class="row g-4">
+            <!-- Form Column -->
+            <div class="col-lg-7">
+              <div class="card p-4 shadow h-100">
+                <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom border-secondary">
+                  <div>
+                    <h4 class="gold-text mb-1"><i class="bi bi-megaphone-fill me-2"></i> تنظیمات محتوای صفحه ورود</h4>
+                    <p class="text-secondary small mb-0">ویرایش متن‌ها، آیکون‌ها و وضعیت نمایش کارت اطلاع‌رسانی ایرانسل</p>
+                  </div>
+                  <button class="btn btn-outline-warning btn-sm" onclick="loadLoginNotification()"><i class="bi bi-arrow-clockwise"></i></button>
+                </div>
+
+                <form id="loginNotifForm" onsubmit="saveLoginNotification(event)">
+                  <div class="row g-3">
+                    <div class="col-12">
+                      <div class="form-check form-switch p-3 rounded bg-dark bg-opacity-25 border border-secondary mb-3">
+                        <input class="form-check-input ms-0 me-2" type="checkbox" id="ln_isVisible" checked onchange="updateLNPreview()">
+                        <label class="form-check-label text-white fw-bold" for="ln_isVisible">نمایش کل کارت اطلاع‌رسانی در اپلیکیشن</label>
+                      </div>
+                    </div>
+
+                    <div class="col-md-8">
+                      <label class="form-label text-secondary small fw-bold">متن برچسب (Badge):</label>
+                      <input type="text" id="ln_badgeText" class="form-control form-control-dark mb-3" placeholder="مثلاً: سرویس اختصاصی مشترکین ایرانسل" oninput="updateLNPreview()">
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label text-secondary small fw-bold">آیکون برچسب:</label>
+                      <select id="ln_badgeIcon" class="form-select form-select-dark mb-3" onchange="updateLNPreview()">
+                        <option value="verified">Verified (تایید شده)</option>
+                        <option value="stars">Stars (ستاره)</option>
+                        <option value="check_circle">Check Circle</option>
+                        <option value="emoji_events">Trophy</option>
+                      </select>
+                    </div>
+
+                    <div class="col-12">
+                      <label class="form-label text-secondary small fw-bold">عنوان اصلی (Literary Title):</label>
+                      <input type="text" id="ln_mainTitle" class="form-control form-control-dark mb-3" oninput="updateLNPreview()">
+                    </div>
+
+                    <div class="col-12">
+                      <label class="form-label text-secondary small fw-bold">متن توضیحات اصلی:</label>
+                      <textarea id="ln_mainDescription" rows="3" class="form-control form-control-dark mb-3" oninput="updateLNPreview()"></textarea>
+                    </div>
+
+                    <div class="col-12">
+                      <div class="p-3 rounded border border-info border-opacity-25 bg-info bg-opacity-10 mb-3">
+                        <div class="form-check form-switch mb-3">
+                          <input class="form-check-input ms-0 me-2" type="checkbox" id="ln_warningIsVisible" checked onchange="updateLNPreview()">
+                          <label class="form-check-label text-info fw-bold" for="ln_warningIsVisible">نمایش کادر هشدار اینترنت</label>
+                        </div>
+                        
+                        <div class="row g-3">
+                          <div class="col-md-8">
+                            <label class="form-label text-secondary small fw-bold">عنوان کادر هشدار:</label>
+                            <input type="text" id="ln_warningTitle" class="form-control form-control-dark mb-2" oninput="updateLNPreview()">
+                          </div>
+                          <div class="col-md-4">
+                            <label class="form-label text-secondary small fw-bold">آیکون هشدار:</label>
+                            <select id="ln_warningIcon" class="form-select form-select-dark mb-2" onchange="updateLNPreview()">
+                              <option value="signal_cellular_alt">Signal (آنتن)</option>
+                              <option value="wifi_off">Wifi Off</option>
+                              <option value="cell_tower">Cell Tower</option>
+                            </select>
+                          </div>
+                          <div class="col-12">
+                            <label class="form-label text-secondary small fw-bold">توضیحات هشدار:</label>
+                            <textarea id="ln_warningDescription" rows="2" class="form-control form-control-dark" oninput="updateLNPreview()"></textarea>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="col-12 d-flex gap-2">
+                      <button type="submit" class="btn btn-gold flex-grow-1 py-2 fw-bold">
+                        <i class="bi bi-save2-fill me-1"></i> ذخیره و انتشار آنی در اپلیکیشن
+                      </button>
+                      <button type="button" class="btn btn-outline-secondary" onclick="resetLoginNotificationDefaults()">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i> بازگشت به پیش‌فرض ایرانسل
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <!-- Preview Column -->
+            <div class="col-lg-5">
+              <div class="card p-4 shadow h-100 bg-black bg-opacity-25" style="border-style: dashed;">
+                <h6 class="text-secondary fw-bold mb-4 text-center"><i class="bi bi-eye-fill me-1"></i> پیش‌نمایش زنده (Live Preview)</h6>
+                
+                <div class="d-flex justify-content-center align-items-center h-100">
+                  <!-- App Screen Mockup -->
+                  <div style="width: 320px; background-color: #F1F5F9; border-radius: 30px; border: 8px solid #334155; padding: 20px; min-height: 500px; box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
+                    <!-- Header Mockup -->
+                    <div style="height: 120px; background: linear-gradient(to bottom, #0B192C, #1E3E62); border-radius: 0 0 20px 20px; margin: -20px -20px 20px -20px; display: flex; align-items: center; justify-content: center;">
+                       <div style="width: 40px; height: 40px; background: #FFB703; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+                         <i class="bi bi-trophy-fill" style="color: #0B192C;"></i>
+                       </div>
+                    </div>
+
+                    <!-- Dynamic Card Preview -->
+                    <div id="ln_preview_container" style="display: none;">
+                      <div style="background: linear-gradient(135deg, #0F2542, #16325B); border: 1.5px solid #FFB703; border-radius: 18px; padding: 15px; box-shadow: 0 8px 15px rgba(0,0,0,0.2); text-align: center;">
+                        <!-- Badge -->
+                        <div style="display: inline-block; background: linear-gradient(to right, #FFB703, #FB8500); border-radius: 20px; padding: 4px 12px; margin-bottom: 10px;">
+                          <div style="display: flex; align-items: center; gap: 5px; font-size: 9px; font-weight: 900; color: #0B192C;">
+                            <i id="ln_preview_badgeIcon" class="bi bi-patch-check-fill"></i>
+                            <span id="ln_preview_badgeText">سرویس اختصاصی</span>
+                          </div>
+                        </div>
+                        
+                        <!-- Title -->
+                        <h6 id="ln_preview_mainTitle" style="color: #FFB703; font-weight: 900; font-size: 13px; line-height: 1.4; margin-bottom: 8px;">عنوان اصلی</h6>
+                        
+                        <!-- Desc -->
+                        <p id="ln_preview_mainDescription" style="color: rgba(255,255,255,0.9); font-size: 10px; line-height: 1.5; margin-bottom: 12px;">توضیحات مربوط به سرویس ایرانسل</p>
+                        
+                        <!-- Warning -->
+                        <div id="ln_preview_warningBox" style="background: rgba(10,25,47,0.8); border: 1px solid rgba(255,183,3,0.3); border-radius: 12px; padding: 10px; text-align: right; display: flex; gap: 10px; align-items: flex-start;">
+                          <div style="width: 24px; height: 24px; background: rgba(255,183,3,0.15); border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+                            <i id="ln_preview_warningIcon" class="bi bi-reception-4" style="color: #FFB703; font-size: 12px;"></i>
+                          </div>
+                          <div>
+                            <div id="ln_preview_warningTitle" style="color: #FFB703; font-weight: 800; font-size: 11px; margin-bottom: 2px;">شرط الزامی</div>
+                            <div id="ln_preview_warningDescription" style="color: #CBD5E1; font-size: 9px; line-height: 1.4;">توضیحات هشدار اینترنت</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div id="ln_preview_hidden_msg" style="text-align: center; color: #64748B; font-size: 11px; margin-top: 50px;">
+                       <i class="bi bi-eye-slash-fill d-block fs-3 mb-2"></i>
+                       کارت اطلاع‌رسانی مخفی شده است
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="section-support" class="admin-section">
+          <!-- Stat Cards Row -->
+          <div class="row g-3 mb-4">
+            <div class="col-sm-6 col-xl-3">
+              <div class="stat-card">
+                <div class="stat-card-icon bg-info bg-opacity-10 text-info">
+                  <i class="bi bi-chat-left-text-fill"></i>
+                </div>
+                <div class="text-secondary small fw-bold mb-1">کل تیکت‌ها</div>
+                <h3 id="supportCountTotal" class="gold-text mb-0">-</h3>
+              </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+              <div class="stat-card">
+                <div class="stat-card-icon bg-danger bg-opacity-10 text-danger">
+                  <i class="bi bi-exclamation-circle-fill"></i>
+                </div>
+                <div class="text-secondary small fw-bold mb-1">جدید / بی‌پاسخ</div>
+                <h3 id="supportCountNew" class="text-danger mb-0">-</h3>
+              </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+              <div class="stat-card">
+                <div class="stat-card-icon bg-warning bg-opacity-10 text-warning">
+                  <i class="bi bi-clock-history"></i>
+                </div>
+                <div class="text-secondary small fw-bold mb-1">در حال بررسی</div>
+                <h3 id="supportCountInProgress" class="text-warning mb-0">-</h3>
+              </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+              <div class="stat-card">
+                <div class="stat-card-icon bg-success bg-opacity-10 text-success">
+                  <i class="bi bi-check-all"></i>
+                </div>
+                <div class="text-secondary small fw-bold mb-1">پاسخ داده شده</div>
+                <h3 id="supportCountAnswered" class="text-success mb-0">-</h3>
+              </div>
+            </div>
+          </div>
+
+          <div class="card p-4 shadow">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4 pb-3 border-bottom border-secondary">
+              <div>
+                <h4 class="gold-text mb-1"><i class="bi bi-headset text-warning me-2"></i> مرکز پشتیبانی و تیکت‌ها</h4>
+                <p class="text-secondary small mb-0">فهرست پیام‌های دریافتی از کاربران و پاسخگویی آنلاین</p>
+              </div>
+              <div class="d-flex gap-2 flex-wrap">
+                <select id="supportStatusFilter" class="form-select form-select-sm form-select-dark" style="width: 140px;" onchange="filterSupportTickets()">
+                  <option value="ALL">همه وضعیت‌ها</option>
+                  <option value="NEW">جدید</option>
+                  <option value="IN_PROGRESS">در حال بررسی</option>
+                  <option value="ANSWERED">پاسخ داده شده</option>
+                  <option value="CLOSED">بسته شده</option>
+                </select>
+                <select id="supportCategoryFilter" class="form-select form-select-sm form-select-dark" style="width: 140px;" onchange="filterSupportTickets()">
+                  <option value="ALL">همه موضوعات</option>
+                  <option value="SCORES">امتیازها</option>
+                  <option value="ADS">تبلیغات</option>
+                  <option value="PRIZES">جوایز</option>
+                  <option value="PURCHASE">خرید</option>
+                  <option value="OTHER">سایر</option>
+                </select>
+                <div style="width: 200px;">
+                  <input type="text" id="supportSearchInput" class="form-control form-control-sm form-control-dark" placeholder="جستجو کد یا شماره..." oninput="filterSupportTickets()">
+                </div>
+                <button class="btn btn-sm btn-outline-warning" onclick="loadAdminSupportTickets()">
+                  <i class="bi bi-arrow-clockwise"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="mb-3 small text-secondary" id="supportFilterSummary">در حال دریافت آمار...</div>
+
+            <div class="table-responsive">
+              <table class="table table-dark table-hover table-striped rounded align-middle">
+                <thead>
+                  <tr class="text-secondary small">
+                    <th style="width: 110px;">کد پیگیری</th>
+                    <th>نام کاربر / موبایل</th>
+                    <th>دسته</th>
+                    <th>موضوع تیکت</th>
+                    <th>وضعیت</th>
+                    <th>آخرین پیام</th>
+                    <th>بروزرسانی</th>
+                    <th style="width: 100px;">عملیات</th>
+                  </tr>
+                </thead>
+                <tbody id="supportTicketsTbody">
+                  <tr><td colspan="8" class="text-center py-4 text-secondary">در حال بارگذاری تیکت‌های پشتیبانی...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================== -->
+        <!-- SECTION 9: تنظیمات و دسترسی (Settings) -->
+        <!-- ============================================================== -->
+        <section id="section-settings" class="admin-section">
+          <div class="row g-4">
+            <div class="col-lg-6">
+              <div class="card p-4 shadow">
+                <h4 class="gold-text mb-3"><i class="bi bi-key-fill text-warning me-2"></i> احراز هویت مدیریت (ADMIN_KEY)</h4>
+                <p class="text-secondary small mb-3">
+                  برای امنیت پنل و جلوگیری از دسترسی غیرمجاز به اطلاعات کاربران، کلید امنیتی مدیریت در مرورگر شما ذخیره شده و با هر درخواست به سرور ارسال می‌شود.
+                </p>
+                <div class="mb-3">
+                  <label class="form-label text-secondary small fw-bold">کلید امنیتی فعلی:</label>
+                  <input type="password" id="adminKeyInput" class="form-control form-control-dark" placeholder="کلید امنیتی ادمین...">
+                </div>
+                <button class="btn btn-gold px-4" onclick="saveAdminKey()">
+                  <i class="bi bi-save me-1"></i> تایید و ذخیره کلید
+                </button>
+              </div>
+            </div>
+
+            <div class="col-lg-6">
+              <div class="card p-4 shadow">
+                <h4 class="text-info mb-3"><i class="bi bi-server me-2"></i> مشخصات فنی سرور و پایگاه داده</h4>
+                <ul class="list-unstyled text-secondary small d-flex flex-column gap-2 mb-0">
+                  <li><strong class="text-white">میزبانی سرور:</strong> Render Cloud Service (Node.js)</li>
+                  <li><strong class="text-white">پایگاه داده:</strong> Supabase Cloud PostgreSQL (Connection Pooler)</li>
+                  <li><strong class="text-white">اعلان‌های پوش:</strong> OneSignal REST API v1</li>
+                  <li><strong class="text-white">سیستم امنیت تبلیغات:</strong> توکن‌های یکبارمصرف و اعتبارسنجی تپسل پلاس</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- ============================================================== -->
+  <!-- MODALS (Support Conversation, Announcement, Start Competition, Archive) -->
+  <!-- ============================================================== -->
+
+  <!-- Modal: Support Ticket Conversation & Reply -->
+  <div class="modal fade modal-dark" id="ticketConversationModal" tabindex="-1" aria-labelledby="ticketConvModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content" style="background-color: #12253B; border: 1px solid var(--border-color); color: #fff;">
+        <div class="modal-header border-secondary">
+          <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-chat-left-text-fill text-info fs-5"></i>
+            <div>
+              <h5 class="modal-title text-white fw-bold" id="ticketConvTitle">گفت‌وگوی تیکت</h5>
+              <div class="small text-secondary">
+                کد پیگیری: <span id="ticketConvCode" class="text-warning fw-bold">-</span> |
+                کاربر: <span id="ticketConvUser" class="text-white">-</span> (<span id="ticketConvPhone" class="text-info">-</span>)
+              </div>
+            </div>
+          </div>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="بستن"></button>
+        </div>
+        <div class="modal-body p-3">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 p-2 rounded mb-3" style="background: #0B192C; border: 1px solid var(--border-color);">
+            <div>
+              <span class="badge bg-secondary me-1" id="ticketConvCategory">-</span>
+              <span class="badge bg-primary" id="ticketConvStatusBadge">-</span>
+              <span class="text-secondary small ms-2">ثبت: <span id="ticketConvCreated">-</span></span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <label class="text-secondary small">تغییر وضعیت:</label>
+              <select id="ticketConvStatusSelect" class="form-select form-select-sm form-select-dark" style="width: auto;" onchange="updateTicketStatusFromSelect()">
+                <option value="NEW">جدید</option>
+                <option value="IN_PROGRESS">در حال بررسی</option>
+                <option value="ANSWERED">پاسخ داده شد</option>
+                <option value="CLOSED">بسته شد</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="ticketMessagesContainer" class="p-3 rounded mb-3" style="max-height: 380px; overflow-y: auto; background-color: #0B192C; border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 12px;">
+            <div class="text-center text-secondary py-3">در حال بارگذاری پیام‌ها...</div>
+          </div>
+
+          <div id="ticketReplyBox">
+            <label class="form-label text-warning small fw-bold"><i class="bi bi-reply-fill"></i> ارسال پاسخ مدیریت به کاربر:</label>
+            <textarea id="adminReplyTextarea" rows="3" class="form-control form-control-dark mb-2" placeholder="متن پاسخ مدیریت را اینجا بنویسید..."></textarea>
+            <div class="d-flex justify-content-between align-items-center">
+              <div class="form-check form-check-inline small">
+                <input class="form-check-input" type="checkbox" id="replySetAnswered" checked>
+                <label class="form-check-label text-secondary" for="replySetAnswered">تغییر خودکار وضعیت به «پاسخ داده شد»</label>
+              </div>
+              <button type="button" class="btn btn-gold btn-sm px-4 fw-bold" id="sendReplyBtn" onclick="sendAdminReply()">
+                <span id="sendReplySpinner" class="spinner-border spinner-border-sm d-none me-1" role="status"></span>
+                <i class="bi bi-send-fill me-1"></i> ثبت و ارسال پاسخ
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Create / Edit Home Announcement -->
+  <div class="modal fade modal-dark" id="announcementModal" tabindex="-1" aria-labelledby="announcementModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content" style="background-color: #12253B; border: 1px solid var(--border-color); color: #fff;">
+        <div class="modal-header border-secondary">
+          <h5 class="modal-title text-info fw-bold" id="announcementModalLabel"><i class="bi bi-megaphone-fill me-2"></i> مدیریت پیام و اطلاعیه صفحه اصلی</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="بستن"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="editAnnId" value="">
+
+          <div class="row g-3">
+            <div class="col-md-8">
+              <label class="form-label text-secondary small fw-bold">عنوان پیام:</label>
+              <input type="text" id="annTitleInput" class="form-control form-control-dark" placeholder="مثلاً: آغاز مسابقه دوره دوم با جوایز ویژه!" oninput="updateLivePreview()">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label text-secondary small fw-bold">نوع پیام:</label>
+              <select id="annTypeSelect" class="form-select form-select-dark" onchange="updateLivePreview()">
+                <option value="ANNOUNCEMENT">اطلاعیه عمومی</option>
+                <option value="COMPETITION_START">شروع مسابقه</option>
+                <option value="COMPETITION_END">اعلام زمان پایان</option>
+                <option value="WINNERS">اعلام برندگان</option>
+                <option value="CUSTOM">پیام ویژه</option>
+              </select>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label text-secondary small fw-bold">متن کامل پیام صفحه اصلی:</label>
+              <textarea id="annContentInput" rows="3" class="form-control form-control-dark" placeholder="متن توضیحات پیام را اینجا وارد کنید..." oninput="updateLivePreview()"></textarea>
+            </div>
+
+            <div class="col-md-7">
+              <label class="form-label text-secondary small fw-bold">تاریخ و ساعت پایان مسابقه (اختیاری):</label>
+              <input type="datetime-local" id="annEndsAtInput" class="form-control form-control-dark" onchange="updateLivePreview()">
+            </div>
+            <div class="col-md-5 d-flex align-items-end gap-1 flex-wrap">
+              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setQuickEndDate(3)">+۳ روز</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setQuickEndDate(7)">+۷ روز</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" onclick="setQuickEndDate(14)">+۱۴ روز</button>
+              <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearEndDate()">حذف مهلت</button>
+            </div>
+
+            <div class="col-12 mt-2">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="annIsActiveSwitch" checked onchange="updateLivePreview()">
+                <label class="form-check-label text-white fw-bold" for="annIsActiveSwitch">انتشار و نمایش مستقیم در صفحه اصلی کاربران</label>
+              </div>
+            </div>
+
+            <!-- Live Preview in App Simulation -->
+            <div class="col-12 mt-3">
+              <label class="form-label text-warning small fw-bold"><i class="bi bi-phone"></i> پیش‌نمایش زنده در صفحه اصلی اپلیکیشن:</label>
+              <div class="card p-3 shadow" id="livePreviewContainer" style="background: linear-gradient(135deg, #0B192C 0%, #1E3E62 100%); border: 1.5px solid #FFB703;">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <div class="d-flex align-items-center gap-2">
+                    <span id="previewBadgeType" class="badge bg-warning text-dark fw-bold">اطلاعیه</span>
+                    <strong id="previewTitle" class="gold-text">عنوان پیام</strong>
+                  </div>
+                  <span id="previewEndDateBadge" class="badge bg-danger d-none">مهلت</span>
+                </div>
+                <p id="previewContent" class="mb-0 text-white small" style="white-space: pre-line;">متن پیام...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer border-secondary">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">انصراف</button>
+          <button type="button" id="saveAnnBtn" class="btn btn-gold px-4" onclick="submitAnnouncementForm()">
+            <span id="saveAnnSpinner" class="spinner-border spinner-border-sm d-none me-1" role="status"></span>
+            ذخیره و انتشار پیام
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Start New Competition with Integrated Announcement -->
+  <div class="modal fade modal-dark" id="startCompModal" tabindex="-1" aria-labelledby="startCompModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content" style="background-color: #12253B; border: 1px solid var(--border-color); color: #fff;">
+        <div class="modal-header border-secondary">
+          <h5 class="modal-title gold-text" id="startCompModalLabel"><i class="bi bi-exclamation-triangle-fill text-danger me-2"></i> شروع مسابقه جدید، آرشیو امتیازها و انتشار پیام آغاز</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="بستن"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-warning border-0 small mb-3">
+            <strong>توجه بسیار مهم:</strong> با شروع مسابقه جدید، رتبه و امتیازهای تمام کاربران در مسابقه فعلی به‌صورت <strong>دائمی در جدول آرشیو PostgreSQL</strong> ذخیره می‌شوند و امتیاز کاربران در دوره جدید از <strong>صفر</strong> آغاز می‌گردد.
+            <hr class="my-2">
+            <strong>نکته امنیتی:</strong> حساب‌های کاربری، شماره‌های موبایل و خریدهای پلن عضویت کاربران <strong>حفظ خواهند شد</strong>.
+          </div>
+
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label text-secondary small fw-bold">عنوان دوره مسابقه جدید:</label>
+              <input type="text" id="newCompTitleInput" class="form-control form-control-dark" placeholder="مثلاً: مسابقه دوره ۳ (جوایز ارزنده)" oninput="updateCompModalPreview()">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label text-secondary small fw-bold">تاریخ و ساعت پایان مسابقه جدید:</label>
+              <input type="datetime-local" id="newCompEndDateInput" class="form-control form-control-dark" onchange="updateCompModalPreview()">
+            </div>
+
+            <div class="col-12">
+              <label class="form-label text-secondary small fw-bold">پیام آغاز مسابقه برای صفحه اصلی اپلیکیشن:</label>
+              <textarea id="newCompAnnContentInput" rows="2" class="form-control form-control-dark" placeholder="متن پیام آغاز مسابقه جدید..." oninput="updateCompModalPreview()"></textarea>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label text-warning small fw-bold"><i class="bi bi-phone"></i> پیش‌نمایش اطلاعیه شروع دوره در اپلیکیشن:</label>
+              <div class="card p-3 shadow" id="newCompPreviewContainer" style="background: linear-gradient(135deg, #0B192C 0%, #1E3E62 100%); border: 1.5px solid #FFB703;">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <span class="badge bg-success text-white fw-bold">شروع مسابقه</span>
+                  <strong id="newCompPreviewTitle" class="gold-text">شروع مسابقه</strong>
+                </div>
+                <p id="newCompPreviewContent" class="mb-0 text-white small">دوره جدید مسابقه آغاز شد.</p>
+              </div>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label text-danger fw-bold">جهت تایید قطعی، عبارت «شروع مسابقه جدید» را تایپ کنید:</label>
+              <input type="text" id="confirmationPhraseInput" class="form-control form-control-dark border-danger" placeholder="شروع مسابقه جدید" onkeyup="checkConfirmationPhrase()">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer border-secondary">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">انصراف</button>
+          <button type="button" id="confirmStartCompBtn" class="btn btn-danger fw-bold px-4" disabled onclick="submitStartNewCompetition()">
+            <span id="startCompSpinner" class="spinner-border spinner-border-sm d-none me-1" role="status"></span>
+            تایید و شروع مسابقه جدید
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: View Archived Leaderboard -->
+  <div class="modal fade modal-dark" id="viewArchiveModal" tabindex="-1" aria-labelledby="viewArchiveModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content" style="background-color: #12253B; border: 1px solid var(--border-color); color: #fff;">
+        <div class="modal-header border-secondary">
+          <h5 class="modal-title gold-text" id="viewArchiveModalLabel"><i class="bi bi-award-fill text-warning me-2"></i> رتبه‌بندی نهایی مسابقه آرشیو شده</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="بستن"></button>
+        </div>
+        <div class="modal-body">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 id="archiveModalCompTitle" class="text-white mb-0">-</h6>
+            <span id="archiveModalCompStats" class="badge bg-secondary">-</span>
+          </div>
+          <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+            <table class="table table-dark table-hover table-striped rounded align-middle">
+              <thead>
+                <tr class="text-secondary">
+                  <th>رتبه نهایی</th>
+                  <th>نام و نام خانوادگی</th>
+                  <th>شماره موبایل</th>
+                  <th>امتیاز کسب‌شده</th>
+                </tr>
+              </thead>
+              <tbody id="archiveResultsTbody">
+                <tr><td colspan="4" class="text-center py-4 text-secondary">در حال دریافت نتایج...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer border-secondary">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">بستن</button>
+        </div>
+      </div>
+    </div>
+  <!-- Modal: Add/Edit Store Product -->
+  <div class="modal fade modal-dark" id="storeProductModal" tabindex="-1" aria-labelledby="storeProductModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content" style="background-color: #12253B; border: 1px solid var(--border-color); color: #fff;">
+        <div class="modal-header border-secondary">
+          <h5 class="modal-title gold-text fw-bold" id="storeProductModalLabel"><i class="bi bi-shop me-2"></i> افزودن / ویرایش بسته فروشگاه</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <form id="storeProductForm" onsubmit="saveStoreProduct(event)">
+            <input type="hidden" id="storeProdId" value="">
+            
+            <div class="row g-3">
+              <div class="col-md-8">
+                <label class="form-label text-secondary small fw-bold">عنوان بسته (ثابت):</label>
+                <input type="text" id="storeProdTitle" class="form-control form-control-dark bg-secondary text-white" readonly>
+                <div class="form-text text-warning small">نام و مشخصات بسته ثابت است و قابل تغییر نیست.</div>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label text-secondary small fw-bold">برچسب اختصاصی (Badge):</label>
+                <input type="text" id="storeProdBadge" class="form-control form-control-dark" placeholder="مثلاً: پرطرفدار، ویژه">
+              </div>
+
+              <div class="col-12">
+                <label class="form-label text-secondary small fw-bold">توضیحات و مزایای بسته:</label>
+                <textarea id="storeProdDesc" rows="2" class="form-control form-control-dark" placeholder="توضیحات..."></textarea>
+              </div>
+
+              <div class="col-md-4">
+                <label class="form-label text-secondary small fw-bold">نوع محصول (ثابت):</label>
+                <input type="text" id="storeProdTypeDisplay" class="form-control form-control-dark bg-secondary text-white" readonly>
+                <input type="hidden" id="storeProdType" value="SQUARE_UNLOCK">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label text-secondary small fw-bold" id="storeUnitsLabel">مقدار / تعداد مربع (ثابت):</label>
+                <input type="number" id="storeProdUnits" class="form-control form-control-dark bg-secondary text-white" readonly>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label text-secondary small fw-bold text-warning">قیمت جدید به تومان (قابل ویرایش):</label>
+                <input type="number" id="storeProdPrice" class="form-control form-control-dark border-warning text-warning fw-bold" min="0" step="1000" placeholder="مثلاً: 99000" required>
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label text-secondary small fw-bold">شناسه مایکت SKU (ثابت):</label>
+                <input type="text" id="storeProdSku" class="form-control form-control-dark font-monospace bg-secondary text-white" readonly>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label text-secondary small fw-bold">ترتیب نمایش:</label>
+                <input type="number" id="storeProdSort" class="form-control form-control-dark" min="1" value="1">
+              </div>
+
+              <div class="col-12 mt-3">
+                <div class="form-check form-switch mb-2">
+                  <input class="form-check-input" type="checkbox" id="storeProdIsActive" checked>
+                  <label class="form-check-label text-white fw-bold" for="storeProdIsActive">نمایش فعال در فروشگاه اپلیکیشن</label>
+                </div>
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" id="storeProdIsReadyInMyket">
+                  <label class="form-check-label text-info fw-bold" for="storeProdIsReadyInMyket">محصول در کنسول مایکت تایید شده و آماده فروش است</label>
+                </div>
+              </div>
+            </div>
+
+            <div class="modal-footer border-secondary mt-4 pb-0 px-0">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">انصراف</button>
+              <button type="submit" class="btn btn-warning fw-bold"><i class="bi bi-save me-1"></i> ذخیره تغییرات بسته</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Add/Edit Reward -->
+  <div class="modal fade modal-dark" id="rewardModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content" style="background-color: #12253B; border: 1px solid var(--border-color); color: #fff;">
+        <div class="modal-header border-secondary">
+          <h5 class="modal-title gold-text" id="rewardModalLabel"><i class="bi bi-gift-fill me-2"></i> افزودن / ویرایش جایزه</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="بستن"></button>
+        </div>
+        <form onsubmit="saveReward(event)">
+          <div class="modal-body">
+            <input type="hidden" id="rewModalId" value="">
+            <div class="row g-3">
+              <div class="col-md-8">
+                <label class="form-label text-secondary small fw-bold">عنوان جایزه:</label>
+                <input type="text" id="rewModalTitle" class="form-control form-control-dark" required placeholder="مثلاً: کارت شارژ ۱۰ هزار تومانی ایرانسل">
+              </div>
+              <div class="col-md-4">
+                <label class="form-label text-secondary small fw-bold">دسته‌بندی:</label>
+                <select id="rewModalCategory" class="form-select form-select-dark">
+                  <option value="cat_recharge">کارت شارژ</option>
+                  <option value="cat_internet">بسته‌های اینترنت</option>
+                  <option value="cat_cash">جوایز نقدی و هدیه</option>
+                  <option value="cat_digital">گیفت کارت دیجیتال</option>
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label text-secondary small fw-bold">امتیاز موردنیاز برای تحویل:</label>
+                <input type="number" id="rewModalCost" class="form-control form-control-dark" required min="0" placeholder="100">
+              </div>
+              <div class="col-md-6">
+                <label class="form-label text-secondary small fw-bold">موجودی انبار (تعداد موجود):</label>
+                <input type="number" id="rewModalStock" class="form-control form-control-dark" required min="0" placeholder="50">
+              </div>
+              <div class="col-12">
+                <label class="form-label text-secondary small fw-bold">آدرس تصویر (Image URL):</label>
+                <input type="url" id="rewModalImageUrl" class="form-control form-control-dark" placeholder="https://images.unsplash.com/...">
+              </div>
+              <div class="col-12">
+                <label class="form-label text-secondary small fw-bold">توضیحات کامل جایزه:</label>
+                <textarea id="rewModalDesc" rows="3" class="form-control form-control-dark" placeholder="نحوه تحویل، شرایط و توضیحات..."></textarea>
+              </div>
+              <div class="col-md-6">
+                <div class="form-check form-switch mt-2">
+                  <input class="form-check-input" type="checkbox" id="rewModalIsFeatured" checked>
+                  <label class="form-check-label text-white fw-bold" for="rewModalIsFeatured">جایزه ویژه (نمایش در هدر ویترین)</label>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-check form-switch mt-2">
+                  <input class="form-check-input" type="checkbox" id="rewModalIsActive" checked>
+                  <label class="form-check-label text-white fw-bold" for="rewModalIsActive">نمایش فعال در اپلیکیشن</label>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer border-secondary">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">انصراف</button>
+            <button type="submit" class="btn btn-gold fw-bold px-4">ذخیره جایزه</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Edit Claim Status -->
+  <div class="modal fade modal-dark" id="claimModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content" style="background-color: #12253B; border: 1px solid var(--border-color); color: #fff;">
+        <div class="modal-header border-secondary">
+          <h5 class="modal-title gold-text"><i class="bi bi-pencil-square me-2"></i> تغییر وضعیت درخواست دریافت جایزه</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="بستن"></button>
+        </div>
+        <form onsubmit="saveClaimStatus(event)">
+          <div class="modal-body">
+            <input type="hidden" id="claimModalId" value="">
+            <div class="mb-3">
+              <label class="form-label text-secondary small fw-bold">وضعیت جدید درخواست:</label>
+              <select id="claimModalStatus" class="form-select form-select-dark" required>
+                <option value="PENDING">در حال بررسی (PENDING)</option>
+                <option value="APPROVED">تایید شده - در صف ارسال (APPROVED)</option>
+                <option value="PROCESSING">در حال پردازش / سفارش خرید (PROCESSING)</option>
+                <option value="SHIPPED">ارسال شده (SHIPPED)</option>
+                <option value="COMPLETED">تکمیل و تحویل داده شد (COMPLETED)</option>
+                <option value="REJECTED">رد شد (REJECTED)</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label text-secondary small fw-bold">کد رهگیری پستی / کدرهگیری تراکنش:</label>
+              <input type="text" id="claimModalTracking" class="form-control form-control-dark" placeholder="مثلاً: 1234567890123456">
+            </div>
+            <div class="mb-3">
+              <label class="form-label text-secondary small fw-bold">یادداشت و توضیحات مدیر برای کاربر:</label>
+              <textarea id="claimModalNotes" rows="3" class="form-control form-control-dark" placeholder="توضیحات تحویل یا علت عدم تایید..."></textarea>
+            </div>
+          </div>
+          <div class="modal-footer border-secondary">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">انصراف</button>
+            <button type="submit" class="btn btn-gold fw-bold px-4">اعمال تغییرات</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    let cachedUsers = [];
+    let cachedAnnouncements = [];
+    let cachedTickets = [];
+    let currentOpenTicket = null;
+    let currentActiveAnn = null;
+    let currentActiveComp = null;
+    let bootstrapStartModal = null;
+    let bootstrapArchiveModal = null;
+    let bootstrapAnnModal = null;
+    let bootstrapTicketModal = null;
+    let bootstrapStoreModal = null;
+    let cachedStoreProducts = [];
+    let cachedStorePurchases = [];
+
+    // Navigation section titles mapping
+    const SECTION_TITLES = {
+      'dashboard': { title: 'داشبورد اصلی', icon: 'bi-speedometer2' },
+      'users': { title: 'مدیریت کاربران', icon: 'bi-people-fill' },
+      'rewards_management': { title: 'جوایز و بنر هدیه', icon: 'bi-gift-fill' },
+      'store': { title: 'فروشگاه و تراکنش‌ها', icon: 'bi-shop' },
+      'support': { title: 'پشتیبانی و تیکت‌ها', icon: 'bi-headset' },
+      'settings': { title: 'تنظیمات پنل', icon: 'bi-gear-fill' },
+      'login_notification': { title: 'مدیریت پیام ورود', icon: 'bi-megaphone-fill' }
+    };
+
+    function navigateTo(sectionId) {
+      if (!SECTION_TITLES[sectionId]) sectionId = 'dashboard';
+
+      // Update Section Visibility
+      document.querySelectorAll('.admin-section').forEach(sec => sec.classList.remove('active'));
+      const targetSec = document.getElementById(`section-${sectionId}`);
+      if (targetSec) targetSec.classList.add('active');
+
+      // Update Sidebar Links
+      document.querySelectorAll('.sidebar-link').forEach(link => {
+        const linkSec = link.getAttribute('onclick')?.match(/'([^']+)'/)?.[1];
+        if (linkSec === sectionId) {
+          link.classList.add('active');
+        } else {
+          link.classList.remove('active');
+        }
+      });
+
+      // Update Topbar Title
+      const titleInfo = SECTION_TITLES[sectionId];
+      const titleEl = document.getElementById('currentSectionTitle');
+      if (titleEl && titleInfo) {
+        titleEl.innerHTML = `<i class="bi ${titleInfo.icon}"></i> ${titleInfo.title}`;
+      }
+
+      // Update URL Hash
+      if (window.location.hash !== `#${sectionId}`) {
+        window.history.replaceState(null, '', `#${sectionId}`);
+      }
+
+      // Trigger Section Specific Data Loading
+      if (sectionId === 'store') {
+        loadStoreProducts();
+        loadStorePurchases();
+      } else if (sectionId === 'rewards') {
+        loadRewardsData();
+        loadRewardAppearance();
+      } else if (sectionId === 'rewards_appearance') {
+        loadRewardAppearance();
+      } else if (sectionId === 'reward_claims') {
+        loadRewardClaims();
+      } else if (sectionId === 'support') {
+        loadAdminSupportTickets();
+      } else if (sectionId === 'login_notification') {
+        loadLoginNotification();
+      }
+
+      // Close mobile sidebar if open
+      closeSidebar();
+
+      // Scroll top
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function toggleSidebar() {
+      const sidebar = document.getElementById('adminSidebar');
+      const backdrop = document.getElementById('sidebarBackdrop');
+      if (sidebar && backdrop) {
+        sidebar.classList.toggle('show');
+        backdrop.classList.toggle('show');
+      }
+    }
+
+    function closeSidebar() {
+      const sidebar = document.getElementById('adminSidebar');
+      const backdrop = document.getElementById('sidebarBackdrop');
+      if (sidebar && backdrop) {
+        sidebar.classList.remove('show');
+        backdrop.classList.remove('show');
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      // Modals Initialization
+      const sModalEl = document.getElementById('startCompModal');
+      if (sModalEl) bootstrapStartModal = new bootstrap.Modal(sModalEl);
+
+      const aModalEl = document.getElementById('viewArchiveModal');
+      if (aModalEl) bootstrapArchiveModal = new bootstrap.Modal(aModalEl);
+
+      const annModalEl = document.getElementById('announcementModal');
+      if (annModalEl) bootstrapAnnModal = new bootstrap.Modal(annModalEl);
+
+      const tModalEl = document.getElementById('ticketConversationModal');
+      if (tModalEl) bootstrapTicketModal = new bootstrap.Modal(tModalEl);
+
+      // Handle Initial Navigation from Hash
+      const initialHash = window.location.hash.replace('#', '');
+      if (initialHash && SECTION_TITLES[initialHash]) {
+        navigateTo(initialHash);
+      } else {
+        navigateTo('dashboard');
+      }
+
+      // Check OneSignal Status
+      checkOneSignalStatus();
+    });
+
+    function getAdminKey() {
+      return localStorage.getItem('reqabat_admin_key') || "";
+    }
+
+    function saveAdminKey() {
+      const input = document.getElementById('adminKeyInput').value.trim();
+      if (input) {
+        localStorage.setItem('reqabat_admin_key', input);
+        alert('کلید مدیریت با موفقیت در مرورگر شما ذخیره شد.');
+        loadDashboard();
+      }
+    }
+
+    function logoutAdmin() {
+      if (!confirm('آیا برای خروج امن از پنل اطمینان دارید؟')) return;
+      localStorage.removeItem('reqabat_admin_key');
+      window.location.reload();
+    }
+
+    // Initialize key field
+    const adminKeyField = document.getElementById('adminKeyInput');
+    if (adminKeyField) adminKeyField.value = getAdminKey();
+
+    function showAlert(msg) {
+      const el = document.getElementById('alertBox');
+      if (el) {
+        el.innerText = msg;
+        el.classList.remove('d-none');
+      }
+    }
+
+    function hideAlert() {
+      const el = document.getElementById('alertBox');
+      if (el) el.classList.add('d-none');
+    }
+
+    function setElText(id, text) {
+      const el = document.getElementById(id);
+      if (el) el.innerText = text;
+    }
+
+    function setElHtml(id, html) {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = html;
+    }
+
+    function setElClass(id, className) {
+      const el = document.getElementById(id);
+      if (el) el.className = className;
+    }
+
+    function checkConfirmationPhrase() {
+      const phrase = document.getElementById('confirmationPhraseInput').value.trim();
+      const btn = document.getElementById('confirmStartCompBtn');
+      if (phrase === 'شروع مسابقه جدید') {
+        btn.removeAttribute('disabled');
+      } else {
+        btn.setAttribute('disabled', 'true');
+      }
+    }
+
+    function openStartCompModal() {
+      document.getElementById('confirmationPhraseInput').value = '';
+      document.getElementById('confirmStartCompBtn').setAttribute('disabled', 'true');
+      const nextNum = currentActiveComp ? (currentActiveComp.competitionNumber + 1) : 2;
+      document.getElementById('newCompTitleInput').value = `مسابقه دوره ${nextNum} (جوایز ارزنده)`;
+      
+      const d = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+      document.getElementById('newCompEndDateInput').value = d.toISOString().slice(0, 16);
+      document.getElementById('newCompAnnContentInput').value = `دوره ${nextNum} مسابقه «رقابت کن، جایزه ببر» آغاز شد! با مشاهده تبلیغات و تکمیل ۱۰۰ مربع روزانه امتیاز کسب کنید و برنده جوایز ویژه شوید.`;
+      
+      updateCompModalPreview();
+      if (bootstrapStartModal) bootstrapStartModal.show();
+    }
+
+    function updateCompModalPreview() {
+      const title = document.getElementById('newCompTitleInput').value.trim() || 'شروع مسابقه جدید';
+      const content = document.getElementById('newCompAnnContentInput').value.trim() || 'دوره جدید مسابقه آغاز شد.';
+      setElText('newCompPreviewTitle', title);
+      setElText('newCompPreviewContent', content);
+    }
+
+    function setQuickEndDate(days) {
+      const d = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+      document.getElementById('annEndsAtInput').value = d.toISOString().slice(0, 16);
+      updateLivePreview();
+    }
+
+    function clearEndDate() {
+      document.getElementById('annEndsAtInput').value = '';
+      updateLivePreview();
+    }
+
+    function openAnnouncementModal(annId = null) {
+      document.getElementById('editAnnId').value = '';
+      if (!annId) {
+        document.getElementById('announcementModalLabel').innerHTML = '<i class="bi bi-plus-circle-fill text-info me-2"></i> ایجاد پیام جدید برای صفحه اصلی';
+        document.getElementById('annTitleInput').value = '';
+        document.getElementById('annContentInput').value = '';
+        document.getElementById('annTypeSelect').value = 'ANNOUNCEMENT';
+        document.getElementById('annEndsAtInput').value = '';
+        document.getElementById('annIsActiveSwitch').checked = true;
+      } else {
+        const ann = cachedAnnouncements.find(a => a.id === annId);
+        if (ann) {
+          document.getElementById('announcementModalLabel').innerHTML = '<i class="bi bi-pencil-square text-warning me-2"></i> ویرایش پیام صفحه اصلی';
+          document.getElementById('editAnnId').value = ann.id;
+          document.getElementById('annTitleInput').value = ann.title;
+          document.getElementById('annContentInput').value = ann.content;
+          document.getElementById('annTypeSelect').value = ann.type || 'ANNOUNCEMENT';
+          document.getElementById('annEndsAtInput').value = ann.endsAt ? new Date(ann.endsAt).toISOString().slice(0, 16) : '';
+          document.getElementById('annIsActiveSwitch').checked = ann.isActive;
+        }
+      }
+      updateLivePreview();
+      if (bootstrapAnnModal) bootstrapAnnModal.show();
+    }
+
+    function editCurrentActiveAnn() {
+      if (currentActiveAnn) {
+        openAnnouncementModal(currentActiveAnn.id);
+      } else {
+        openAnnouncementModal();
+      }
+    }
+
+    function updateLivePreview() {
+      const title = document.getElementById('annTitleInput').value.trim() || 'عنوان پیام';
+      const content = document.getElementById('annContentInput').value.trim() || 'متن کامل پیام در این قسمت قرار می‌گیرد...';
+      const type = document.getElementById('annTypeSelect').value;
+      const endsAt = document.getElementById('annEndsAtInput').value;
+      const isActive = document.getElementById('annIsActiveSwitch').checked;
+
+      setElText('previewTitle', title);
+      setElText('previewContent', content);
+
+      const badgeType = document.getElementById('previewBadgeType');
+      const typeLabels = {
+        'ANNOUNCEMENT': { text: 'اطلاعیه', cls: 'bg-primary' },
+        'COMPETITION_START': { text: 'شروع مسابقه', cls: 'bg-success' },
+        'COMPETITION_END': { text: 'پایان مسابقه', cls: 'bg-danger' },
+        'WINNERS': { text: 'اعلام برندگان', cls: 'bg-warning text-dark' },
+        'CUSTOM': { text: 'پیام ویژه', cls: 'bg-info text-dark' }
+      };
+      const info = typeLabels[type] || { text: 'اطلاعیه', cls: 'bg-primary' };
+      if (badgeType) {
+        badgeType.className = `badge ${info.cls} fw-bold`;
+        badgeType.innerText = info.text;
+      }
+
+      const endBadge = document.getElementById('previewEndDateBadge');
+      if (endBadge) {
+        if (endsAt) {
+          const diffMs = new Date(endsAt).getTime() - Date.now();
+          if (diffMs > 0) {
+            const days = Math.floor(diffMs / (24 * 3600 * 1000));
+            const hours = Math.floor((diffMs % (24 * 3600 * 1000)) / (3600 * 1000));
+            endBadge.innerText = days > 0 ? `مهلت: ${days} روز و ${hours} ساعت باقیمانده` : `مهلت: ${hours} ساعت باقیمانده`;
+            endBadge.classList.remove('d-none');
+          } else {
+            endBadge.innerText = 'زمان پایان سپری شده';
+            endBadge.classList.remove('d-none');
+          }
+        } else {
+          endBadge.classList.add('d-none');
+        }
+      }
+
+      const container = document.getElementById('livePreviewContainer');
+      if (container) {
+        if (!isActive) {
+          container.style.opacity = '0.45';
+          container.style.filter = 'grayscale(60%)';
+        } else {
+          container.style.opacity = '1';
+          container.style.filter = 'none';
+        }
+      }
+    }
+
+    async function submitAnnouncementForm() {
+      const title = document.getElementById('annTitleInput').value.trim();
+      const content = document.getElementById('annContentInput').value.trim();
+      if (!title || !content) {
+        alert('لطفاً عنوان و متن پیام را وارد کنید.');
+        return;
+      }
+
+      const id = document.getElementById('editAnnId').value.trim() || undefined;
+      const type = document.getElementById('annTypeSelect').value;
+      const endsAtRaw = document.getElementById('annEndsAtInput').value;
+      const endsAt = endsAtRaw ? new Date(endsAtRaw).getTime() : null;
+      const isActive = document.getElementById('annIsActiveSwitch').checked;
+      const key = getAdminKey();
+
+      const btn = document.getElementById('saveAnnBtn');
+      const spinner = document.getElementById('saveAnnSpinner');
+      btn.setAttribute('disabled', 'true');
+      if (spinner) spinner.classList.remove('d-none');
+
+      try {
+        const res = await fetch('/api/admin/announcements', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-key': key
+          },
+          body: JSON.stringify({ id, title, content, type, isActive, endsAt })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          if (bootstrapAnnModal) bootstrapAnnModal.hide();
+          loadDashboard();
+        } else {
+          alert('خطا در ذخیره پیام: ' + (data.error || 'عملیات ناموفق بود'));
+        }
+      } catch (err) {
+        alert('خطای ارتباط با سرور: ' + err.message);
+      } finally {
+        if (spinner) spinner.classList.add('d-none');
+        btn.removeAttribute('disabled');
+      }
+    }
+
+    async function toggleCurrentActiveAnn() {
+      if (!currentActiveAnn) return;
+      await toggleAnnouncement(currentActiveAnn.id);
+    }
+
+    async function toggleAnnouncement(annId) {
+      const key = getAdminKey();
+      try {
+        const res = await fetch(`/api/admin/announcements/${annId}/toggle`, {
+          method: 'PATCH',
+          headers: { 'x-admin-key': key }
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadDashboard();
+        } else {
+          alert('خطا: ' + (data.error || 'عملیات ناموفق بود'));
+        }
+      } catch (err) {
+        alert('خطای ارتباط: ' + err.message);
+      }
+    }
+
+    async function loadDashboard() {
+      const spinner = document.getElementById('refreshSpinner');
+      const authBadge = document.getElementById('authStatusBadge');
+      if (spinner) spinner.classList.remove('d-none');
+      hideAlert();
+
+      const key = getAdminKey();
+
+      try {
+        const res = await fetch('/api/admin/overview', {
+          headers: { 'x-admin-key': key }
+        });
+
+        if (res.status === 401) {
+          if (authBadge) {
+            authBadge.className = 'badge bg-danger';
+            authBadge.innerText = 'کلید نامعتبر';
+          }
+          showAlert('خطای دسترسی: کلید امنیتی مدیریت نامعتبر است. لطفاً در بخش «تنظیمات و دسترسی» کلید صحیح را وارد کنید.');
+          setElHtml('usersTbody', '<tr><td colspan="6" class="text-center text-danger py-4">دسترسی نیازمند کلید معتبر مدیریت است.</td></tr>');
+          setElHtml('sessionsTbody', '<tr><td colspan="6" class="text-center text-danger py-4">دسترسی مسدود است.</td></tr>');
+          return;
+        }
+
+        if (!res.ok) {
+          throw new Error('خطا در ارتباط با سرور (کد ' + res.status + ')');
+        }
+
+        const data = await res.json();
+        if (authBadge) {
+          authBadge.className = 'badge bg-success';
+          authBadge.innerText = 'متصل و معتبر';
+        }
+
+        // Stats
+        setElText('totalUsers', (data.totalUsers || 0) + ' نفر');
+        setElText('totalScores', (data.totalScoresSum || 0) + ' امتیاز');
+
+        // Fetch additional stats in background
+        await Promise.allSettled([loadStorePurchases(), loadRewardClaims()]);
+        
+        const successCount = cachedStorePurchases.filter(p => p.status === 'SUCCESS').length;
+        setElText('totalTransactions', successCount + ' موفق');
+        
+        const pendingCount = cachedClaims.filter(c => c.status === 'PENDING').length;
+        setElText('totalClaims', pendingCount + ' جدید');
+
+        // Active Competition
+        if (data.activeCompetition) {
+          currentActiveComp = data.activeCompetition;
+          const compNumText = 'دوره ' + data.activeCompetition.competitionNumber;
+          setElText('activeCompNumber', compNumText);
+          setElText('activeCompTitle', data.activeCompetition.title);
+          setElText('dashCompNumber', compNumText);
+          setElText('dashCompTitle', data.activeCompetition.title);
+
+          const startDate = new Date(data.activeCompetition.startedAt);
+          setElText('activeCompStartedAt', startDate.toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }));
+          
+          if (data.activeCompetition.endedAt) {
+            const endDate = new Date(data.activeCompetition.endedAt);
+            const endText = endDate.toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            setElText('activeCompEndedAt', endText);
+            setElText('dashCompEndedAt', endText);
+          } else {
+            setElText('activeCompEndedAt', 'نامحدود / تعیین نشده');
+            setElText('dashCompEndedAt', 'نامحدود');
+          }
+        }
+
+        // Active Announcement
+        currentActiveAnn = data.activeAnnouncement;
+        renderActiveAnnouncement(currentActiveAnn);
+
+        // All Announcements
+        cachedAnnouncements = data.announcements || [];
+        renderAnnouncements(cachedAnnouncements);
+
+        // Past Competitions
+        const pastComps = data.pastCompetitions || [];
+        setElText('archivedCompsCount', pastComps.length + ' دوره');
+        renderArchivedCompetitions(pastComps);
+
+        // Logs
+        renderLogs(data.competitionLogs || []);
+
+        // Users & Sessions
+        cachedUsers = data.users || [];
+        renderUsers(cachedUsers);
+        renderSessions(data.recentSessions || []);
+
+        // Load Support Tickets
+        loadAdminSupportTickets();
+
+      } catch (err) {
+        if (authBadge) {
+          authBadge.className = 'badge bg-warning text-dark';
+          authBadge.innerText = 'خطای ارتباط';
+        }
+        showAlert(err.message || 'خطا در برقراری ارتباط با سرور');
+      } finally {
+        if (spinner) spinner.classList.add('d-none');
+      }
+    }
+
+    function renderActiveAnnouncement(ann) {
+      const toggleBtn = document.getElementById('toggleActiveAnnBtn');
+      const typeBadge = document.getElementById('activeAnnTypeBadge');
+
+      if (!ann) {
+        setElClass('activeAnnStatusBadge', 'badge bg-secondary');
+        setElHtml('activeAnnStatusBadge', '<i class="bi bi-dash-circle"></i> بدون پیام فعال');
+        if (typeBadge) typeBadge.className = 'badge bg-dark d-none';
+        setElText('activeAnnTitle', 'در حال حاضر هیچ پیامی در بالای صفحه اصلی فعال نیست.');
+        setElText('activeAnnContent', 'برای نمایش اطلاعیه یا پیام جدید به کاربران اپلیکیشن، روی دکمه «ایجاد پیام جدید» کلیک کنید.');
+        setElText('activeAnnStartsAt', '-');
+        setElText('activeAnnEndsAt', '-');
+
+        // Dashboard Summary Card
+        setElText('dashAnnType', 'غیرفعال');
+        setElText('dashAnnStatus', 'بدون پیام');
+        setElText('dashAnnTitle', 'پیام فعالی وجود ندارد');
+        setElText('dashAnnContent', 'برای ایجاد اطلاعیه جدید به بخش اعلان‌ها بروید.');
+
+        if (toggleBtn) toggleBtn.classList.add('d-none');
+        return;
+      }
+
+      if (toggleBtn) toggleBtn.classList.remove('d-none');
+      setElClass('activeAnnStatusBadge', ann.isActive ? 'badge bg-success' : 'badge bg-danger');
+      setElHtml('activeAnnStatusBadge', ann.isActive ? '<i class="bi bi-check-circle-fill"></i> در حال نمایش در صفحه اصلی' : '<i class="bi bi-eye-slash-fill"></i> غیرفعال شده');
+
+      const typeLabels = {
+        'ANNOUNCEMENT': 'اطلاعیه',
+        'COMPETITION_START': 'شروع مسابقه',
+        'COMPETITION_END': 'پایان مسابقه',
+        'WINNERS': 'اعلام برندگان',
+        'CUSTOM': 'پیام ویژه'
+      };
+      const labelText = typeLabels[ann.type] || 'اطلاعیه';
+      if (typeBadge) {
+        typeBadge.classList.remove('d-none');
+        typeBadge.innerText = labelText;
+      }
+
+      setElText('activeAnnTitle', ann.title);
+      setElText('activeAnnContent', ann.content);
+      setElText('activeAnnStartsAt', new Date(ann.updatedAt || ann.startsAt).toLocaleDateString('fa-IR', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }));
+      
+      if (ann.endsAt) {
+        const endDate = new Date(ann.endsAt);
+        setElText('activeAnnEndsAt', endDate.toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }));
+      } else {
+        setElText('activeAnnEndsAt', 'تعیین نشده');
+      }
+
+      // Dashboard Summary
+      setElText('dashAnnType', labelText);
+      setElText('dashAnnStatus', ann.isActive ? 'در حال نمایش' : 'غیرفعال');
+      setElClass('dashAnnStatus', ann.isActive ? 'badge bg-success' : 'badge bg-secondary');
+      setElText('dashAnnTitle', ann.title);
+      setElText('dashAnnContent', ann.content);
+
+      if (toggleBtn) {
+        toggleBtn.innerHTML = ann.isActive ? '<i class="bi bi-eye-slash"></i> غیرفعال‌سازی' : '<i class="bi bi-eye"></i> فعال‌سازی';
+        toggleBtn.className = ann.isActive ? 'btn btn-sm btn-outline-danger' : 'btn btn-sm btn-outline-success';
+      }
+    }
+
+    function renderAnnouncements(list) {
+      const tbody = document.getElementById('announcementsTbody');
+      if (!tbody) return;
+
+      if (!list || list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-3 text-secondary"><i class="bi bi-info-circle"></i> هیچ پیامی ثبت نشده است.</td></tr>';
+        return;
+      }
+
+      const typeLabels = {
+        'ANNOUNCEMENT': 'اطلاعیه',
+        'COMPETITION_START': 'شروع مسابقه',
+        'COMPETITION_END': 'پایان مسابقه',
+        'WINNERS': 'اعلام برندگان',
+        'CUSTOM': 'پیام ویژه'
+      };
+
+      tbody.innerHTML = list.map(a => {
+        const endDateStr = a.endsAt ? new Date(a.endsAt).toLocaleDateString('fa-IR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+        const updatedStr = new Date(a.updatedAt).toLocaleDateString('fa-IR', { month: 'short', day: 'numeric' });
+        const statusBadge = a.isActive ? '<span class="badge bg-success">فعال</span>' : '<span class="badge bg-secondary">غیرفعال</span>';
+        const toggleBtnText = a.isActive ? '<i class="bi bi-pause-fill"></i>' : '<i class="bi bi-play-fill"></i>';
+
+        return `
+          <tr>
+            <td class="fw-bold">${a.title}</td>
+            <td><small class="badge bg-dark border border-secondary">${typeLabels[a.type] || a.type}</small></td>
+            <td>${statusBadge}</td>
+            <td><small class="text-warning">${endDateStr}</small></td>
+            <td><small class="text-secondary">${updatedStr}</small></td>
+            <td>
+              <div class="d-flex gap-1">
+                <button class="btn btn-sm btn-outline-warning" title="ویرایش پیام" onclick="openAnnouncementModal('${a.id}')">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-info" title="تغییر وضعیت فعال/غیرفعال" onclick="toggleAnnouncement('${a.id}')">
+                  ${toggleBtnText}
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function renderArchivedCompetitions(comps) {
+      const tbody = document.getElementById('archivedCompsTbody');
+      if (!tbody) return;
+
+      if (!comps || comps.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-secondary"><i class="bi bi-info-circle"></i> هنوز هیچ مسابقه‌ای به پایان نرسیده و آرشیو نشده است.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = comps.map(c => {
+        const endDate = c.endedAt ? new Date(c.endedAt).toLocaleDateString('fa-IR', { year: 'numeric', month: 'short', day: 'numeric' }) : '-';
+        return `
+          <tr>
+            <td><span class="badge bg-secondary">دوره ${c.competitionNumber}</span></td>
+            <td class="fw-bold">${c.title}</td>
+            <td>${c.totalParticipants} نفر</td>
+            <td><span class="badge badge-gold">${c.totalScore} امتیاز</span></td>
+            <td><small class="text-secondary">${endDate}</small></td>
+            <td>
+              <button class="btn btn-sm btn-outline-warning" onclick="viewArchivedLeaderboard('${c.id}')">
+                <i class="bi bi-eye-fill me-1"></i> کارنامه نهایی
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function renderLogs(logs) {
+      const tbody = document.getElementById('logsTbody');
+      if (!tbody) return;
+
+      if (!logs || logs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-secondary"><i class="bi bi-info-circle"></i> لاگی ثبت نشده است.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = logs.map(l => {
+        const dt = new Date(l.createdAt).toLocaleDateString('fa-IR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        return `
+          <tr>
+            <td><small class="text-secondary">${dt}</small></td>
+            <td><span class="badge bg-info text-dark">${l.action}</span></td>
+            <td><small>${l.details || (l.prevTitle + ' -> ' + l.newTitle)}</small></td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    async function viewArchivedLeaderboard(compId) {
+      const resultsTbody = document.getElementById('archiveResultsTbody');
+      if (resultsTbody) resultsTbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-secondary">در حال دریافت کارنامه نهایی از دیتابیس...</td></tr>';
+      if (bootstrapArchiveModal) bootstrapArchiveModal.show();
+
+      try {
+        const res = await fetch(`/api/competitions/${compId}/results`);
+        const data = await res.json();
+        if (data.success) {
+          setElText('archiveModalCompTitle', data.competition.title);
+          setElText('archiveModalCompStats', `شرکت‌کنندگان: ${data.competition.totalParticipants} نفر | مجموع امتیاز: ${data.competition.totalScore}`);
+          
+          if (!data.results || data.results.length === 0) {
+            if (resultsTbody) resultsTbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-secondary">هیچ رتبه‌ای برای این مسابقه ذخیره نشده است.</td></tr>';
+          } else {
+            if (resultsTbody) {
+              resultsTbody.innerHTML = data.results.map(r => `
+                <tr>
+                  <td><span class="badge ${r.rank <= 3 ? 'bg-warning text-dark fw-bold' : 'bg-secondary'}">#${r.rank}</span></td>
+                  <td class="fw-bold">${r.displayName}</td>
+                  <td dir="ltr" class="text-secondary">${r.phoneNumber}</td>
+                  <td><span class="badge badge-gold">${r.finalScore} امتیاز</span></td>
+                </tr>
+              `).join('');
+            }
+          }
+        } else {
+          if (resultsTbody) resultsTbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger py-4">${data.error || 'خطا در دریافت'}</td></tr>`;
+        }
+      } catch (err) {
+        if (resultsTbody) resultsTbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger py-4">خطای ارتباط: ${err.message}</td></tr>`;
+      }
+    }
+
+    async function submitStartNewCompetition() {
+      const phrase = document.getElementById('confirmationPhraseInput').value.trim();
+      if (phrase !== 'شروع مسابقه جدید') {
+        alert('لطفاً عبارت «شروع مسابقه جدید» را دقیقاً وارد کنید.');
+        return;
+      }
+
+      const newTitle = document.getElementById('newCompTitleInput').value.trim();
+      const endDateRaw = document.getElementById('newCompEndDateInput').value;
+      const endDate = endDateRaw ? new Date(endDateRaw).toISOString() : null;
+      const annContent = document.getElementById('newCompAnnContentInput').value.trim();
+
+      const key = getAdminKey();
+      const btn = document.getElementById('confirmStartCompBtn');
+      const spinner = document.getElementById('startCompSpinner');
+
+      btn.setAttribute('disabled', 'true');
+      if (spinner) spinner.classList.remove('d-none');
+
+      try {
+        const res = await fetch('/api/admin/competition/start-new', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-key': key
+          },
+          body: JSON.stringify({
+            confirmationPhrase: phrase,
+            newTitle,
+            endDate,
+            announcementTitle: newTitle ? `آغاز ${newTitle}` : undefined,
+            announcementContent: annContent || undefined
+          })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          alert('عملیات با موفقیت انجام شد!\n' + data.message);
+          if (bootstrapStartModal) bootstrapStartModal.hide();
+          loadDashboard();
+        } else {
+          alert('خطا در شروع مسابقه جدید: ' + (data.error || 'عملیات ناموفق بود'));
+        }
+      } catch (err) {
+        alert('خطای ارتباط با سرور: ' + err.message);
+      } finally {
+        if (spinner) spinner.classList.add('d-none');
+        btn.removeAttribute('disabled');
+      }
+    }
+
+    function renderUsers(users) {
+      const tbody = document.getElementById('usersTbody');
+      if (!tbody) return;
+
+      if (!users || users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-secondary"><i class="bi bi-info-circle"></i> هیچ کاربری در مسابقه فعلی ثبت نشده است.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = users.map((u, index) => `
+        <tr>
+          <td><span class="${index < 3 ? 'badge bg-warning text-dark fw-bold' : 'text-secondary'}">${index + 1}</span></td>
+          <td class="fw-bold">${u.firstName || ''} ${u.lastName || ''}</td>
+          <td dir="ltr" class="text-end">${u.phoneNumber || '-'}</td>
+          <td><span class="badge badge-gold">${u.score || 0} امتیاز</span></td>
+          <td>
+            <button class="btn btn-sm btn-outline-info" title="بازنشانی دوره ۲۴ ساعته کاربر" onclick="resetUserCycle('${u.id}')">
+              <i class="bi bi-arrow-repeat"></i> ریست دوره
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function renderSessions(sessions) {
+      const tbody = document.getElementById('sessionsTbody');
+      if (!tbody) return;
+
+      if (!sessions || sessions.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-secondary"><i class="bi bi-info-circle"></i> هنوز هیچ تبلیغی در این دوره تکمیل و ثبت نشده است.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = sessions.map(s => `
+        <tr>
+          <td><code class="text-info">${s.sessionId}</code></td>
+          <td><span class="badge bg-warning text-dark">مربع ${s.squareNumber}</span></td>
+          <td><small class="text-secondary">${s.userId.substring(0, 8)}...</small></td>
+          <td>${s.adDurationSeconds} ثانیه</td>
+          <td><span class="badge bg-success"><i class="bi bi-check-circle"></i> تایید سرور</span></td>
+          <td><small class="text-secondary" title="${s.token || ''}">${(s.token || '').substring(0, 10)}...</small></td>
+        </tr>
+      `).join('');
+    }
+
+    function filterUsers() {
+      const q = (document.getElementById('userSearchInput')?.value || '').trim().toLowerCase();
+      if (!q) {
+        renderUsers(cachedUsers);
+        return;
+      }
+      const filtered = cachedUsers.filter(u => 
+        (u.firstName && u.firstName.toLowerCase().includes(q)) ||
+        (u.lastName && u.lastName.toLowerCase().includes(q))
+      );
+      renderUsers(filtered);
+    }
+
+    async function resetUserCycle(userId) {
+      if (!confirm('آیا از بازنشانی چرخه ۲۴ ساعته کاربر ' + userId + ' اطمینان دارید؟')) return;
+      const key = getAdminKey();
+      try {
+        const res = await fetch('/api/admin/cycle/reset', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-key': key
+          },
+          body: JSON.stringify({ userId })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('چرخه ۲۴ ساعته کاربر با موفقیت بازنشانی شد.');
+          loadDashboard();
+        } else {
+          alert('خطا: ' + (data.error || 'عملیات ناموفق بود'));
+        }
+      } catch (err) {
+        alert('خطای ارتباط: ' + err.message);
+      }
+    }
+
+    // ====================================================================
+    // Support Tickets Management
+    // ====================================================================
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    const SUPPORT_CATEGORY_MAP = {
+      'SCORES': { label: 'امتیازها', icon: 'bi-star-fill text-warning' },
+      'ADS': { label: 'تبلیغات', icon: 'bi-play-circle-fill text-info' },
+      'PRIZES': { label: 'جوایز', icon: 'bi-gift-fill text-primary' },
+      'MEMBERSHIP': { label: 'عضویت', icon: 'bi-award-fill text-warning' },
+      'PURCHASE': { label: 'خرید', icon: 'bi-cart-check-fill text-success' },
+      'LOGIN': { label: 'مشکل ورود', icon: 'bi-key-fill text-danger' },
+      'OTHER': { label: 'سایر موارد', icon: 'bi-question-circle text-secondary' }
+    };
+
+    const SUPPORT_STATUS_MAP = {
+      'NEW': { label: 'جدید / بی‌پاسخ', cls: 'badge bg-danger' },
+      'IN_PROGRESS': { label: 'در حال بررسی', cls: 'badge bg-warning text-dark' },
+      'ANSWERED': { label: 'پاسخ داده شد', cls: 'badge bg-success' },
+      'CLOSED': { label: 'بسته شده', cls: 'badge bg-secondary' }
+    };
+
+    async function loadAdminSupportTickets() {
+      const key = getAdminKey();
+      try {
+        const res = await fetch('/api/admin/support/tickets', {
+          headers: { 'x-admin-key': key }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.success) {
+          cachedTickets = data.tickets || [];
+
+          // Update Counters
+          if (data.stats) {
+            setElText('supportCountTotal', data.stats.total || 0);
+            setElText('supportCountNew', data.stats.newCount || 0);
+            setElText('supportCountInProgress', data.stats.inProgressCount || 0);
+            setElText('supportCountAnswered', data.stats.answeredCount || 0);
+
+            // Sidebar notification badge
+            const sideBadge = document.getElementById('sidebarSupportBadge');
+            if (sideBadge) {
+              if (data.stats.newCount > 0) {
+                sideBadge.innerText = data.stats.newCount;
+                sideBadge.style.display = 'inline-block';
+              } else {
+                sideBadge.style.display = 'none';
+              }
+            }
+          }
+
+          filterSupportTickets();
+        }
+      } catch (err) {
+        console.warn('[Support Tickets Fetch Error]', err.message);
+      }
+    }
+
+    function filterSupportTickets() {
+      const search = (document.getElementById('supportSearchInput')?.value || '').trim().toLowerCase();
+      const statusFilter = document.getElementById('supportStatusFilter')?.value || 'ALL';
+      const categoryFilter = document.getElementById('supportCategoryFilter')?.value || 'ALL';
+
+      let filtered = cachedTickets.slice();
+
+      if (statusFilter !== 'ALL') {
+        filtered = filtered.filter(t => t.status === statusFilter);
+      }
+
+      if (categoryFilter !== 'ALL') {
+        filtered = filtered.filter(t => t.category === categoryFilter);
+      }
+
+      if (search) {
+        filtered = filtered.filter(t => 
+          (t.trackingCode && t.trackingCode.toLowerCase().includes(search)) ||
+          (t.phoneNumber && t.phoneNumber.includes(search)) ||
+          (t.userName && t.userName.toLowerCase().includes(search)) ||
+          (t.subject && t.subject.toLowerCase().includes(search)) ||
+          (t.lastMessage && t.lastMessage.toLowerCase().includes(search))
+        );
+      }
+
+      setElText('supportFilterSummary', `${filtered.length} تیکت از ${cachedTickets.length}`);
+      renderSupportTickets(filtered);
+    }
+
+    function renderSupportTickets(tickets) {
+      const tbody = document.getElementById('supportTicketsTbody');
+      if (!tbody) return;
+
+      if (!tickets || tickets.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-secondary">هیچ تیکت پشتیبانی متناسب با فیلتر یافت نشد.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = tickets.map(t => {
+        const cat = SUPPORT_CATEGORY_MAP[t.category] || SUPPORT_CATEGORY_MAP['OTHER'];
+        const stat = SUPPORT_STATUS_MAP[t.status] || SUPPORT_STATUS_MAP['NEW'];
+        const updateDate = new Date(t.updatedAtMs).toLocaleDateString('fa-IR', {
+          month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
+
+        const snippet = t.lastMessage ? (t.lastMessage.length > 40 ? t.lastMessage.substring(0, 40) + '...' : t.lastMessage) : '-';
+        const senderBadge = t.lastSenderType === 'ADMIN' 
+          ? '<span class="badge bg-info text-dark" style="font-size:0.65rem;">مدیر</span> ' 
+          : '<span class="badge bg-secondary" style="font-size:0.65rem;">کاربر</span> ';
+
+        return `
+          <tr>
+            <td><strong class="text-warning">${escapeHtml(t.trackingCode)}</strong></td>
+            <td>
+              <div class="fw-bold text-white">${escapeHtml(t.userName)}</div>
+              <small class="text-secondary" style="direction:ltr; display:inline-block;">${escapeHtml(t.phoneNumber)}</small>
+            </td>
+            <td>
+              <span class="small text-nowrap"><i class="bi ${cat.icon} me-1"></i> ${cat.label}</span>
+            </td>
+            <td>
+              <div class="text-white text-truncate" style="max-width: 180px;">${escapeHtml(t.subject)}</div>
+            </td>
+            <td><span class="${stat.cls}">${stat.label}</span></td>
+            <td>
+              <small class="text-light" style="max-width: 220px; display:inline-block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                ${senderBadge}${escapeHtml(snippet)}
+              </small>
+            </td>
+            <td><small class="text-secondary">${updateDate}</small></td>
+            <td>
+              <button class="btn btn-sm btn-outline-info" onclick="openSupportTicketModal('${t.id}')">
+                <i class="bi bi-chat-dots me-1"></i> پاسخ
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    async function openSupportTicketModal(ticketId) {
+      currentOpenTicket = null;
+      const key = getAdminKey();
+
+      setElText('ticketConvTitle', 'در حال بارگذاری...');
+      setElText('ticketConvCode', '...');
+      setElText('ticketConvUser', '...');
+      setElText('ticketConvPhone', '...');
+      setElHtml('ticketMessagesContainer', '<div class="text-center text-secondary py-4"><span class="spinner-border spinner-border-sm me-2"></span>در حال دریافت پیام‌ها...</div>');
+      
+      const replyArea = document.getElementById('adminReplyTextarea');
+      if (replyArea) replyArea.value = '';
+
+      if (bootstrapTicketModal) bootstrapTicketModal.show();
+
+      try {
+        const res = await fetch(`/api/admin/support/tickets/${ticketId}`, {
+          headers: { 'x-admin-key': key }
+        });
+        if (!res.ok) throw new Error('خطا در دریافت تیکت');
+        const data = await res.json();
+        if (data.success && data.ticket) {
+          currentOpenTicket = data.ticket;
+          renderTicketConversation(data.ticket, data.messages || []);
+        }
+      } catch (err) {
+        setElHtml('ticketMessagesContainer', `<div class="alert alert-danger mb-0">${escapeHtml(err.message)}</div>`);
+      }
+    }
+
+    function renderTicketConversation(ticket, messages) {
+      setElText('ticketConvTitle', ticket.subject);
+      setElText('ticketConvCode', ticket.trackingCode);
+      setElText('ticketConvUser', ticket.userName);
+      setElText('ticketConvPhone', ticket.phoneNumber);
+
+      const cat = SUPPORT_CATEGORY_MAP[ticket.category] || SUPPORT_CATEGORY_MAP['OTHER'];
+      const stat = SUPPORT_STATUS_MAP[ticket.status] || SUPPORT_STATUS_MAP['NEW'];
+      setElText('ticketConvCategory', cat.label);
+      setElClass('ticketConvStatusBadge', stat.cls);
+      setElText('ticketConvStatusBadge', stat.label);
+
+      const createdDate = new Date(ticket.createdAtMs).toLocaleDateString('fa-IR', {
+        year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+      });
+      setElText('ticketConvCreated', createdDate);
+
+      const select = document.getElementById('ticketConvStatusSelect');
+      if (select) select.value = ticket.status;
+
+      const container = document.getElementById('ticketMessagesContainer');
+      if (!container) return;
+
+      if (!messages || messages.length === 0) {
+        container.innerHTML = '<div class="text-center text-secondary py-3">هیچ پیامی ثبت نشده است.</div>';
+        return;
+      }
+
+      container.innerHTML = messages.map(m => {
+        const isUser = m.senderType === 'USER';
+        const timeStr = new Date(m.createdAtMs).toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' });
+        const dateStr = new Date(m.createdAtMs).toLocaleDateString('fa-IR', { month: 'short', day: 'numeric' });
+
+        if (isUser) {
+          return `
+            <div class="d-flex flex-column align-items-start" style="max-width: 85%; align-self: flex-start;">
+              <div class="d-flex align-items-center gap-1 mb-1">
+                <span class="badge bg-secondary" style="font-size: 0.7rem;"><i class="bi bi-person-fill"></i> ${escapeHtml(m.senderName || 'کاربر')}</span>
+                <span class="text-secondary small" style="font-size: 0.72rem;">${dateStr} ${timeStr}</span>
+              </div>
+              <div class="p-3 rounded-3 text-white" style="background-color: #1E3E62; border: 1px solid #2E5077; white-space: pre-line; word-break: break-word;">
+                ${escapeHtml(m.messageText)}
+              </div>
+            </div>
+          `;
+        } else {
+          return `
+            <div class="d-flex flex-column align-items-end" style="max-width: 85%; align-self: flex-end;">
+              <div class="d-flex align-items-center gap-1 mb-1">
+                <span class="text-secondary small" style="font-size: 0.72rem;">${dateStr} ${timeStr}</span>
+                <span class="badge bg-warning text-dark fw-bold" style="font-size: 0.7rem;"><i class="bi bi-shield-check"></i> پاسخ پشتیبانی مدیریت</span>
+              </div>
+              <div class="p-3 rounded-3 text-dark fw-medium" style="background-color: #FFB703; border: 1px solid #FB8500; white-space: pre-line; word-break: break-word;">
+                ${escapeHtml(m.messageText)}
+              </div>
+            </div>
+          `;
+        }
+      }).join('');
+
+      container.scrollTop = container.scrollHeight;
+    }
+
+    async function sendAdminReply() {
+      if (!currentOpenTicket) return;
+      const textarea = document.getElementById('adminReplyTextarea');
+      const text = textarea ? textarea.value.trim() : '';
+      if (!text) {
+        alert('لطفاً متن پاسخ را وارد نمایید.');
+        return;
+      }
+
+      const shouldSetAnswered = document.getElementById('replySetAnswered')?.checked;
+      const newStatus = shouldSetAnswered ? 'ANSWERED' : currentOpenTicket.status;
+
+      const btn = document.getElementById('sendReplyBtn');
+      const spinner = document.getElementById('sendReplySpinner');
+      if (btn) btn.setAttribute('disabled', 'true');
+      if (spinner) spinner.classList.remove('d-none');
+
+      const key = getAdminKey();
+      try {
+        const res = await fetch(`/api/admin/support/tickets/${currentOpenTicket.id}/messages`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-key': key
+          },
+          body: JSON.stringify({ message: text, newStatus })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          if (textarea) textarea.value = '';
+          await openSupportTicketModal(currentOpenTicket.id);
+          loadAdminSupportTickets();
+        } else {
+          alert('خطا: ' + (data.error || 'ارسال پاسخ ناموفق بود'));
+        }
+      } catch (err) {
+        alert('خطای ارتباط: ' + err.message);
+      } finally {
+        if (btn) btn.removeAttribute('disabled');
+        if (spinner) spinner.classList.add('d-none');
+      }
+    }
+
+    async function updateTicketStatusFromSelect() {
+      if (!currentOpenTicket) return;
+      const select = document.getElementById('ticketConvStatusSelect');
+      const status = select ? select.value : null;
+      if (!status) return;
+      const key = getAdminKey();
+
+      try {
+        const res = await fetch(`/api/admin/support/tickets/${currentOpenTicket.id}/status`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-key': key
+          },
+          body: JSON.stringify({ status })
+        });
+        const data = await res.json();
+        if (data.success) {
+          currentOpenTicket.status = status;
+          const stat = SUPPORT_STATUS_MAP[status] || SUPPORT_STATUS_MAP['NEW'];
+          setElClass('ticketConvStatusBadge', stat.cls);
+          setElText('ticketConvStatusBadge', stat.label);
+          loadAdminSupportTickets();
+        } else {
+          alert('خطا: ' + (data.error || 'تغییر وضعیت ناموفق بود'));
+        }
+      } catch (err) {
+        alert('خطای ارتباط: ' + err.message);
+      }
+    }
+
+    // ====================================================================
+    // OneSignal & Push Notification
+    // ====================================================================
+    async function checkOneSignalStatus() {
+      const key = getAdminKey();
+      const badge = document.getElementById('onesignalBadge');
+      try {
+        const res = await fetch('/api/admin/onesignal/status', {
+          headers: { 'x-admin-key': key }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (badge) {
+          if (data.configured) {
+            badge.className = 'badge bg-success';
+            badge.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> پیکربندی‌شده و متصل';
+          } else {
+            badge.className = 'badge bg-warning text-dark';
+            badge.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-1"></i> کلیدها در Render تنظیم نشده‌اند';
+          }
+        }
+      } catch (e) {
+        if (badge) {
+          badge.className = 'badge bg-secondary';
+          badge.innerText = 'عدم دسترسی به وضعیت';
+        }
+      }
+    }
+
+    async function sendPushNotification() {
+      const title = (document.getElementById('pushTitle')?.value || '').trim();
+      const message = (document.getElementById('pushMessage')?.value || '').trim();
+      const audience = document.getElementById('pushAudience')?.value || 'ALL';
+
+      if (!title || !message) {
+        alert('لطفاً عنوان و متن اعلان پوش را وارد کنید.');
+        return;
+      }
+
+      const btn = document.getElementById('sendPushBtn');
+      const spinner = document.getElementById('pushSpinner');
+      if (btn) btn.setAttribute('disabled', 'true');
+      if (spinner) spinner.classList.remove('d-none');
+
+      const key = getAdminKey();
+      try {
+        const res = await fetch('/api/admin/push-notification', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-key': key
+          },
+          body: JSON.stringify({ title, message, audience })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('اعلان پوش با موفقیت به سرویس OneSignal ارسال گردید.');
+          document.getElementById('pushTitle').value = '';
+          document.getElementById('pushMessage').value = '';
+        } else {
+          alert('خطا در ارسال اعلان: ' + (data.error || 'پاسخ ناموفق'));
+        }
+      } catch (err) {
+        alert('خطای ارتباط با سرور: ' + err.message);
+      } finally {
+        if (btn) btn.removeAttribute('disabled');
+        if (spinner) spinner.classList.add('d-none');
+      }
+    }
+
+    // ==============================================================
+    // Store Management Functions
+    // ==============================================================
+    function toggleStoreUnitsLabel() {
+      const type = document.getElementById('storeProdType')?.value;
+      const label = document.getElementById('storeUnitsLabel');
+      const unitsInput = document.getElementById('storeProdUnits');
+      if (type === 'ACCOUNT_UPGRADE') {
+        if (label) label.innerText = 'سطح ارتقا (۱ = VIP کامل):';
+        if (unitsInput) unitsInput.value = 1;
+      } else {
+        if (label) label.innerText = 'تعداد مربع‌های اعطایی:';
+        if (unitsInput && unitsInput.value == 1) unitsInput.value = 10;
+      }
+    }
+
+    async function loadStoreProducts() {
+      const tbody = document.getElementById('storeProductsTbody');
+      const key = getAdminKey();
+
+      try {
+        const res = await fetch('/api/admin/store/products', {
+          headers: { 'x-admin-key': key }
+        });
+        if (!res.ok) throw new Error('خطا در دریافت بسته‌ها (کد ' + res.status + ')');
+        const data = await res.json();
+        cachedStoreProducts = data.products || [];
+
+        // Update counts
+        const countEl = document.getElementById('storePackagesCount');
+        if (countEl) countEl.innerText = `${cachedStoreProducts.length} بسته`;
+        const sidebarBadge = document.getElementById('sidebarStoreBadge');
+        if (sidebarBadge) sidebarBadge.innerText = `${cachedStoreProducts.length} بسته`;
+
+        if (!tbody) return;
+        if (cachedStoreProducts.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="8" class="text-center text-secondary py-4">هیچ بسته‌ای در فروشگاه تعریف نشده است.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = cachedStoreProducts.map(p => {
+          const typeLabel = p.product_type === 'ACCOUNT_UPGRADE' 
+            ? '<span class="badge bg-warning text-dark"><i class="bi bi-star-fill me-1"></i> ارتقای سطح حساب</span>' 
+            : '<span class="badge bg-primary"><i class="bi bi-grid-fill me-1"></i> بازگشایی مربع</span>';
+          
+          let unitsLabel = '';
+          if (p.id === 'pkg_upgrade_silver') {
+            unitsLabel = '<span class="badge bg-info text-dark">ضریب ۳ برابری (۳X)</span>';
+          } else if (p.id === 'pkg_upgrade_gold') {
+            unitsLabel = '<span class="badge bg-warning text-dark">ضریب ۶ برابری (۶X)</span>';
+          } else {
+            unitsLabel = `<strong class="text-warning">${Number(p.units_granted).toLocaleString('fa-IR')}</strong> مربع`;
+          }
+
+          const priceFormatted = Number(p.price_toman).toLocaleString('fa-IR') + ' تومان';
+
+          const myketStatus = p.is_ready_in_myket
+            ? '<span class="badge bg-success"><i class="bi bi-check-circle me-1"></i> فعال در مایکت</span>'
+            : '<span class="badge bg-secondary"><i class="bi bi-clock me-1"></i> در حال آماده‌سازی</span>';
+
+          const activeBadge = p.is_active
+            ? '<span class="badge bg-success-subtle text-success border border-success">نمایش فعال</span>'
+            : '<span class="badge bg-danger-subtle text-danger border border-danger">مخفی / غیرفعال</span>';
+
+          const badgeDisplay = p.badge ? `<span class="badge bg-dark border border-warning text-warning ms-1">${escapeHtml(p.badge)}</span>` : '';
+
+          return `
+            <tr>
+              <td>
+                <div class="fw-bold text-white">${escapeHtml(p.title)} ${badgeDisplay}</div>
+                <div class="text-secondary small text-truncate" style="max-width: 250px;">${escapeHtml(p.description)}</div>
+              </td>
+              <td>${typeLabel}</td>
+              <td>${unitsLabel}</td>
+              <td class="fw-bold text-info">${priceFormatted}</td>
+              <td><code class="text-warning" style="font-size: 11px;">${escapeHtml(p.myket_sku)}</code></td>
+              <td>${myketStatus}</td>
+              <td>${activeBadge}</td>
+              <td>
+                <button class="btn btn-warning btn-sm" onclick="openEditProductModal('${p.id}')" title="ویرایش قیمت"><i class="bi bi-pencil-fill me-1"></i> ویرایش قیمت</button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">خطا: ${escapeHtml(err.message)}</td></tr>`;
+      }
+    }
+
+    async function loadStorePurchases() {
+      const tbody = document.getElementById('storePurchasesTbody');
+      const key = getAdminKey();
+
+      try {
+        const res = await fetch('/api/admin/store/purchases', {
+          headers: { 'x-admin-key': key }
+        });
+        if (!res.ok) throw new Error('خطا در دریافت سوابق تراکنش‌ها');
+        const data = await res.json();
+        cachedStorePurchases = data.purchases || [];
+
+        // Update metric summaries
+        const purchasesCountEl = document.getElementById('storeTotalPurchases');
+        if (purchasesCountEl) purchasesCountEl.innerText = `${cachedStorePurchases.length} تراکنش`;
+
+        let totalRev = 0;
+        cachedStorePurchases.forEach(item => {
+          if (item.status === 'SUCCESS') totalRev += Number(item.amount || 0);
+        });
+        const revEl = document.getElementById('storeTotalRevenue');
+        if (revEl) revEl.innerText = `${totalRev.toLocaleString('fa-IR')} تومان`;
+
+        if (!tbody) return;
+        if (cachedStorePurchases.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" class="text-center text-secondary py-4">تاکنون تراکنشی ثبت نشده است.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = cachedStorePurchases.map(row => {
+          const userMasked = (row.first_name || '') + ' ' + (row.last_name || '') + (row.phone_number ? ` (${row.phone_number})` : '');
+          const statusBadge = row.status === 'SUCCESS' 
+            ? '<span class="badge bg-success"><i class="bi bi-check-lg me-1"></i> تایید شده</span>'
+            : `<span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i> ${escapeHtml(row.status)}</span>`;
+
+          const tokenDisplay = row.purchase_token 
+            ? `<code class="text-secondary" style="font-size: 11px;">${escapeHtml(row.purchase_token.substring(0, 16))}...</code>`
+            : '<span class="text-muted small">ندارد</span>';
+
+          const dateStr = row.created_at ? new Date(row.created_at).toLocaleString('fa-IR') : '—';
+
+          return `
+            <tr>
+              <td><span class="font-monospace small text-info">${escapeHtml(row.purchase_id)}</span></td>
+              <td><span class="small text-white">${escapeHtml(userMasked || row.user_id)}</span></td>
+              <td><strong>${escapeHtml(row.product_title || row.product_id)}</strong></td>
+              <td class="text-warning fw-bold">${Number(row.amount).toLocaleString('fa-IR')} تومان</td>
+              <td>${tokenDisplay}</td>
+              <td>${statusBadge}</td>
+              <td class="small text-secondary">${dateStr}</td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">خطا: ${escapeHtml(err.message)}</td></tr>`;
+      }
+    }
+
+    function openAddProductModal() {
+      alert('امکان افزودن بسته جدید وجود ندارد. فروشگاه شامل ۴ بسته ثابت (۲ بسته بازگشایی مربع و ۲ بسته ارتقای نقره‌ای و طلایی) است و فقط ویرایش قیمت مجاز است.');
+    }
+
+    function openEditProductModal(id) {
+      const prod = cachedStoreProducts.find(p => p.id === id);
+      if (!prod) return;
+
+      document.getElementById('storeProdId').value = prod.id;
+      document.getElementById('storeProdTitle').value = prod.title || '';
+      document.getElementById('storeProdDesc').value = prod.description || '';
+      document.getElementById('storeProdType').value = prod.product_type || 'SQUARE_UNLOCK';
+      document.getElementById('storeProdTypeDisplay').value = (prod.product_type === 'ACCOUNT_UPGRADE' ? 'ارتقای حساب کاربری (VIP)' : 'بازگشایی مربع مسابقه');
+      document.getElementById('storeProdUnits').value = prod.units_granted || 10;
+      document.getElementById('storeProdPrice').value = prod.price_toman || 0;
+      document.getElementById('storeProdSku').value = prod.myket_sku || '';
+      document.getElementById('storeProdBadge').value = prod.badge || '';
+      document.getElementById('storeProdSort').value = prod.sort_order || 1;
+      document.getElementById('storeProdIsActive').checked = Boolean(prod.is_active);
+      document.getElementById('storeProdIsReadyInMyket').checked = Boolean(prod.is_ready_in_myket);
+
+      document.getElementById('storeProductModalLabel').innerHTML = '<i class="bi bi-pencil-square me-2"></i> ویرایش قیمت بسته فروشگاه';
+      if (!bootstrapStoreModal) {
+        bootstrapStoreModal = new bootstrap.Modal(document.getElementById('storeProductModal'));
+      }
+      bootstrapStoreModal.show();
+    }
+
+    async function saveStoreProduct(event) {
+      event.preventDefault();
+      const id = document.getElementById('storeProdId').value.trim();
+      const title = document.getElementById('storeProdTitle').value.trim();
+      const description = document.getElementById('storeProdDesc').value.trim();
+      const product_type = document.getElementById('storeProdType').value;
+      const units_granted = Number(document.getElementById('storeProdUnits').value);
+      const price_toman = Number(document.getElementById('storeProdPrice').value);
+      const myket_sku = document.getElementById('storeProdSku').value.trim();
+      const badge = document.getElementById('storeProdBadge').value.trim();
+      const sort_order = Number(document.getElementById('storeProdSort').value);
+      const is_active = document.getElementById('storeProdIsActive').checked;
+      const is_ready_in_myket = document.getElementById('storeProdIsReadyInMyket').checked;
+
+      const key = getAdminKey();
+      try {
+        const res = await fetch('/api/admin/store/products', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-key': key
+          },
+          body: JSON.stringify({
+            id: id || undefined,
+            title,
+            description,
+            product_type,
+            units_granted,
+            price_toman,
+            myket_sku,
+            badge,
+            sort_order,
+            is_active,
+            is_ready_in_myket
+          })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          if (bootstrapStoreModal) bootstrapStoreModal.hide();
+          loadStoreProducts();
+        } else {
+          alert('خطا در ذخیره بسته: ' + (data.error || 'پاسخ ناموفق'));
+        }
+      } catch (err) {
+        alert('خطای ارتباط با سرور: ' + err.message);
+      }
+    }
+
+    async function deleteStoreProduct(id) {
+      if (!confirm('آیا از حذف این بسته از فروشگاه اطمینان دارید؟')) return;
+      const key = getAdminKey();
+
+      try {
+        const res = await fetch(`/api/admin/store/products/${id}`, {
+          method: 'DELETE',
+          headers: { 'x-admin-key': key }
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadStoreProducts();
+        } else {
+          alert('خطا در حذف بسته: ' + (data.error || 'پاسخ ناموفق'));
+        }
+      } catch (err) {
+        alert('خطای ارتباط با سرور: ' + err.message);
+      }
+    }
+
+    // ==============================================================
+    // Rewards & Claims JS Functions
+    // ==============================================================
+    let cachedRewards = [];
+    let cachedCategories = [];
+    let cachedClaims = [];
+    let bootstrapRewardModal = null;
+    let bootstrapClaimModal = null;
+
+    async function loadRewardsData() {
+      const tbody = document.getElementById('rewardsTbody');
+      const key = getAdminKey();
+      try {
+        const res = await fetch('/api/rewards/admin/rewards', { headers: { 'x-admin-key': key } });
+        if (!res.ok) throw new Error('خطا در دریافت لیست جوایز');
+        const data = await res.json();
+        cachedRewards = data.rewards || [];
+
+        if (!tbody) return;
+        if (cachedRewards.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" class="text-center text-secondary py-4">هیچ جایزه‌ای ثبت نشده است.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = cachedRewards.map(r => {
+          const imgHtml = r.image_url 
+            ? `<img src="${escapeHtml(r.image_url)}" style="width:40px;height:40px;object-fit:cover;" class="rounded me-2">`
+            : `<div class="rounded me-2 d-inline-flex align-items-center justify-content-center bg-secondary" style="width:40px;height:40px;"><i class="bi bi-gift text-white"></i></div>`;
+          const featuredBadge = r.is_featured ? '<span class="badge bg-warning text-dark">ویژه</span>' : '<span class="text-muted small">—</span>';
+          const activeBadge = r.is_active ? '<span class="badge bg-success">فعال</span>' : '<span class="badge bg-danger">غیرفعال</span>';
+          const costText = Number(r.cost_points).toLocaleString('fa-IR') + ' امتیاز';
+
+          return `
+            <tr>
+              <td>
+                <div class="d-flex align-items-center">
+                  ${imgHtml}
+                  <div>
+                    <strong class="text-white">${escapeHtml(r.title)}</strong>
+                    <div class="text-secondary small">${escapeHtml(r.description || '')}</div>
+                  </div>
+                </div>
+              </td>
+              <td><span class="badge bg-dark border border-secondary">${escapeHtml(r.category_name || r.category_id || 'عمومی')}</span></td>
+              <td class="fw-bold text-warning">${costText}</td>
+              <td class="fw-bold text-info">${Number(r.stock_quantity).toLocaleString('fa-IR')} عدد</td>
+              <td>${featuredBadge}</td>
+              <td>${activeBadge}</td>
+              <td>
+                <div class="btn-group btn-group-sm">
+                  <button class="btn btn-outline-warning" onclick="openEditRewardModal('${r.id}')"><i class="bi bi-pencil-fill"></i></button>
+                  <button class="btn btn-outline-danger" onclick="deleteReward('${r.id}')"><i class="bi bi-trash-fill"></i></button>
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger py-4">خطا: ${escapeHtml(err.message)}</td></tr>`;
+      }
+    }
+
+    function openAddRewardModal() {
+      document.getElementById('rewModalId').value = '';
+      document.getElementById('rewModalTitle').value = '';
+      document.getElementById('rewModalCost').value = 100;
+      document.getElementById('rewModalStock').value = 50;
+      document.getElementById('rewModalImageUrl').value = '';
+      document.getElementById('rewModalDesc').value = '';
+      document.getElementById('rewModalIsFeatured').checked = true;
+      document.getElementById('rewModalIsActive').checked = true;
+
+      document.getElementById('rewardModalLabel').innerHTML = '<i class="bi bi-plus-circle-fill me-2"></i> تعریف جایزه جدید';
+      if (!bootstrapRewardModal) bootstrapRewardModal = new bootstrap.Modal(document.getElementById('rewardModal'));
+      bootstrapRewardModal.show();
+    }
+
+    function openEditRewardModal(id) {
+      const r = cachedRewards.find(item => item.id === id);
+      if (!r) return;
+
+      document.getElementById('rewModalId').value = r.id;
+      document.getElementById('rewModalTitle').value = r.title || '';
+      document.getElementById('rewModalCategory').value = r.category_id || 'cat_recharge';
+      document.getElementById('rewModalCost').value = r.cost_points || 0;
+      document.getElementById('rewModalStock').value = r.stock_quantity || 0;
+      document.getElementById('rewModalImageUrl').value = r.image_url || '';
+      document.getElementById('rewModalDesc').value = r.description || '';
+      document.getElementById('rewModalIsFeatured').checked = Boolean(r.is_featured);
+      document.getElementById('rewModalIsActive').checked = Boolean(r.is_active);
+
+      document.getElementById('rewardModalLabel').innerHTML = '<i class="bi bi-pencil-square me-2"></i> ویرایش اطلاعات جایزه';
+      if (!bootstrapRewardModal) bootstrapRewardModal = new bootstrap.Modal(document.getElementById('rewardModal'));
+      bootstrapRewardModal.show();
+    }
+
+    async function saveReward(event) {
+      event.preventDefault();
+      const id = document.getElementById('rewModalId').value;
+      const title = document.getElementById('rewModalTitle').value.trim();
+      const category_id = document.getElementById('rewModalCategory').value;
+      const cost_points = Number(document.getElementById('rewModalCost').value);
+      const stock_quantity = Number(document.getElementById('rewModalStock').value);
+      const image_url = document.getElementById('rewModalImageUrl').value.trim();
+      const description = document.getElementById('rewModalDesc').value.trim();
+      const is_featured = document.getElementById('rewModalIsFeatured').checked;
+      const is_active = document.getElementById('rewModalIsActive').checked;
+
+      const key = getAdminKey();
+      const url = id ? `/api/rewards/admin/rewards/${id}` : '/api/rewards/admin/rewards';
+      const method = id ? 'PUT' : 'POST';
+
+      try {
+        const res = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json', 'x-admin-key': key },
+          body: JSON.stringify({ title, category_id, cost_points, stock_quantity, image_url, description, is_featured, is_active })
+        });
+        const data = await res.json();
+        if (data.success) {
+          if (bootstrapRewardModal) bootstrapRewardModal.hide();
+          loadRewardsData();
+        } else {
+          alert('خطا: ' + (data.message || 'ثبت جایزه ناموفق بود'));
+        }
+      } catch (err) {
+        alert('خطای ارتباط: ' + err.message);
+      }
+    }
+
+    async function deleteReward(id) {
+      if (!confirm('آیا از حذف این جایزه اطمینان دارید؟')) return;
+      const key = getAdminKey();
+      try {
+        const res = await fetch(`/api/rewards/admin/rewards/${id}`, { method: 'DELETE', headers: { 'x-admin-key': key } });
+        const data = await res.json();
+        if (data.success) {
+          loadRewardsData();
+        } else {
+          alert('خطا: ' + data.message);
+        }
+      } catch (err) {
+        alert('خطا: ' + err.message);
+      }
+    }
+
+    function updateBannerImagePreview(url) {
+      const previewContainer = document.getElementById('rewAppPreviewContainer');
+      const previewImg = document.getElementById('rewAppPreviewImg');
+      const promptDiv = document.getElementById('rewAppUploadPrompt');
+      const urlInput = document.getElementById('rewAppBannerUrl');
+
+      if (url && url.trim() !== '') {
+        if (urlInput) urlInput.value = url;
+        if (previewImg) previewImg.src = url;
+        if (previewContainer) previewContainer.classList.remove('d-none');
+        if (promptDiv) promptDiv.classList.add('d-none');
+      } else {
+        if (urlInput) urlInput.value = '';
+        if (previewImg) previewImg.src = '';
+        if (previewContainer) previewContainer.classList.add('d-none');
+        if (promptDiv) promptDiv.classList.remove('d-none');
+      }
+    }
+
+    function removeBannerImage() {
+      const fileInput = document.getElementById('rewAppImageFile');
+      if (fileInput) fileInput.value = '';
+      updateBannerImagePreview('');
+    }
+
+    async function handleBannerImageSelect(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      // Validate Type & Size
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+      if (!allowedTypes.includes(file.type)) {
+        alert('خطا: فقط فرمت‌های JPG، PNG و WebP مجاز هستند.');
+        event.target.value = '';
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        alert('خطا: حجم فایل نباید بیشتر از ۵ مگابایت باشد.');
+        event.target.value = '';
+        return;
+      }
+
+      // Show local preview immediately
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        updateBannerImagePreview(e.target.result);
+      };
+      reader.readAsDataURL(file);
+
+      // Upload progress simulation & actual upload
+      const progressWrapper = document.getElementById('rewAppUploadProgressWrapper');
+      const progressBar = document.getElementById('rewAppUploadProgressBar');
+      const percentText = document.getElementById('rewAppUploadPercent');
+      const statusText = document.getElementById('rewAppUploadStatusText');
+
+      if (progressWrapper) progressWrapper.classList.remove('d-none');
+      if (progressBar) progressBar.style.width = '20%';
+      if (percentText) percentText.innerText = '۲۰٪';
+      if (statusText) statusText.innerText = 'در حال آماده‌سازی فایل در Supabase Storage...';
+
+      const formData = new FormData();
+      formData.append('banner', file);
+
+      const key = getAdminKey();
+      try {
+        if (progressBar) progressBar.style.width = '60%';
+        if (percentText) percentText.innerText = '۶۰٪';
+        if (statusText) statusText.innerText = 'در حال آپلود در bucket نام‌گذاری شده gift-banners...';
+
+        const res = await fetch('/api/rewards/admin/upload-banner', {
+          method: 'POST',
+          headers: { 'x-admin-key': key },
+          body: formData
+        });
+        const data = await res.json();
+
+        if (progressBar) progressBar.style.width = '100%';
+        if (percentText) percentText.innerText = '۱۰۰٪';
+        if (statusText) statusText.innerText = 'آپلود موفقیت‌آمیز در Supabase Storage!';
+
+        setTimeout(() => {
+          if (progressWrapper) progressWrapper.classList.add('d-none');
+        }, 1500);
+
+        if (data.success && data.url) {
+          updateBannerImagePreview(data.url);
+          // Auto save appearance immediately to make the uploaded banner active
+          try {
+            const hero_title = document.getElementById('rewAppHeroTitle')?.value.trim() || 'اینترنت ۲۰ گیگ برنده شو!';
+            const primary_color = document.getElementById('rewAppColor')?.value || '#10B981';
+            const hero_subtitle = document.getElementById('rewAppHeroSubtitle')?.value.trim() || 'هدیه ویژه دوره جاری مسابقه رقابت کن، جایزه ببر';
+            const terms_text = document.getElementById('rewAppTermsText')?.value.trim() || '';
+            const is_active = document.getElementById('rewAppIsActive')?.checked ?? true;
+
+            await fetch('/api/rewards/admin/appearance', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-admin-key': key },
+              body: JSON.stringify({
+                hero_title,
+                primary_color,
+                hero_subtitle,
+                hero_banner_url: data.url,
+                terms_text,
+                is_active,
+                active_sections: { isActive: is_active }
+              })
+            });
+            alert('تصویر بنر با موفقیت در سرور بارگذاری شد و به‌عنوان بنر فعال جایگزین گردید.');
+          } catch (saveErr) {
+            console.warn('Auto-save appearance notice:', saveErr);
+          }
+        } else {
+          alert('خطا در آپلود: ' + (data.message || 'خطای سرور'));
+        }
+      } catch (err) {
+        if (progressWrapper) progressWrapper.classList.add('d-none');
+        alert('خطای شبکه در بارگذاری تصویر: آرامش خود را حفظ کرده و دوباره تلاش کنید.');
+      }
+    }
+
+    async function loadRewardAppearance() {
+      try {
+        const res = await fetch('/api/rewards/appearance');
+        const data = await res.json();
+        if (data.success && data.appearance) {
+          const app = data.appearance;
+          if (document.getElementById('rewAppHeroTitle')) document.getElementById('rewAppHeroTitle').value = app.hero_title || '';
+          if (document.getElementById('rewAppColor')) document.getElementById('rewAppColor').value = app.primary_color || '#10B981';
+          if (document.getElementById('rewAppHeroSubtitle')) document.getElementById('rewAppHeroSubtitle').value = app.hero_subtitle || '';
+          updateBannerImagePreview(app.hero_banner_url || '');
+          if (document.getElementById('rewAppTermsText')) document.getElementById('rewAppTermsText').value = app.terms_text || '';
+          const isActive = (app.is_active !== false && app.active_sections?.isActive !== false);
+          if (document.getElementById('rewAppIsActive')) document.getElementById('rewAppIsActive').checked = isActive;
+        }
+      } catch (err) {
+        console.error('Error loading appearance:', err);
+      }
+    }
+
+    async function saveRewardAppearance(event) {
+      event.preventDefault();
+      const hero_title = document.getElementById('rewAppHeroTitle')?.value.trim() || '';
+      const primary_color = document.getElementById('rewAppColor')?.value || '#10B981';
+      const hero_subtitle = document.getElementById('rewAppHeroSubtitle')?.value.trim() || '';
+      const hero_banner_url = document.getElementById('rewAppBannerUrl')?.value.trim() || '';
+      const terms_text = document.getElementById('rewAppTermsText')?.value.trim() || '';
+      const is_active = document.getElementById('rewAppIsActive')?.checked ?? true;
+
+      const key = getAdminKey();
+      try {
+        const res = await fetch('/api/rewards/admin/appearance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-admin-key': key },
+          body: JSON.stringify({
+            hero_title,
+            primary_color,
+            hero_subtitle,
+            hero_banner_url,
+            terms_text,
+            is_active,
+            active_sections: { isActive: is_active }
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert('اطلاعات بنر هدیه با موفقیت در دیتابیس ذخیره گردید.');
+        } else {
+          alert('خطا: ' + (data.message || 'ثبت نا موفق بود'));
+        }
+      } catch (err) {
+        alert('خطا: ' + err.message);
+      }
+    }
+
+    async function loadRewardClaims() {
+      const tbody = document.getElementById('rewardClaimsTbody');
+      const key = getAdminKey();
+      try {
+        const res = await fetch('/api/rewards/admin/claims', { headers: { 'x-admin-key': key } });
+        if (!res.ok) throw new Error('خطا در دریافت لیست درخواست‌ها');
+        const data = await res.json();
+        cachedClaims = data.claims || [];
+
+        // Sidebar claims count badge
+        const pendingCount = cachedClaims.filter(c => c.status === 'PENDING').length;
+        const badge = document.getElementById('sidebarClaimsBadge');
+        if (badge) badge.innerText = pendingCount.toString();
+
+        if (!tbody) return;
+        if (cachedClaims.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="8" class="text-center text-secondary py-4">هیچ درخواستی ثبت نشده است.</td></tr>';
+          return;
+        }
+
+        const STATUS_MAP = {
+          'PENDING': { label: 'در حال بررسی', cls: 'bg-warning text-dark' },
+          'APPROVED': { label: 'تایید شده', cls: 'bg-info text-dark' },
+          'PROCESSING': { label: 'در حال ارسال', cls: 'bg-primary' },
+          'SHIPPED': { label: 'ارسال شد', cls: 'bg-success' },
+          'COMPLETED': { label: 'تکمیل شده', cls: 'bg-success' },
+          'REJECTED': { label: 'رد شد', cls: 'bg-danger' }
+        };
+
+        tbody.innerHTML = cachedClaims.map(c => {
+          const st = STATUS_MAP[c.status] || { label: c.status, cls: 'bg-secondary' };
+          const dateStr = c.created_at ? new Date(c.created_at).toLocaleString('fa-IR') : '—';
+          const userText = (c.first_name || '') + ' ' + (c.last_name || '') + (c.phone || c.phone_number ? ` (${c.phone || c.phone_number})` : '');
+
+          return `
+            <tr>
+              <td><code class="text-warning fw-bold">${escapeHtml(c.tracking_code)}</code></td>
+              <td><span class="small text-white">${escapeHtml(userText || c.user_id)}</span></td>
+              <td><strong>${escapeHtml(c.reward_title || c.reward_id)}</strong></td>
+              <td class="text-info fw-bold">${Number(c.cost_points || c.reward_cost || 0).toLocaleString('fa-IR')} امتیاز</td>
+              <td>
+                <div class="small fw-bold text-white">${escapeHtml(c.recipient_name || '—')}</div>
+                <div class="small text-secondary text-truncate" style="max-width: 200px;">${escapeHtml(c.shipping_address || 'تحویل دیجیتال')}</div>
+              </td>
+              <td><span class="badge ${st.cls}">${st.label}</span></td>
+              <td class="small text-secondary">${dateStr}</td>
+              <td>
+                <button class="btn btn-outline-warning btn-sm" onclick="openEditClaimModal('${c.id}')"><i class="bi bi-pencil-fill"></i> مدیریت</button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+      } catch (err) {
+        if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">خطا: ${escapeHtml(err.message)}</td></tr>`;
+      }
+    }
+
+    function openEditClaimModal(id) {
+      const c = cachedClaims.find(item => item.id === id);
+      if (!c) return;
+
+      document.getElementById('claimModalId').value = c.id;
+      document.getElementById('claimModalStatus').value = c.status || 'PENDING';
+      document.getElementById('claimModalTracking').value = c.tracking_number || '';
+      document.getElementById('claimModalNotes').value = c.admin_notes || '';
+
+      if (!bootstrapClaimModal) bootstrapClaimModal = new bootstrap.Modal(document.getElementById('claimModal'));
+      bootstrapClaimModal.show();
+    }
+
+    async function saveClaimStatus(event) {
+      event.preventDefault();
+      const id = document.getElementById('claimModalId').value;
+      const status = document.getElementById('claimModalStatus').value;
+      const tracking_number = document.getElementById('claimModalTracking').value.trim();
+      const admin_notes = document.getElementById('claimModalNotes').value.trim();
+
+      const key = getAdminKey();
+      try {
+        const res = await fetch(`/api/rewards/admin/claims/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'x-admin-key': key },
+          body: JSON.stringify({ status, tracking_number, admin_notes })
+        });
+        const data = await res.json();
+        if (data.success) {
+          if (bootstrapClaimModal) bootstrapClaimModal.hide();
+          loadRewardClaims();
+        } else {
+          alert('خطا: ' + (data.message || 'اعمال تغییرات ناموفق بود'));
+        }
+      } catch (err) {
+        alert('خطای ارتباط: ' + err.message);
+      }
+    }
+
+    // ====================================================================
+    // LOGIN NOTIFICATION MANAGEMENT
+    // ====================================================================
+    async function loadLoginNotification() {
+      const key = getAdminKey();
+      try {
+        const res = await fetch('/api/admin/login-notification', {
+          headers: { 'x-admin-key': key }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const s = data.settings || data.data;
+        if (data.success && s) {
+          document.getElementById('ln_isVisible').checked = (s.is_visible !== false);
+          document.getElementById('ln_badgeText').value = s.badge_text || '';
+          document.getElementById('ln_badgeIcon').value = s.badge_icon || 'verified';
+          document.getElementById('ln_mainTitle').value = s.main_title || '';
+          document.getElementById('ln_mainDescription').value = s.main_description || '';
+          document.getElementById('ln_warningIsVisible').checked = (s.warning_is_visible !== false);
+          document.getElementById('ln_warningTitle').value = s.warning_title || '';
+          document.getElementById('ln_warningDescription').value = s.warning_description || '';
+          document.getElementById('ln_warningIcon').value = s.warning_icon || 'signal_cellular_alt';
+          
+          updateLNPreview();
+        }
+      } catch (err) {
+        console.error('[Login Notification Load Error]', err);
+      }
+    }
+
+    function updateLNPreview() {
+      const isVisible = document.getElementById('ln_isVisible').checked;
+      const warningIsVisible = document.getElementById('ln_warningIsVisible').checked;
+      
+      const container = document.getElementById('ln_preview_container');
+      const hiddenMsg = document.getElementById('ln_preview_hidden_msg');
+      
+      if (!isVisible) {
+        container.style.display = 'none';
+        hiddenMsg.style.display = 'block';
+        return;
+      }
+      
+      container.style.display = 'block';
+      hiddenMsg.style.display = 'none';
+      
+      setElText('ln_preview_badgeText', document.getElementById('ln_badgeText').value);
+      setElText('ln_preview_mainTitle', document.getElementById('ln_mainTitle').value);
+      setElText('ln_preview_mainDescription', document.getElementById('ln_mainDescription').value);
+      setElText('ln_preview_warningTitle', document.getElementById('ln_warningTitle').value);
+      setElText('ln_preview_warningDescription', document.getElementById('ln_warningDescription').value);
+      
+      // Update Icons
+      const badgeIcon = document.getElementById('ln_badgeIcon').value;
+      const warningIcon = document.getElementById('ln_warningIcon').value;
+      
+      const biMap = {
+        'verified': 'bi-patch-check-fill',
+        'stars': 'bi-stars',
+        'check_circle': 'bi-check-circle-fill',
+        'emoji_events': 'bi-trophy-fill'
+      };
+      const wiMap = {
+        'signal_cellular_alt': 'bi-reception-4',
+        'wifi_off': 'bi-wifi-off',
+        'cell_tower': 'bi-broadcast-pin'
+      };
+      
+      const badgeIconEl = document.getElementById('ln_preview_badgeIcon');
+      if (badgeIconEl) badgeIconEl.className = `bi ${biMap[badgeIcon] || 'bi-patch-check-fill'}`;
+      
+      const warningIconEl = document.getElementById('ln_preview_warningIcon');
+      if (warningIconEl) warningIconEl.className = `bi ${wiMap[warningIcon] || 'bi-reception-4'}`;
+      
+      // Warning visibility
+      document.getElementById('ln_preview_warningBox').style.display = warningIsVisible ? 'flex' : 'none';
+    }
+
+    async function saveLoginNotification(e) {
+      if (e) e.preventDefault();
+      const key = getAdminKey();
+      
+      const payload = {
+        is_visible: document.getElementById('ln_isVisible').checked,
+        badge_text: document.getElementById('ln_badgeText').value,
+        badge_icon: document.getElementById('ln_badgeIcon').value,
+        main_title: document.getElementById('ln_mainTitle').value,
+        main_description: document.getElementById('ln_mainDescription').value,
+        warning_is_visible: document.getElementById('ln_warningIsVisible').checked,
+        warning_title: document.getElementById('ln_warningTitle').value,
+        warning_description: document.getElementById('ln_warningDescription').value,
+        warning_icon: document.getElementById('ln_warningIcon').value
+      };
+      
+      try {
+        const res = await fetch('/api/admin/login-notification', {
+          method: 'POST',
+          headers: { 'x-admin-key': key, 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+          showNotification('تنظیمات صفحه ورود با موفقیت ذخیره و منتشر شد.', 'success');
+        } else {
+          showNotification('خطا در ذخیره‌سازی: ' + (data.message || 'نامشخص'), 'error');
+        }
+      } catch (err) {
+        showNotification('خطای ارتباط با سرور: ' + err.message, 'error');
+      }
+    }
+
+    function resetLoginNotificationDefaults() {
+      if (!confirm('آیا مایل به بازگرداندن تنظیمات به حالت پیش‌فرض (ایرانسل) هستید؟')) return;
+      
+      document.getElementById('ln_isVisible').checked = true;
+      document.getElementById('ln_badgeText').value = 'سرویس اختصاصی مشترکین ایرانسل';
+      document.getElementById('ln_badgeIcon').value = 'verified';
+      document.getElementById('ln_mainTitle').value = 'سامانه منحصرأ ویژه مشترکان ارجمند ایرانسل';
+      document.getElementById('ln_mainDescription').value = 'با کمال احترام و افتخار، این سامانه منحصراً جهت حضور، رقابت و بهره‌مندی مشترکین گرامی و همراهان وفادار اپراتور ایرانسل طراحی گردیده است.';
+      document.getElementById('ln_warningIsVisible').checked = true;
+      document.getElementById('ln_warningTitle').value = 'شرط الزامی: ورود با «اینترنت دیتای ایرانسل»';
+      document.getElementById('ln_warningDescription').value = 'لطفاً پیش از ورود، وای‌فای و فیلترشکن را خاموش نموده و از طریق اینترنت همراه سیم‌کارت ایرانسل متصل گردید.';
+      document.getElementById('ln_warningIcon').value = 'signal_cellular_alt';
+      
+      updateLNPreview();
+    }
+
+    function showNotification(msg, type = 'success') {
+      // Basic fallback if global alert not ready
+      const alertBox = document.getElementById('alertBox');
+      if (alertBox) {
+        alertBox.innerText = msg;
+        alertBox.className = `alert alert-${type === 'success' ? 'success' : 'danger'} shadow-sm mb-4`;
+        alertBox.classList.remove('d-none');
+        setTimeout(() => alertBox.classList.add('d-none'), 5000);
+      } else {
+        alert(msg);
+      }
+    }
+
+    // Auto-refresh every 12 seconds with live data
+    loadDashboard();
+    setInterval(loadDashboard, 12000);
+  </script>
+</body>
+</html>

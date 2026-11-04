@@ -1,5 +1,20 @@
 {
+  "name": "reward-backend",
+  "version": "1.0.0",
+  "description": "Backend API and Admin Dashboard for 'Reqabat Kon, Jayezah Bebar' on cPanel (api.kalametgame.ir)",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "test": "node server/test_hosting_readiness.js"
+  },
+  "engines": {
+    "node": ">=20.0.0 <=22.x"
+  },
   "dependencies": {
-    "multer": "^2.5.0"
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "multer": "^1.4.5-lts.1",
+    "pg": "^8.11.5"
   }
 }

@@ -299,8 +299,8 @@ fun SingleGiftBannerCard(
         val trimmed = heroBannerUrl.trim()
         when {
             trimmed.startsWith("http://") || trimmed.startsWith("https://") -> trimmed
-            trimmed.startsWith("/") -> "https://reward-app-backend-a9ze.onrender.com$trimmed"
-            trimmed.isNotBlank() -> "https://reward-app-backend-a9ze.onrender.com/$trimmed"
+            trimmed.startsWith("/") -> "https://api.kalametgame.ir$trimmed"
+            trimmed.isNotBlank() -> "https://api.kalametgame.ir/$trimmed"
             else -> R.drawable.banner_rewards_20gb
         }
     }

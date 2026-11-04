@@ -1,0 +1,11 @@
+{
+  "id": "default",
+  "hero_title": "ویترین طلایی جوایز بهاره",
+  "hero_subtitle": "ویژه کاربران وفادار شبکه ایرانسل",
+  "hero_banner_url": "https://images.unsplash.com/photo-1513151233558-d860c5398176",
+  "primary_color": "#F59E0B",
+  "active_sections": {
+    "isActive": true
+  },
+  "terms_text": "قوانین و تکمیلی تحویل جایزه"
+}

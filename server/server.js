@@ -57,10 +57,10 @@ function checkSupabaseHostType(rawUrl) {
     const parsed = new URL(rawUrl);
     const host = parsed.hostname;
     if (host.includes('.pooler.supabase.com')) {
-      console.log(`[PostgreSQL Host Check] Using Supabase Connection Pooler (${host}:${parsed.port || 5432}). Full IPv4 compatibility with Render verified.`);
+      console.log(`[PostgreSQL Host Check] Using Supabase Connection Pooler (${host}:${parsed.port || 6543}). Full IPv4 compatibility with cPanel verified.`);
     } else if (host.startsWith('db.') && host.endsWith('.supabase.co')) {
-      console.warn(`[PostgreSQL Host Warning] Host is direct domain "${host}". Direct Supabase connections are IPv6-only and may fail on Render with ETIMEDOUT or ENOTFOUND.`);
-      console.warn(`[PostgreSQL Host Recommendation] In Supabase -> Settings -> Database -> Connection string, select "Connection Pooler" (e.g. aws-0-[region].pooler.supabase.com:6543) and set that as DATABASE_URL in Render.`);
+      console.warn(`[PostgreSQL Host Warning] Host is direct domain "${host}". Direct Supabase connections are IPv6-only and will fail on cPanel shared hosting with ETIMEDOUT or ENOTFOUND.`);
+      console.warn(`[PostgreSQL Host Recommendation] In Supabase -> Settings -> Database -> Connection string, select "Connection Pooler" (e.g. aws-0-[region].pooler.supabase.com:6543) and set that as DATABASE_URL in cPanel.`);
     }
   } catch (e) {
     // Ignore parse error
@@ -79,7 +79,7 @@ if (activeDbUrl) {
   pool = new Pool({
     connectionString: activeDbUrl,
     ssl: isLocalhost ? false : { rejectUnauthorized: false },
-    max: 20,
+    max: 10,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000,
   });
@@ -157,7 +157,7 @@ async function testAndInitDatabase() {
     console.log(`[PostgreSQL Server Time]: ${res.rows[0].current_time}`);
     console.log(`[PostgreSQL Engine]: ${res.rows[0].pg_version.split(' ')[0]} ${res.rows[0].pg_version.split(' ')[1]}`);
 
-    await initDatabaseTables();
+    await verifyDatabaseSchema();
     await detectSchemaColumns();
     await migrateFromLocalJsonIfExists();
     console.log('====================================================');
@@ -169,15 +169,56 @@ async function testAndInitDatabase() {
     console.error(`[PostgreSQL Error Message]: ${err.message}`);
     console.error(`[PostgreSQL Error Code]: ${err.code || 'N/A'}`);
     if (err.message.includes('ETIMEDOUT') || err.message.includes('ENOTFOUND') || err.code === 'ECONNREFUSED') {
-      console.error('[PostgreSQL Network Advice] Render runs on IPv4 and cannot route to direct Supabase host (db.xxx.supabase.co).');
-      console.error('[PostgreSQL Network Advice] Use the Supabase Connection Pooler URI (aws-0-*.pooler.supabase.com:6543) in Render environment variables.');
+      console.error('[PostgreSQL Network Advice] cPanel runs on IPv4 and cannot route to direct Supabase host (db.xxx.supabase.co).');
+      console.error('[PostgreSQL Network Advice] Use the Supabase Connection Pooler URI (aws-0-*.pooler.supabase.com:6543) in cPanel environment variables.');
     }
     console.error('====================================================');
     return false;
   }
 }
 
-// Ensure all required tables and columns exist (safe, idempotent, non-destructive)
+// Read-only database schema inspection (Strictly non-destructive, does NOT execute automatic DDL)
+async function verifyDatabaseSchema() {
+  if (!pool || !isDbConnected) return;
+
+  const expectedTables = [
+    'users', 'user_scores', 'daily_cycles', 'ad_sessions',
+    'store_products', 'store_purchases', 'instant_unlock_credits',
+    'user_store_tiers', 'user_feedback_rewards', 'competition_archive',
+    'competition_logs', 'announcements', 'support_tickets',
+    'support_messages', 'rewards', 'reward_categories',
+    'reward_claims', 'reward_appearance', 'login_notification_settings'
+  ];
+
+  try {
+    const res = await pool.query(`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_schema = 'public'
+    `);
+    const existing = new Set(res.rows.map(r => r.table_name));
+    const missing = expectedTables.filter(t => !existing.has(t));
+    const present = expectedTables.filter(t => existing.has(t));
+
+    console.log(`[PostgreSQL Verification] Verified public schema tables (${present.length}/${expectedTables.length} present).`);
+
+    if (missing.length > 0) {
+      console.warn(`[PostgreSQL Verification Warning] Missing tables detected: ${missing.join(', ')}`);
+      console.warn(`[PostgreSQL Policy Notice] Automatic DDL execution is disabled to prevent unintended schema mutations. Please run migration.sql in the Supabase SQL Editor if needed.`);
+
+      if (process.env.AUTO_INIT_DB === 'true') {
+        console.log('[PostgreSQL DDL] AUTO_INIT_DB=true is enabled. Running safe DDL queries...');
+        await initDatabaseTables();
+      }
+    } else {
+      console.log('[PostgreSQL Verification SUCCESS] All required tables exist and are verified.');
+    }
+  } catch (err) {
+    console.error('[PostgreSQL Schema Verification Error]', err.message);
+  }
+}
+
+// Ensure all required tables and columns exist (safe, idempotent, non-destructive - only runs when explicitly requested)
 async function initDatabaseTables() {
   if (!pool || !isDbConnected) return;
 
@@ -855,16 +896,16 @@ function ensureDatabaseReady(req, res, next) {
   if (!pool || !isDbConnected) {
     return res.status(503).json({
       success: false,
-      error: "اتصال به پایگاه داده ابری Supabase برقرار نیست. لطفاً متغیر محیطی DATABASE_URL را در پنل Render تنظیم نمایید.",
+      error: "اتصال به پایگاه داده ابری Supabase برقرار نیست. لطفاً متغیر محیطی DATABASE_URL را در پنل هاست cPanel تنظیم نمایید.",
       dbStatus: "DISCONNECTED",
-      tip: "در صورتی که از Render استفاده می‌کنید، از رشته اتصال Connection Pooler (پورت 6543 با هاست pooler.supabase.com) استفاده کنید."
+      tip: "در هاست اشتراکی، حتماً از رشته اتصال Connection Pooler در Supabase (پورت 6543 با دامنه pooler.supabase.com) استفاده کنید تا با محدودیت IPv6 مواجه نشوید."
     });
   }
   next();
 }
 
-// Health check endpoint for Render
-app.get('/health', async (req, res) => {
+// Health check endpoint (Available at /health and /api/health)
+app.get(['/health', '/api/health'], async (req, res) => {
   let dbStatus = 'disconnected';
   if (pool) {
     try {
@@ -880,6 +921,7 @@ app.get('/health', async (req, res) => {
     status: 'ok',
     uptime: process.uptime(),
     timestamp: Date.now(),
+    server: 'Reqabat Backend (cPanel)',
     database: {
       status: dbStatus,
       configured: Boolean(DATABASE_URL),
