@@ -103,7 +103,7 @@ if (activeDbUrl) {
     // Ignore early share errors
   }
 } else {
-  console.warn('[PostgreSQL Init] DATABASE_URL is not set in environment variables. Database operations will return HTTP 503 until configured in Render.');
+  console.warn('[PostgreSQL Init] DATABASE_URL is not set in environment variables. Database operations will return HTTP 503 until configured in cPanel.');
 }
 
 // Mount Independent Rewards Microservice Router
@@ -942,6 +942,15 @@ function requireAdminAuth(req, res, next) {
   next();
 }
 
+// Dedicated Admin Auth Verification Endpoint
+app.get('/api/admin/auth/verify', requireAdminAuth, (req, res) => {
+  return res.json({
+    success: true,
+    message: "احراز هویت مدیریت با موفقیت تایید شد.",
+    dbConnected: isDbConnected
+  });
+});
+
 // User Authentication Middleware (Strict server-side validation against PostgreSQL public.users)
 async function requireUserAuth(req, res, next) {
   try {
@@ -1138,7 +1147,7 @@ const otpStore = new Map(); // key: phoneNumber -> { otp, expiresAt, requestsCou
 async function sendSmsViaKavenegar(phoneNumber, otp) {
   const apiKey = process.env.KAVENEGAR_API_KEY || process.env.SMS_API_KEY;
   if (!apiKey) {
-    throw new Error("سرویس پیامکی روی سرور تنظیم نشده است. لطفاً متغیر محیطی SMS_API_KEY یا KAVENEGAR_API_KEY را در تنظیمات Render وارد کنید.");
+    throw new Error("سرویس پیامکی روی سرور تنظیم نشده است. لطفاً متغیر محیطی SMS_API_KEY یا KAVENEGAR_API_KEY را در تنظیمات cPanel وارد کنید.");
   }
 
   const receptor = phoneNumber.trim();
@@ -1331,7 +1340,7 @@ app.post('/api/auth/otp/request', async (req, res) => {
       console.warn(`[SMS Gateway] Cannot send OTP: No SMS API key configured in environment.`);
       return res.status(503).json({
         success: false,
-        error: "سرویس پیامکی روی سرور فعال نیست. لطفاً با رمز عبور (ورود مستقیم) وارد شوید یا متغیر KAVENEGAR_API_KEY را در تنظیمات Render وارد نمایید."
+        error: "سرویس پیامکی روی سرور فعال نیست. لطفاً با رمز عبور (ورود مستقیم) وارد شوید یا متغیر KAVENEGAR_API_KEY را در تنظیمات cPanel وارد نمایید."
       });
     }
 
@@ -3567,7 +3576,7 @@ app.post('/api/admin/push-notification', requireAdminAuth, async (req, res) => {
 
     if (!appId || !apiKey) {
       return res.status(503).json({ 
-        error: "کلیدهای ONESIGNAL_APP_ID یا ONESIGNAL_REST_API_KEY در متغیرهای محیطی Render سرور تنظیم نشده‌اند." 
+        error: "کلیدهای ONESIGNAL_APP_ID یا ONESIGNAL_REST_API_KEY در متغیرهای محیطی cPanel سرور تنظیم نشده‌اند." 
       });
     }
 

@@ -495,13 +495,16 @@
 
       <!-- Sidebar Footer -->
       <div class="sidebar-footer">
-        <div class="d-flex align-items-center justify-content-between mb-3">
+        <div class="d-flex align-items-center justify-content-between mb-2">
           <div class="d-flex align-items-center gap-2">
             <i class="bi bi-shield-check text-warning"></i>
             <span class="small text-secondary">وضعیت سرور:</span>
           </div>
-          <span id="authStatusBadge" class="badge bg-secondary">در حال بررسی...</span>
+          <span id="authStatusBadge" class="badge bg-secondary" style="cursor: pointer;" onclick="openAdminAuthModal()" title="کلیک برای تنظیم یا ورود کلید">در حال بررسی...</span>
         </div>
+        <button class="btn btn-sm btn-outline-warning w-100 fw-bold py-2 mb-2" onclick="openAdminAuthModal()">
+          <i class="bi bi-key-fill me-1"></i> ورود / تغییر کلید مدیریت
+        </button>
         <button class="btn btn-sm btn-outline-danger w-100 fw-bold py-2" onclick="logoutAdmin()">
           <i class="bi bi-box-arrow-right me-1"></i> خروج امن از پنل
         </button>
@@ -619,11 +622,11 @@
               </div>
             </div>
             <div class="col-md-3 col-sm-6">
-              <div class="shortcut-card" onclick="navigateTo('settings')">
-                <div class="shortcut-icon"><i class="bi bi-gear-fill"></i></div>
+              <div class="shortcut-card" onclick="openAdminAuthModal()" title="کلیک برای ورود یا تغییر کلید مدیریت">
+                <div class="shortcut-icon"><i class="bi bi-shield-lock-fill text-warning"></i></div>
                 <div>
                   <div class="fw-bold">تنظیمات</div>
-                  <small class="text-secondary">امنیت پنل</small>
+                  <small class="text-secondary">کلید و امنیت پنل</small>
                 </div>
               </div>
             </div>
@@ -1641,6 +1644,49 @@
         </form>
       </div>
     </div>
+  <!-- Modal: Admin Key Authentication Dialog -->
+  <div class="modal fade modal-dark" id="adminAuthModal" tabindex="-1" aria-labelledby="adminAuthModalLabel" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content" style="background-color: #12253B; border: 2px solid #F59E0B; color: #fff; box-shadow: 0 10px 35px rgba(0,0,0,0.7); border-radius: 12px;">
+        <div class="modal-header border-secondary pb-3">
+          <h5 class="modal-title gold-text fw-bold" id="adminAuthModalLabel">
+            <i class="bi bi-shield-lock-fill text-warning me-2"></i> ورود به پنل مدیریت
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="بستن"></button>
+        </div>
+        <div class="modal-body p-4">
+          <div class="text-center mb-4">
+            <div class="display-6 text-warning mb-2"><i class="bi bi-key-fill"></i></div>
+            <h6 class="fw-bold text-white mb-2">کلید امنیتی مدیریت (ADMIN_KEY)</h6>
+            <p class="text-secondary small mb-0">
+              برای دسترسی به داشبورد، مدیریت کاربران، جوایز و تنظیمات، لطفاً کلید امنیتی مدیریت که در متغیرهای محیطی cPanel تنظیم کرده‌اید را وارد فرمایید:
+            </p>
+          </div>
+          
+          <div id="modalAuthAlert" class="alert alert-danger d-none py-2 px-3 small mb-3"></div>
+
+          <div class="mb-3">
+            <label class="form-label text-secondary small fw-bold">کلید امنیتی ادمین:</label>
+            <div class="input-group">
+              <input type="password" id="modalAdminKeyInput" class="form-control form-control-dark" placeholder="کلید امنیتی را وارد کنید..." style="direction: ltr; font-family: monospace;" autofocus>
+              <button class="btn btn-outline-secondary" type="button" onclick="toggleModalKeyVisibility()" title="نمایش / پنهان‌سازی کلید">
+                <i class="bi bi-eye" id="toggleKeyIcon"></i>
+              </button>
+            </div>
+            <div class="form-text text-secondary small mt-1">
+              این کلید به‌صورت محلی در حافظه مرورگر ذخیره خواهد شد.
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer border-secondary justify-content-between pt-3">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">انصراف</button>
+          <button type="button" id="modalSubmitKeyBtn" class="btn btn-gold px-4 fw-bold" onclick="submitModalAdminKey()">
+            <span id="modalAuthSpinner" class="spinner-border spinner-border-sm d-none me-1" role="status"></span>
+            <i class="bi bi-box-arrow-in-right me-1"></i> ورود و تایید کلید
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Scripts -->
@@ -1792,10 +1838,129 @@
     const adminKeyField = document.getElementById('adminKeyInput');
     if (adminKeyField) adminKeyField.value = getAdminKey();
 
+    function openAdminAuthModal() {
+      const modalEl = document.getElementById('adminAuthModal');
+      if (!modalEl) return;
+      const input = document.getElementById('modalAdminKeyInput');
+      if (input) {
+        input.value = getAdminKey();
+      }
+      const alertEl = document.getElementById('modalAuthAlert');
+      if (alertEl) alertEl.classList.add('d-none');
+      
+      if (!window.bootstrapAdminAuthModal) {
+        window.bootstrapAdminAuthModal = new bootstrap.Modal(modalEl);
+      }
+      window.bootstrapAdminAuthModal.show();
+      setTimeout(() => { if (input) input.focus(); }, 400);
+    }
+
+    function toggleModalKeyVisibility() {
+      const input = document.getElementById('modalAdminKeyInput');
+      const icon = document.getElementById('toggleKeyIcon');
+      if (!input || !icon) return;
+      if (input.type === 'password') {
+        input.type = 'text';
+        icon.className = 'bi bi-eye-slash';
+      } else {
+        input.type = 'password';
+        icon.className = 'bi bi-eye';
+      }
+    }
+
+    async function submitModalAdminKey() {
+      const input = document.getElementById('modalAdminKeyInput');
+      const key = (input ? input.value : '').trim();
+      const alertEl = document.getElementById('modalAuthAlert');
+      const spinner = document.getElementById('modalAuthSpinner');
+      const submitBtn = document.getElementById('modalSubmitKeyBtn');
+
+      if (!key) {
+        if (alertEl) {
+          alertEl.innerText = 'لطفاً کلید امنیتی مدیریت را وارد کنید.';
+          alertEl.className = 'alert alert-warning py-2 px-3 small mb-3';
+          alertEl.classList.remove('d-none');
+        }
+        return;
+      }
+
+      if (spinner) spinner.classList.remove('d-none');
+      if (submitBtn) submitBtn.setAttribute('disabled', 'true');
+      if (alertEl) alertEl.classList.add('d-none');
+
+      try {
+        const res = await fetch('/api/admin/auth/verify', {
+          headers: { 'x-admin-key': key }
+        });
+
+        if (res.status === 401) {
+          if (alertEl) {
+            alertEl.innerText = '❌ کلید وارد شده نامعتبر است. لطفاً مقدار ADMIN_KEY در متغیرهای محیطی cPanel هاست را بررسی نمایید.';
+            alertEl.className = 'alert alert-danger py-2 px-3 small mb-3';
+            alertEl.classList.remove('d-none');
+          }
+          return;
+        }
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || 'خطا در اعتبارسنجی کلید (کد ' + res.status + ')');
+        }
+
+        // Key verified! Save key to localStorage
+        localStorage.setItem('reqabat_admin_key', key);
+        const kField = document.getElementById('adminKeyInput');
+        if (kField) kField.value = key;
+
+        if (alertEl) {
+          alertEl.innerText = '✓ کلید با موفقیت تایید شد. در حال بارگذاری اطلاعات پنل...';
+          alertEl.className = 'alert alert-success py-2 px-3 small mb-3';
+          alertEl.classList.remove('d-none');
+        }
+
+        setTimeout(() => {
+          if (window.bootstrapAdminAuthModal) {
+            window.bootstrapAdminAuthModal.hide();
+          }
+          loadDashboard();
+        }, 500);
+
+      } catch (err) {
+        if (alertEl) {
+          alertEl.innerText = 'خطای ارتباط: ' + err.message;
+          alertEl.className = 'alert alert-danger py-2 px-3 small mb-3';
+          alertEl.classList.remove('d-none');
+        }
+      } finally {
+        if (spinner) spinner.classList.add('d-none');
+        if (submitBtn) submitBtn.removeAttribute('disabled');
+      }
+    }
+
+    // Support Enter key in modal key input
+    document.addEventListener('DOMContentLoaded', () => {
+      const modalInput = document.getElementById('modalAdminKeyInput');
+      if (modalInput) {
+        modalInput.addEventListener('keyup', (e) => {
+          if (e.key === 'Enter') submitModalAdminKey();
+        });
+      }
+    });
+
     function showAlert(msg) {
       const el = document.getElementById('alertBox');
       if (el) {
         el.innerText = msg;
+        el.className = 'alert alert-danger shadow-sm mb-4';
+        el.classList.remove('d-none');
+      }
+    }
+
+    function showAlertHtml(html) {
+      const el = document.getElementById('alertBox');
+      if (el) {
+        el.innerHTML = html;
+        el.className = 'alert alert-danger shadow-sm mb-4';
         el.classList.remove('d-none');
       }
     }
@@ -2034,10 +2199,27 @@
           if (authBadge) {
             authBadge.className = 'badge bg-danger';
             authBadge.innerText = 'کلید نامعتبر';
+            authBadge.style.cursor = 'pointer';
+            authBadge.onclick = openAdminAuthModal;
           }
-          showAlert('خطای دسترسی: کلید امنیتی مدیریت نامعتبر است. لطفاً در بخش «تنظیمات و دسترسی» کلید صحیح را وارد کنید.');
-          setElHtml('usersTbody', '<tr><td colspan="6" class="text-center text-danger py-4">دسترسی نیازمند کلید معتبر مدیریت است.</td></tr>');
+          showAlertHtml(`
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 py-1">
+              <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-shield-lock-fill fs-5 text-warning"></i>
+                <span><strong>خطای دسترسی مدیریت:</strong> کلید امنیتی (ADMIN_KEY) وارد نشده یا نامعتبر است.</span>
+              </div>
+              <button class="btn btn-warning btn-sm fw-bold px-3 py-1 shadow-sm" onclick="openAdminAuthModal()">
+                <i class="bi bi-key-fill me-1"></i> ورود / وارد کردن کلید مدیریت
+              </button>
+            </div>
+          `);
+          setElHtml('usersTbody', '<tr><td colspan="6" class="text-center text-danger py-4">دسترسی نیازمند کلید معتبر مدیریت است.<br><button class="btn btn-outline-warning btn-sm mt-2" onclick="openAdminAuthModal()"><i class="bi bi-key me-1"></i> وارد کردن کلید مدیریت</button></td></tr>');
           setElHtml('sessionsTbody', '<tr><td colspan="6" class="text-center text-danger py-4">دسترسی مسدود است.</td></tr>');
+          
+          if (!key && !window.adminAuthModalOpenedOnce) {
+            window.adminAuthModalOpenedOnce = true;
+            openAdminAuthModal();
+          }
           return;
         }
 
