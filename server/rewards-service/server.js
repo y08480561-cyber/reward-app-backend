@@ -112,7 +112,14 @@ rewardsRouter.get('/appearance', async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'تنظیمات ظاهری در پایگاه داده یافت نشد.' });
     }
-    return res.json({ success: true, appearance: result.rows[0] });
+    const row = result.rows[0];
+    return res.json({
+      success: true,
+      appearance: {
+        ...row,
+        hero_banner_url: row.hero_banner_url || ''
+      }
+    });
   } catch (err) {
     console.error('[Rewards Error] Failed to fetch appearance from PostgreSQL:', err.message);
     return res.status(500).json({ success: false, message: 'خطا در دریافت تنظیمات ظاهر از پایگاه داده.' });
@@ -480,7 +487,14 @@ const saveAppearanceHandler = async (req, res) => {
       return res.status(500).json({ success: false, message: 'خطا در ثبت تنظیمات در پایگاه داده.' });
     }
 
-    return res.json({ success: true, appearance: result.rows[0] });
+    const savedRow = result.rows[0];
+    return res.json({
+      success: true,
+      appearance: {
+        ...savedRow,
+        hero_banner_url: savedRow.hero_banner_url || ''
+      }
+    });
   } catch (err) {
     console.error('[Rewards Admin Error] Save appearance failed:', err.message);
     return res.status(500).json({ success: false, message: 'خطا در ذخیره ظاهر و بنر هدیه در پایگاه داده: ' + err.message });
