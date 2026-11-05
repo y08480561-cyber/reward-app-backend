@@ -2,6 +2,6 @@
 deployment:
   tasks:
     - export DEPLOYPATH=/home/kalametg/reward-backend
+    - command -v rsync >/dev/null 2>&1 || { echo "Error: rsync not found on this server. Deployment aborted."; exit 1; }
     - /bin/mkdir -p $DEPLOYPATH
-    - /usr/bin/rsync -av reward-backend/ $DEPLOYPATH --exclude .env --exclude node_modules --exclude .git --exclude .gitignore
-    - /bin/chmod -R 755 $DEPLOYPATH
+    - rsync -av reward-backend/ $DEPLOYPATH --exclude .env --exclude node_modules --exclude .git
