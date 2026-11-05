@@ -1,7 +1,5 @@
 ---
 deployment:
   tasks:
-    - export DEPLOYPATH=/home/kalametg/reward-backend
-    - "command -v rsync >/dev/null 2>&1 || { echo 'rsync not found, stopping deployment'; exit 1; }"
-    - /bin/mkdir -p "$DEPLOYPATH"
-    - rsync -av --exclude='.env' --exclude='node_modules' --exclude='.git' reward-backend/ "$DEPLOYPATH/"
+    - /bin/mkdir -p /home/kalametg/reward-backend
+    - rsync -av --exclude='.env' --exclude='node_modules/' --exclude='.git/' ./reward-backend/ /home/kalametg/reward-backend/
