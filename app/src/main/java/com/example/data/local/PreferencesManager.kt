@@ -29,7 +29,7 @@ class PreferencesManager(context: Context) {
         // Default credentials placeholder (managed via build configuration and settings)
         const val DEFAULT_TAPSELL_KEY = ""
         const val DEFAULT_REWARDED_ZONE = ""
-        const val DEFAULT_SERVER_URL = "https://api.kalametgame.ir"
+        const val DEFAULT_SERVER_URL = "https://reward-app-backend-1.onrender.com"
         const val DEFAULT_ADMIN_PIN = ""
         const val DEFAULT_SUPABASE_URL = ""
         const val DEFAULT_SUPABASE_ANON_KEY = ""
@@ -82,7 +82,8 @@ class PreferencesManager(context: Context) {
     var serverUrl: String
         get() {
             var raw = prefs.getString(KEY_SERVER_URL, DEFAULT_SERVER_URL) ?: DEFAULT_SERVER_URL
-            if (raw.isBlank() || !raw.startsWith("http")) {
+            // If stored URL is empty, points to broken cPanel domain, or is invalid, update to active Render URL
+            if (raw.isBlank() || !raw.startsWith("http") || raw.contains("api.kalametgame.ir")) {
                 raw = DEFAULT_SERVER_URL
                 prefs.edit().putString(KEY_SERVER_URL, raw).apply()
             }
