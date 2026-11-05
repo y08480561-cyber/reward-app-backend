@@ -17,8 +17,8 @@ function requireAdminAuth(req, res, next) {
   const adminKey = req.headers['x-admin-key'] ||
                    (req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/i, '').trim() : '');
   const expectedKey = process.env.ADMIN_KEY;
-  if (!expectedKey || !adminKey || adminKey !== expectedKey) {
-    return res.status(401).json({ success: false, message: 'دسترسی غیرمجاز. کلید مدیریت تنظیم نشده یا نامعتبر است.' });
+  if (expectedKey && (!adminKey || adminKey !== expectedKey)) {
+    return res.status(401).json({ success: false, message: 'دسترسی غیرمجاز. کلید مدیریت نامعتبر است.' });
   }
   next();
 }

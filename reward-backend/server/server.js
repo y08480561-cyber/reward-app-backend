@@ -119,16 +119,15 @@ async function testAndInitDatabase() {
   console.log('====================================================');
   console.log('[MySQL] Initializing database subsystem...');
 
-  if (!pool || !process.env.DB_USER || !process.env.ADMIN_KEY) {
-    if (!process.env.ADMIN_KEY) {
-      console.error('[MySQL CRITICAL] ADMIN_KEY is NOT set! Admin panel will be inaccessible.');
-    }
-    if (!pool || !process.env.DB_USER) {
-      console.error('[MySQL CRITICAL] Database credentials are NOT set in environment variables!');
-    }
+  if (!pool || !process.env.DB_USER) {
+    console.error('[MySQL CRITICAL] Database credentials are NOT set in environment variables!');
     console.log('====================================================');
     isDbConnected = false;
     return false;
+  }
+
+  if (!process.env.ADMIN_KEY) {
+    console.warn('[MySQL Warning] ADMIN_KEY is NOT set. Admin panel is running in OPEN mode (no security).');
   }
 
   try {
@@ -911,12 +910,10 @@ app.get(['/health', '/api/health'], async (req, res) => {
 
 // Admin Authentication Middleware (Strict header-based, no query strings, unified)
 function requireAdminAuth(req, res, next) {
-  const expectedKey = process.env.ADMIN_KEY;
-  const adminKey = req.headers['x-admin-key'] ||
-                   (req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/i, '').trim() : '');
-
-  if (!expectedKey || !adminKey || adminKey !== expectedKey) {
-    return res.status(401).json({ error: "دسترسی غیرمجاز. کلید امنیتی مدیریت تنظیم نشده یا نامعتبر است." });
+  // If ADMIN_KEY is explicitly set in environment, we enforce it. 
+  // If it's NOT set, we allow access (requested by user to remove if problematic).
+  if (expectedKey && (!adminKey || adminKey !== expectedKey)) {
+    return res.status(401).json({ error: "دسترسی غیرمجاز. کلید امنیتی مدیریت نامعتبر است." });
   }
   next();
 }

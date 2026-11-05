@@ -325,11 +325,24 @@ SELECT
 FROM users u
 LEFT JOIN user_scores s ON u.id = s.user_id;
 
+-- درج مسابقه اولیه
+INSERT IGNORE INTO competitions (id, competition_number, title, status, started_at, created_by)
+VALUES ('COMP_1', 1, 'مسابقه شماره ۱ (جایزه آیفون و پلی‌استیشن)', 'ACTIVE', NOW(), 'system');
+
+-- درج اطلاعیه اولیه
+INSERT IGNORE INTO home_announcements (id, title, content, type, is_active, competition_id, starts_at, created_by)
+VALUES ('ANN_1', 'آغاز مسابقه بزرگ دوره‌ای!', 'به مسابقه «رقابت کن، جایزه ببر» خوش آمدید! با تکمیل روزانه ۱۰۰ مربع تبلیغاتی تپسل امتیاز کسب کنید و شانس برنده شدن آیفون ۱۶ و کنسول پلی‌استیشن را افزایش دهید.', 'COMPETITION_START', 1, 'COMP_1', NOW(), 'system');
+
+-- درج تنظیمات ظاهری پیش‌فرض
+INSERT IGNORE INTO reward_appearance (id, hero_title, hero_subtitle, hero_banner_url, primary_color)
+VALUES ('default', 'اینترنت ۲۰ گیگ برنده شو!', 'هدیه ویژه دوره جاری مسابقه رقابت کن، جایزه ببر', '', '#10B981');
+
 -- درج بسته‌های اولیه فروشگاه مایکت
 INSERT IGNORE INTO store_products (id, title, description, product_type, units_granted, price_toman, myket_sku, badge, sort_order)
 VALUES 
-  ('PKG_1', 'بسته برنزی (۱۰ خانه)', 'بازگشایی فوری ۱۰ خانه از مسابقه بدون مشاهده تبلیغات', 'SQUARE_UNLOCK', 10, 10000, 'reqabat_pkg_10', 'محبوب', 1),
-  ('PKG_2', 'بسته نقره‌ای (۳۰ خانه)', 'بازگشایی فوری ۳۰ خانه از مسابقه با ضریب امتیاز ۲ برابری', 'SQUARE_UNLOCK', 30, 25000, 'reqabat_pkg_30', 'ویژه', 2),
-  ('PKG_3', 'بسته طلایی (۱۰۰ خانه کامل)', 'بازگشایی کامل تمامی ۱۰۰ خانه مسابقه با ضریب ۳ برابری', 'SQUARE_UNLOCK', 100, 70000, 'reqabat_pkg_100', 'پیشنهاد طلایی', 3);
+  ('pkg_squares_50', 'بسته ۵۰ تایی بازگشایی سریع', 'بازگشایی فوری ۵۰ خانه از مسابقه بدون مشاهده تبلیغات', 'SQUARE_UNLOCK', 50, 45000, 'req_pkg_50', 'محبوب', 1),
+  ('pkg_squares_100', 'بسته ۱۰۰ تایی بازگشایی کامل', 'بازگشایی کامل تمامی ۱۰۰ خانه مسابقه در یک روز', 'SQUARE_UNLOCK', 100, 80000, 'req_pkg_100', 'پیشنهاد ویژه', 2),
+  ('pkg_upgrade_silver', 'ارتقای سطح به نقره‌ای (ضریب ۳X)', 'افزایش دائمی امتیازات دریافتی از هر تبلیغ به ۳ امتیاز', 'ACCOUNT_UPGRADE', 1, 70000, 'req_tier_silver', 'پرفروش', 3),
+  ('pkg_upgrade_gold', 'ارتقای سطح به طلایی (ضریب ۶X)', 'افزایش دائمی امتیازات دریافتی از هر تبلیغ به ۶ امتیاز (حرفه‌ای)', 'ACCOUNT_UPGRADE', 1, 120000, 'req_tier_gold', 'طلایی', 4);
 
 SET FOREIGN_KEY_CHECKS = 1;
