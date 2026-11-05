@@ -8,7 +8,6 @@ const fs = require('fs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const ADMIN_API_KEY = process.env.ADMIN_KEY;
 
 // MySQL Connection Configuration (cPanel MySQL)
 const DB_CONFIG = {
@@ -124,10 +123,6 @@ async function testAndInitDatabase() {
     console.log('====================================================');
     isDbConnected = false;
     return false;
-  }
-
-  if (!process.env.ADMIN_KEY) {
-    console.warn('[MySQL Warning] ADMIN_KEY is NOT set. Admin panel is running in OPEN mode (no security).');
   }
 
   try {
@@ -908,13 +903,8 @@ app.get(['/health', '/api/health'], async (req, res) => {
   });
 });
 
-// Admin Authentication Middleware (Strict header-based, no query strings, unified)
+// Admin Authentication Middleware (OPEN ACCESS as requested)
 function requireAdminAuth(req, res, next) {
-  // If ADMIN_KEY is explicitly set in environment, we enforce it. 
-  // If it's NOT set, we allow access (requested by user to remove if problematic).
-  if (expectedKey && (!adminKey || adminKey !== expectedKey)) {
-    return res.status(401).json({ error: "دسترسی غیرمجاز. کلید امنیتی مدیریت نامعتبر است." });
-  }
   next();
 }
 

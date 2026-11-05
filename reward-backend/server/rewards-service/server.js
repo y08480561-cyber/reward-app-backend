@@ -9,17 +9,10 @@ const rewardsRouter = express.Router();
 rewardsRouter.use(cors());
 rewardsRouter.use(express.json());
 
-const ADMIN_KEY = process.env.ADMIN_KEY;
 let pool = null;
 
-// Unified Admin Authentication Middleware
+// Unified Admin Authentication Middleware (OPEN ACCESS as requested)
 function requireAdminAuth(req, res, next) {
-  const adminKey = req.headers['x-admin-key'] ||
-                   (req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/i, '').trim() : '');
-  const expectedKey = process.env.ADMIN_KEY;
-  if (expectedKey && (!adminKey || adminKey !== expectedKey)) {
-    return res.status(401).json({ success: false, message: 'دسترسی غیرمجاز. کلید مدیریت نامعتبر است.' });
-  }
   next();
 }
 
