@@ -3,6 +3,7 @@ const cors = require('cors');
 const { Pool } = require('pg');
 const crypto = require('crypto');
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
 
 const rewardsRouter = express.Router();
@@ -595,7 +596,7 @@ rewardsRouter.post('/admin/upload-banner', requireAdminAuth, upload.single('bann
 
   } catch (err) {
     console.error('[Upload Banner Error]:', err);
-    return res.status(500).json({ success: false, message: 'خطای داخلی در پردازش تصویر.' });
+    return res.status(500).json({ success: false, message: 'خطای پردازش تصویر: ' + (err.message || 'خطای نامشخص') });
   }
 });
 
