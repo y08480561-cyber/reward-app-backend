@@ -1,15 +1,28 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const mysql = require('mysql2/promise');
 const path = require('path');
 const crypto = require('crypto');
 const fs = require('fs');
-const { Pool } = require('pg');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_API_KEY = process.env.ADMIN_KEY;
-const DATABASE_URL = process.env.DATABASE_URL;
+
+// MySQL Connection Configuration (cPanel MySQL)
+const DB_CONFIG = {
+  host: process.env.DB_HOST || 'localhost',
+  port: process.env.DB_PORT || 3306,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME || 'kalametg_rewardapp',
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 0
+};
 
 app.use(cors());
 app.use(express.json());
@@ -26,7 +39,7 @@ app.get(['/admin', '/admin/dashboard'], (req, res) => {
 });
 
 // ====================================================================
-// PostgreSQL Pool Configuration (Supabase PostgreSQL Integration)
+// MySQL Pool Configuration (cPanel MySQL Integration)
 // ====================================================================
 let pool = null;
 let isDbConnected = false;
@@ -37,73 +50,50 @@ const schemaInfo = {
   userScoresScoreCol: 'total_score',
 };
 
-// Mask sensitive password from connection URL for safe logging
-function getSanitizedDbUrl(rawUrl) {
-  if (!rawUrl) return 'NOT_CONFIGURED';
+// PostgreSQL-to-MySQL compatibility query wrapper
+async function dbQuery(sql, params = [], connection = null) {
+  const executor = connection || pool;
+  if (!executor) throw new Error('Database pool not initialized');
+  // Convert $1, $2... to ? for MySQL
+  const mysqlSql = sql.replace(/\$\d+/g, '?');
   try {
-    const parsed = new URL(rawUrl);
-    const maskedPassword = parsed.password ? '***' : '';
-    const portPart = parsed.port ? `:${parsed.port}` : '';
-    return `${parsed.protocol}//${parsed.username}${maskedPassword ? ':' + maskedPassword : ''}@${parsed.hostname}${portPart}${parsed.pathname}`;
-  } catch (e) {
-    return rawUrl.replace(/:\/\/(.*?):(.*?)@/, '://$1:***@');
-  }
-}
-
-// Check if URL uses direct host or recommended Session Pooler
-function checkSupabaseHostType(rawUrl) {
-  if (!rawUrl) return;
-  try {
-    const parsed = new URL(rawUrl);
-    const host = parsed.hostname;
-    if (host.includes('.pooler.supabase.com')) {
-      console.log(`[PostgreSQL Host Check] Using Supabase Connection Pooler (${host}:${parsed.port || 6543}). Full IPv4 compatibility with cPanel verified.`);
-    } else if (host.startsWith('db.') && host.endsWith('.supabase.co')) {
-      console.warn(`[PostgreSQL Host Warning] Host is direct domain "${host}". Direct Supabase connections are IPv6-only and will fail on cPanel shared hosting with ETIMEDOUT or ENOTFOUND.`);
-      console.warn(`[PostgreSQL Host Recommendation] In Supabase -> Settings -> Database -> Connection string, select "Connection Pooler" (e.g. aws-0-[region].pooler.supabase.com:6543) and set that as DATABASE_URL in cPanel.`);
-    }
-  } catch (e) {
-    // Ignore parse error
-  }
-}
-
-function isValidUuid(str) {
-  if (typeof str !== 'string') return false;
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
-}
-
-const activeDbUrl = DATABASE_URL;
-
-if (activeDbUrl) {
-  const isLocalhost = activeDbUrl.includes('localhost') || activeDbUrl.includes('127.0.0.1');
-  pool = new Pool({
-    connectionString: activeDbUrl,
-    ssl: isLocalhost ? false : { rejectUnauthorized: false },
-    max: 10,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
-  });
-
-  pool.on('error', (err) => {
-    console.error('[PostgreSQL Pool Unexpected Error]', err.message);
-    isDbConnected = false;
-  });
-
-  // Share pool with rewards service if already loaded
-  try {
-    const rewardsPath = path.join(__dirname, 'rewards-service/server.js');
-    if (fs.existsSync(rewardsPath)) {
-      const rewardsModule = require(rewardsPath);
-      if (rewardsModule && rewardsModule.setPool) {
-        rewardsModule.setPool(pool);
-        console.log('[PostgreSQL] Database pool shared with Rewards Microservice.');
-      }
+    const [result] = await executor.query(mysqlSql, params);
+    // If it's a SELECT, result is an array of rows
+    if (Array.isArray(result)) {
+      return { rows: result, rowCount: result.length };
+    } else {
+      // It's a ResultSetHeader (INSERT/UPDATE/DELETE)
+      return { rows: [], rowCount: result.affectedRows, insertId: result.insertId };
     }
   } catch (err) {
-    // Ignore early share errors
+    console.error('[MySQL Query Error]:', err.message);
+    console.error('[Query]:', mysqlSql);
+    throw err;
   }
+}
+
+// Transaction wrapper for MySQL
+async function withTransaction(callback) {
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const result = await callback(connection);
+    await connection.commit();
+    return result;
+  } catch (err) {
+    await connection.rollback();
+    throw err;
+  } finally {
+    connection.release();
+  }
+}
+
+// Initialize MySQL Pool
+if (process.env.DB_USER) {
+  pool = mysql.createPool(DB_CONFIG);
+  console.log('[MySQL] Connection pool created for ' + DB_CONFIG.user + '@' + DB_CONFIG.host);
 } else {
-  console.warn('[PostgreSQL Init] DATABASE_URL is not set in environment variables. Database operations will return HTTP 503 until configured in cPanel.');
+  console.warn('[MySQL Init] DB_USER is not set. Database operations will return HTTP 503.');
 }
 
 // Mount Independent Rewards Microservice Router
@@ -111,6 +101,7 @@ try {
   const rewardsModule = require(path.join(__dirname, 'rewards-service/server.js'));
   if (rewardsModule && rewardsModule.rewardsRouter) {
     if (pool && rewardsModule.setPool) {
+      // Rewards service also needs to be updated to handle MySQL
       rewardsModule.setPool(pool);
       console.log('[Rewards Microservice] Shared database pool linked.');
     }
@@ -121,41 +112,34 @@ try {
   }
 } catch (e) {
   console.error('[CRITICAL ERROR] Failed to mount rewards microservice:', e.message);
-  process.exit(1);
 }
 
 // Database Connection Test and Schema Initialization
 async function testAndInitDatabase() {
   console.log('====================================================');
-  console.log('[PostgreSQL] Initializing database subsystem...');
+  console.log('[MySQL] Initializing database subsystem...');
 
-  if (!DATABASE_URL || !pool || !process.env.ADMIN_KEY) {
+  if (!pool || !process.env.DB_USER || !process.env.ADMIN_KEY) {
     if (!process.env.ADMIN_KEY) {
-      console.error('[PostgreSQL CRITICAL] ADMIN_KEY is NOT set! Admin panel will be inaccessible.');
+      console.error('[MySQL CRITICAL] ADMIN_KEY is NOT set! Admin panel will be inaccessible.');
     }
-    if (!DATABASE_URL || !pool) {
-      console.error('[PostgreSQL CRITICAL] DATABASE_URL is NOT set in environment variables!');
+    if (!pool || !process.env.DB_USER) {
+      console.error('[MySQL CRITICAL] Database credentials are NOT set in environment variables!');
     }
     console.log('====================================================');
     isDbConnected = false;
     return false;
   }
 
-  const sanitized = getSanitizedDbUrl(DATABASE_URL);
-  console.log(`[PostgreSQL] Connection Target: ${sanitized}`);
-  checkSupabaseHostType(DATABASE_URL);
-
   try {
-    console.log('[PostgreSQL] Testing live connection to PostgreSQL server...');
-    const client = await pool.connect();
-    const res = await client.query('SELECT NOW() as current_time, current_database() as db_name, version() as pg_version');
-    client.release();
+    console.log('[MySQL] Testing live connection to MySQL server...');
+    const [res] = await dbQuery('SELECT NOW() as current_time, DATABASE() as db_name, VERSION() as mysql_version');
 
     isDbConnected = true;
-    console.log('[PostgreSQL SUCCESS] Successfully connected to database!');
-    console.log(`[PostgreSQL Database]: ${res.rows[0].db_name}`);
-    console.log(`[PostgreSQL Server Time]: ${res.rows[0].current_time}`);
-    console.log(`[PostgreSQL Engine]: ${res.rows[0].pg_version.split(' ')[0]} ${res.rows[0].pg_version.split(' ')[1]}`);
+    console.log('[MySQL SUCCESS] Successfully connected to database!');
+    console.log(`[MySQL Database]: ${res[0].db_name}`);
+    console.log(`[MySQL Server Time]: ${res[0].current_time}`);
+    console.log(`[MySQL Engine]: ${res[0].mysql_version}`);
 
     await verifyDatabaseSchema();
     await detectSchemaColumns();
@@ -165,13 +149,9 @@ async function testAndInitDatabase() {
   } catch (err) {
     isDbConnected = false;
     console.error('====================================================');
-    console.error('[PostgreSQL CONNECTION FAILED] Unable to establish connection to PostgreSQL server!');
-    console.error(`[PostgreSQL Error Message]: ${err.message}`);
-    console.error(`[PostgreSQL Error Code]: ${err.code || 'N/A'}`);
-    if (err.message.includes('ETIMEDOUT') || err.message.includes('ENOTFOUND') || err.code === 'ECONNREFUSED') {
-      console.error('[PostgreSQL Network Advice] cPanel runs on IPv4 and cannot route to direct Supabase host (db.xxx.supabase.co).');
-      console.error('[PostgreSQL Network Advice] Use the Supabase Connection Pooler URI (aws-0-*.pooler.supabase.com:6543) in cPanel environment variables.');
-    }
+    console.error('[MySQL CONNECTION FAILED] Unable to establish connection to MySQL server!');
+    console.error(`[MySQL Error Message]: ${err.message}`);
+    console.error(`[MySQL Error Code]: ${err.code || 'N/A'}`);
     console.error('====================================================');
     return false;
   }
@@ -182,39 +162,38 @@ async function verifyDatabaseSchema() {
   if (!pool || !isDbConnected) return;
 
   const expectedTables = [
-    'users', 'user_scores', 'daily_cycles', 'ad_sessions',
-    'store_products', 'store_purchases', 'instant_unlock_credits',
-    'user_store_tiers', 'user_feedback_rewards', 'competition_archive',
-    'competition_logs', 'announcements', 'support_tickets',
-    'support_messages', 'rewards', 'reward_categories',
-    'reward_claims', 'reward_appearance', 'login_notification_settings'
+    'users', 'user_scores', 'daily_cycles', 'square_states', 'ad_sessions',
+    'user_memberships', 'purchases', 'competitions', 'competition_archives',
+    'competition_logs', 'home_announcements', 'support_tickets',
+    'support_messages', 'store_products', 'user_entitlements', 'reward_categories',
+    'rewards', 'reward_appearance', 'reward_claims', 'login_notification_settings'
   ];
 
   try {
-    const res = await pool.query(`
+    const [res] = await dbQuery(`
       SELECT table_name 
       FROM information_schema.tables 
-      WHERE table_schema = 'public'
+      WHERE table_schema = DATABASE()
     `);
-    const existing = new Set(res.rows.map(r => r.table_name));
+    const existing = new Set(res.map(r => r.TABLE_NAME || r.table_name));
     const missing = expectedTables.filter(t => !existing.has(t));
     const present = expectedTables.filter(t => existing.has(t));
 
-    console.log(`[PostgreSQL Verification] Verified public schema tables (${present.length}/${expectedTables.length} present).`);
+    console.log(`[MySQL Verification] Verified schema tables (${present.length}/${expectedTables.length} present).`);
 
     if (missing.length > 0) {
-      console.warn(`[PostgreSQL Verification Warning] Missing tables detected: ${missing.join(', ')}`);
-      console.warn(`[PostgreSQL Policy Notice] Automatic DDL execution is disabled to prevent unintended schema mutations. Please run migration.sql in the Supabase SQL Editor if needed.`);
+      console.warn(`[MySQL Verification Warning] Missing tables detected: ${missing.join(', ')}`);
+      console.warn(`[MySQL Policy Notice] Automatic DDL execution is disabled by default. Please run schema_mysql.sql in phpMyAdmin if needed.`);
 
       if (process.env.AUTO_INIT_DB === 'true') {
-        console.log('[PostgreSQL DDL] AUTO_INIT_DB=true is enabled. Running safe DDL queries...');
+        console.log('[MySQL DDL] AUTO_INIT_DB=true is enabled. Running safe DDL queries...');
         await initDatabaseTables();
       }
     } else {
-      console.log('[PostgreSQL Verification SUCCESS] All required tables exist and are verified.');
+      console.log('[MySQL Verification SUCCESS] All required tables exist and are verified.');
     }
   } catch (err) {
-    console.error('[PostgreSQL Schema Verification Error]', err.message);
+    console.error('[MySQL Schema Verification Error]', err.message);
   }
 }
 
@@ -223,8 +202,8 @@ async function initDatabaseTables() {
   if (!pool || !isDbConnected) return;
 
   const ddlQueries = [
-    // 1. Ensure public.users exists and has all expected columns
-    `CREATE TABLE IF NOT EXISTS public.users (
+    // 1. Ensure users exists and has all expected columns
+    `CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       first_name TEXT NOT NULL DEFAULT '',
       last_name TEXT NOT NULL DEFAULT '',
@@ -235,26 +214,26 @@ async function initDatabaseTables() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );`,
     // Safe schema additions to guarantee no 42703 column errors
-    `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS total_score INTEGER NOT NULL DEFAULT 0;`,
-    `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';`,
-    `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS auth_method TEXT DEFAULT 'DIRECT_CREDENTIALS';`,
-    `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS password_hash TEXT;`,
-    `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS auth_token TEXT;`,
-    `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();`,
-    `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();`,
-    `CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone_unique ON public.users(phone_number);`,
-    `CREATE INDEX IF NOT EXISTS idx_users_score ON public.users(total_score DESC);`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS total_score INTEGER NOT NULL DEFAULT 0;`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_method TEXT DEFAULT 'DIRECT_CREDENTIALS';`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_token TEXT;`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone_unique ON users(phone_number);`,
+    `CREATE INDEX IF NOT EXISTS idx_users_score ON users(total_score DESC);`,
 
     // 2. User scores table (explicit score tracking)
-    `CREATE TABLE IF NOT EXISTS public.user_scores (
+    `CREATE TABLE IF NOT EXISTS user_scores (
       user_id TEXT PRIMARY KEY,
       total_score INTEGER NOT NULL DEFAULT 0 CHECK (total_score >= 0),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );`,
-    `CREATE INDEX IF NOT EXISTS idx_user_scores_total ON public.user_scores(total_score DESC);`,
+    `CREATE INDEX IF NOT EXISTS idx_user_scores_total ON user_scores(total_score DESC);`,
 
     // 3. 24-Hour Cycles table
-    `CREATE TABLE IF NOT EXISTS public.daily_cycles (
+    `CREATE TABLE IF NOT EXISTS daily_cycles (
       cycle_id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
       start_time BIGINT NOT NULL,
@@ -262,10 +241,10 @@ async function initDatabaseTables() {
       status TEXT NOT NULL DEFAULT 'ACTIVE',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );`,
-    `CREATE INDEX IF NOT EXISTS idx_daily_cycles_user ON public.daily_cycles(user_id, start_time, end_time);`,
+    `CREATE INDEX IF NOT EXISTS idx_daily_cycles_user ON daily_cycles(user_id, start_time, end_time);`,
 
     // 4. Square States table (100 squares per cycle per user)
-    `CREATE TABLE IF NOT EXISTS public.square_states (
+    `CREATE TABLE IF NOT EXISTS square_states (
       state_key TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
       cycle_id TEXT NOT NULL,
@@ -274,10 +253,10 @@ async function initDatabaseTables() {
       completed_at BIGINT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );`,
-    `CREATE INDEX IF NOT EXISTS idx_square_states_lookup ON public.square_states(user_id, cycle_id, square_number);`,
+    `CREATE INDEX IF NOT EXISTS idx_square_states_lookup ON square_states(user_id, cycle_id, square_number);`,
 
     // 5. Ad Sessions log table (Anti-fraud & audit trail with unique token/nonce)
-    `CREATE TABLE IF NOT EXISTS public.ad_sessions (
+    `CREATE TABLE IF NOT EXISTS ad_sessions (
       session_id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
       square_number INTEGER NOT NULL CHECK (square_number BETWEEN 1 AND 100),
@@ -288,17 +267,17 @@ async function initDatabaseTables() {
       token TEXT UNIQUE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );`,
-    `CREATE INDEX IF NOT EXISTS idx_ad_sessions_user ON public.ad_sessions(user_id);`,
-    `CREATE INDEX IF NOT EXISTS idx_ad_sessions_token ON public.ad_sessions(token);`,
+    `CREATE INDEX IF NOT EXISTS idx_ad_sessions_user ON ad_sessions(user_id);`,
+    `CREATE INDEX IF NOT EXISTS idx_ad_sessions_token ON ad_sessions(token);`,
 
     // Update existing table constraints safely to support 100 squares without data loss
     `DO $$
     BEGIN
-      ALTER TABLE public.square_states DROP CONSTRAINT IF EXISTS square_states_square_number_check;
-      ALTER TABLE public.square_states ADD CONSTRAINT square_states_square_number_check CHECK (square_number BETWEEN 1 AND 100);
+      ALTER TABLE square_states DROP CONSTRAINT IF EXISTS square_states_square_number_check;
+      ALTER TABLE square_states ADD CONSTRAINT square_states_square_number_check CHECK (square_number BETWEEN 1 AND 100);
 
-      ALTER TABLE public.ad_sessions DROP CONSTRAINT IF EXISTS ad_sessions_square_number_check;
-      ALTER TABLE public.ad_sessions ADD CONSTRAINT ad_sessions_square_number_check CHECK (square_number BETWEEN 1 AND 100);
+      ALTER TABLE ad_sessions DROP CONSTRAINT IF EXISTS ad_sessions_square_number_check;
+      ALTER TABLE ad_sessions ADD CONSTRAINT ad_sessions_square_number_check CHECK (square_number BETWEEN 1 AND 100);
     EXCEPTION
       WHEN OTHERS THEN
         NULL;
@@ -312,7 +291,7 @@ async function initDatabaseTables() {
         JOIN pg_namespace n ON n.oid = c.relnamespace
         WHERE n.nspname = 'public' AND c.relname = 'leaderboard'
       ) THEN
-        CREATE VIEW public.leaderboard AS
+        CREATE VIEW leaderboard AS
         SELECT 
           u.id AS user_id,
           u.first_name,
@@ -320,13 +299,13 @@ async function initDatabaseTables() {
           COALESCE(s.total_score, u.total_score, 0) AS total_score,
           u.created_at,
           ROW_NUMBER() OVER (ORDER BY COALESCE(s.total_score, u.total_score, 0) DESC, u.created_at ASC) AS rank
-        FROM public.users u
-        LEFT JOIN public.user_scores s ON u.id = s.user_id;
+        FROM users u
+        LEFT JOIN user_scores s ON u.id = s.user_id;
       END IF;
     END $$;`,
 
     // 7. User Memberships table (Free, Silver, Gold panels per cycle)
-    `CREATE TABLE IF NOT EXISTS public.user_memberships (
+    `CREATE TABLE IF NOT EXISTS user_memberships (
       user_id TEXT NOT NULL,
       cycle_id TEXT NOT NULL,
       panel_type TEXT NOT NULL DEFAULT 'free',
@@ -336,7 +315,7 @@ async function initDatabaseTables() {
     );`,
 
     // 8. Purchases table (Myket In-App Billing verification audit trail)
-    `CREATE TABLE IF NOT EXISTS public.purchases (
+    `CREATE TABLE IF NOT EXISTS purchases (
       purchase_id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
       product_id TEXT NOT NULL,
@@ -347,7 +326,7 @@ async function initDatabaseTables() {
     );`,
 
     // 9. Competitions table (Management of sequential competition rounds)
-    `CREATE TABLE IF NOT EXISTS public.competitions (
+    `CREATE TABLE IF NOT EXISTS competitions (
       id TEXT PRIMARY KEY,
       competition_number INTEGER NOT NULL,
       title TEXT NOT NULL,
@@ -359,13 +338,13 @@ async function initDatabaseTables() {
       created_by TEXT NOT NULL DEFAULT 'admin',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );`,
-    `CREATE INDEX IF NOT EXISTS idx_competitions_status ON public.competitions(status);`,
-    `CREATE INDEX IF NOT EXISTS idx_competitions_number ON public.competitions(competition_number);`,
+    `CREATE INDEX IF NOT EXISTS idx_competitions_status ON competitions(status);`,
+    `CREATE INDEX IF NOT EXISTS idx_competitions_number ON competitions(competition_number);`,
 
     // 10. Permanent Archive Table for Previous Competitions
-    `CREATE TABLE IF NOT EXISTS public.competition_archives (
+    `CREATE TABLE IF NOT EXISTS competition_archives (
       id TEXT PRIMARY KEY,
-      competition_id TEXT NOT NULL REFERENCES public.competitions(id) ON DELETE CASCADE,
+      competition_id TEXT NOT NULL REFERENCES competitions(id) ON DELETE CASCADE,
       user_id TEXT NOT NULL,
       final_score INTEGER NOT NULL DEFAULT 0,
       final_rank INTEGER NOT NULL DEFAULT 0,
@@ -374,11 +353,11 @@ async function initDatabaseTables() {
       phone_number TEXT DEFAULT '',
       archived_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );`,
-    `CREATE INDEX IF NOT EXISTS idx_comp_archives_lookup ON public.competition_archives(competition_id, final_rank);`,
-    `CREATE INDEX IF NOT EXISTS idx_comp_archives_user ON public.competition_archives(competition_id, user_id);`,
+    `CREATE INDEX IF NOT EXISTS idx_comp_archives_lookup ON competition_archives(competition_id, final_rank);`,
+    `CREATE INDEX IF NOT EXISTS idx_comp_archives_user ON competition_archives(competition_id, user_id);`,
 
     // 11. Competition Operation Audit Logs
-    `CREATE TABLE IF NOT EXISTS public.competition_logs (
+    `CREATE TABLE IF NOT EXISTS competition_logs (
       log_id TEXT PRIMARY KEY,
       action TEXT NOT NULL,
       admin_key_used TEXT NOT NULL,
@@ -391,38 +370,38 @@ async function initDatabaseTables() {
       details TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );`,
-    `CREATE INDEX IF NOT EXISTS idx_comp_logs_created ON public.competition_logs(created_at DESC);`,
+    `CREATE INDEX IF NOT EXISTS idx_comp_logs_created ON competition_logs(created_at DESC);`,
 
     // 12. Ad Sessions competition reference
-    `ALTER TABLE public.ad_sessions ADD COLUMN IF NOT EXISTS competition_id TEXT;`,
-    `CREATE INDEX IF NOT EXISTS idx_ad_sessions_competition ON public.ad_sessions(competition_id);`,
+    `ALTER TABLE ad_sessions ADD COLUMN IF NOT EXISTS competition_id TEXT;`,
+    `CREATE INDEX IF NOT EXISTS idx_ad_sessions_competition ON ad_sessions(competition_id);`,
 
     // 13. Home Announcements Table
-    `CREATE TABLE IF NOT EXISTS public.home_announcements (
+    `CREATE TABLE IF NOT EXISTS home_announcements (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
       content TEXT NOT NULL,
       type TEXT NOT NULL DEFAULT 'ANNOUNCEMENT',
       is_active BOOLEAN NOT NULL DEFAULT true,
-      competition_id TEXT REFERENCES public.competitions(id) ON DELETE SET NULL,
+      competition_id TEXT REFERENCES competitions(id) ON DELETE SET NULL,
       starts_at TIMESTAMPTZ,
       ends_at TIMESTAMPTZ,
       created_by TEXT NOT NULL DEFAULT 'admin',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );`,
-    `CREATE INDEX IF NOT EXISTS idx_announcements_active ON public.home_announcements(is_active, updated_at DESC);`,
-    `CREATE INDEX IF NOT EXISTS idx_announcements_comp ON public.home_announcements(competition_id);`,
+    `CREATE INDEX IF NOT EXISTS idx_announcements_active ON home_announcements(is_active, updated_at DESC);`,
+    `CREATE INDEX IF NOT EXISTS idx_announcements_comp ON home_announcements(competition_id);`,
 
     // 14. Add auth_token to users table for robust server-side token validation
-    `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS auth_token TEXT;`,
-    `CREATE INDEX IF NOT EXISTS idx_users_auth_token ON public.users(auth_token);`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_token TEXT;`,
+    `CREATE INDEX IF NOT EXISTS idx_users_auth_token ON users(auth_token);`,
 
     // 15. Support Tickets Table
-    `CREATE TABLE IF NOT EXISTS public.support_tickets (
+    `CREATE TABLE IF NOT EXISTS support_tickets (
       id TEXT PRIMARY KEY,
       tracking_code TEXT NOT NULL UNIQUE,
-      user_id TEXT NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       subject TEXT NOT NULL,
       category TEXT NOT NULL DEFAULT 'OTHER',
       status TEXT NOT NULL DEFAULT 'NEW',
@@ -430,24 +409,24 @@ async function initDatabaseTables() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       last_message_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );`,
-    `CREATE INDEX IF NOT EXISTS idx_support_tickets_user ON public.support_tickets(user_id, updated_at DESC);`,
-    `CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON public.support_tickets(status, updated_at DESC);`,
-    `CREATE INDEX IF NOT EXISTS idx_support_tickets_tracking ON public.support_tickets(tracking_code);`,
+    `CREATE INDEX IF NOT EXISTS idx_support_tickets_user ON support_tickets(user_id, updated_at DESC);`,
+    `CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON support_tickets(status, updated_at DESC);`,
+    `CREATE INDEX IF NOT EXISTS idx_support_tickets_tracking ON support_tickets(tracking_code);`,
 
     // 16. Support Messages Table
-    `CREATE TABLE IF NOT EXISTS public.support_messages (
+    `CREATE TABLE IF NOT EXISTS support_messages (
       id TEXT PRIMARY KEY,
-      ticket_id TEXT NOT NULL REFERENCES public.support_tickets(id) ON DELETE CASCADE,
+      ticket_id TEXT NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
       sender_type TEXT NOT NULL CHECK (sender_type IN ('USER', 'ADMIN')),
       sender_id TEXT NOT NULL,
       sender_name TEXT NOT NULL,
       message_text TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );`,
-    `CREATE INDEX IF NOT EXISTS idx_support_messages_ticket ON public.support_messages(ticket_id, created_at ASC);`,
+    `CREATE INDEX IF NOT EXISTS idx_support_messages_ticket ON support_messages(ticket_id, created_at ASC);`,
 
     // 17. Store Products Table (Dynamic store packages & pricing)
-    `CREATE TABLE IF NOT EXISTS public.store_products (
+    `CREATE TABLE IF NOT EXISTS store_products (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
       description TEXT NOT NULL,
@@ -462,10 +441,10 @@ async function initDatabaseTables() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );`,
-    `CREATE INDEX IF NOT EXISTS idx_store_products_active ON public.store_products(is_active, sort_order ASC);`,
+    `CREATE INDEX IF NOT EXISTS idx_store_products_active ON store_products(is_active, sort_order ASC);`,
 
     // 18. User Entitlements (Instant unlock credits & VIP account status)
-    `CREATE TABLE IF NOT EXISTS public.user_entitlements (
+    `CREATE TABLE IF NOT EXISTS user_entitlements (
       user_id TEXT PRIMARY KEY,
       instant_unlock_credits INTEGER NOT NULL DEFAULT 0,
       is_vip BOOLEAN NOT NULL DEFAULT false,
@@ -474,21 +453,21 @@ async function initDatabaseTables() {
     );`,
 
     // 19. Schema updates for users and purchases
-    `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS instant_unlock_credits INTEGER NOT NULL DEFAULT 0;`,
-    `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS is_vip BOOLEAN NOT NULL DEFAULT false;`,
-    `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS account_tier TEXT NOT NULL DEFAULT 'NORMAL';`,
-    `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS panel_type TEXT NOT NULL DEFAULT 'free';`,
-    `ALTER TABLE public.users ADD COLUMN IF NOT EXISTS multiplier INTEGER NOT NULL DEFAULT 1;`,
-    `ALTER TABLE public.user_entitlements ADD COLUMN IF NOT EXISTS account_tier TEXT NOT NULL DEFAULT 'NORMAL';`,
-    `ALTER TABLE public.user_entitlements ADD COLUMN IF NOT EXISTS multiplier INTEGER NOT NULL DEFAULT 1;`,
-    `ALTER TABLE public.purchases ADD COLUMN IF NOT EXISTS myket_order_id TEXT;`,
-    `ALTER TABLE public.purchases ADD COLUMN IF NOT EXISTS units_granted INTEGER DEFAULT 0;`,
-    `ALTER TABLE public.purchases ADD COLUMN IF NOT EXISTS error_message TEXT;`,
-    `ALTER TABLE public.purchases ADD COLUMN IF NOT EXISTS verification_source TEXT DEFAULT 'MYKET_IAB';`,
-    `CREATE UNIQUE INDEX IF NOT EXISTS idx_purchases_token ON public.purchases(purchase_token) WHERE purchase_token IS NOT NULL;`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS instant_unlock_credits INTEGER NOT NULL DEFAULT 0;`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS is_vip BOOLEAN NOT NULL DEFAULT false;`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS account_tier TEXT NOT NULL DEFAULT 'NORMAL';`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS panel_type TEXT NOT NULL DEFAULT 'free';`,
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS multiplier INTEGER NOT NULL DEFAULT 1;`,
+    `ALTER TABLE user_entitlements ADD COLUMN IF NOT EXISTS account_tier TEXT NOT NULL DEFAULT 'NORMAL';`,
+    `ALTER TABLE user_entitlements ADD COLUMN IF NOT EXISTS multiplier INTEGER NOT NULL DEFAULT 1;`,
+    `ALTER TABLE purchases ADD COLUMN IF NOT EXISTS myket_order_id TEXT;`,
+    `ALTER TABLE purchases ADD COLUMN IF NOT EXISTS units_granted INTEGER DEFAULT 0;`,
+    `ALTER TABLE purchases ADD COLUMN IF NOT EXISTS error_message TEXT;`,
+    `ALTER TABLE purchases ADD COLUMN IF NOT EXISTS verification_source TEXT DEFAULT 'MYKET_IAB';`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_purchases_token ON purchases(purchase_token) WHERE purchase_token IS NOT NULL;`,
 
     // 20. Reward Categories Table
-    `CREATE TABLE IF NOT EXISTS public.reward_categories (
+    `CREATE TABLE IF NOT EXISTS reward_categories (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       slug TEXT NOT NULL UNIQUE,
@@ -497,14 +476,14 @@ async function initDatabaseTables() {
       is_active BOOLEAN NOT NULL DEFAULT true,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );`,
-    `CREATE INDEX IF NOT EXISTS idx_reward_categories_active ON public.reward_categories(is_active, sort_order ASC);`,
+    `CREATE INDEX IF NOT EXISTS idx_reward_categories_active ON reward_categories(is_active, sort_order ASC);`,
 
     // 21. Rewards Table
-    `CREATE TABLE IF NOT EXISTS public.rewards (
+    `CREATE TABLE IF NOT EXISTS rewards (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
       description TEXT DEFAULT '',
-      category_id TEXT REFERENCES public.reward_categories(id) ON DELETE SET NULL,
+      category_id TEXT REFERENCES reward_categories(id) ON DELETE SET NULL,
       cost_points INTEGER NOT NULL CHECK (cost_points >= 0),
       stock_quantity INTEGER NOT NULL DEFAULT 0 CHECK (stock_quantity >= 0),
       image_url TEXT DEFAULT '',
@@ -516,11 +495,11 @@ async function initDatabaseTables() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );`,
-    `CREATE INDEX IF NOT EXISTS idx_rewards_active ON public.rewards(is_active, sort_order ASC);`,
-    `CREATE INDEX IF NOT EXISTS idx_rewards_category ON public.rewards(category_id);`,
+    `CREATE INDEX IF NOT EXISTS idx_rewards_active ON rewards(is_active, sort_order ASC);`,
+    `CREATE INDEX IF NOT EXISTS idx_rewards_category ON rewards(category_id);`,
 
     // 22. Reward Appearance Table
-    `CREATE TABLE IF NOT EXISTS public.reward_appearance (
+    `CREATE TABLE IF NOT EXISTS reward_appearance (
       id TEXT PRIMARY KEY DEFAULT 'default',
       hero_title TEXT NOT NULL DEFAULT 'ویترین جوایز و پاداش‌های ارزشمند',
       hero_subtitle TEXT DEFAULT 'امتیازهای کسب‌شده خود در مسابقات را به کارت شارژ، بسته‌های اینترنت و جوایز نقدی تبدیل کنید',
@@ -532,11 +511,11 @@ async function initDatabaseTables() {
     );`,
 
     // 23. Reward Claims Table
-    `CREATE TABLE IF NOT EXISTS public.reward_claims (
+    `CREATE TABLE IF NOT EXISTS reward_claims (
       id TEXT PRIMARY KEY,
       tracking_code TEXT NOT NULL UNIQUE,
-      user_id TEXT NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
-      reward_id TEXT NOT NULL REFERENCES public.rewards(id) ON DELETE RESTRICT,
+      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      reward_id TEXT NOT NULL REFERENCES rewards(id) ON DELETE RESTRICT,
       cost_points INTEGER NOT NULL CHECK (cost_points >= 0),
       status TEXT NOT NULL DEFAULT 'PENDING',
       recipient_name TEXT DEFAULT '',
@@ -547,12 +526,12 @@ async function initDatabaseTables() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );`,
-    `CREATE INDEX IF NOT EXISTS idx_reward_claims_user ON public.reward_claims(user_id, created_at DESC);`,
-    `CREATE INDEX IF NOT EXISTS idx_reward_claims_status ON public.reward_claims(status, created_at DESC);`,
-    `CREATE INDEX IF NOT EXISTS idx_reward_claims_tracking ON public.reward_claims(tracking_code);`,
+    `CREATE INDEX IF NOT EXISTS idx_reward_claims_user ON reward_claims(user_id, created_at DESC);`,
+    `CREATE INDEX IF NOT EXISTS idx_reward_claims_status ON reward_claims(status, created_at DESC);`,
+    `CREATE INDEX IF NOT EXISTS idx_reward_claims_tracking ON reward_claims(tracking_code);`,
 
     // 24. Login Notification Settings Table
-    `CREATE TABLE IF NOT EXISTS public.login_notification_settings (
+    `CREATE TABLE IF NOT EXISTS login_notification_settings (
       id TEXT PRIMARY KEY DEFAULT 'default',
       is_visible BOOLEAN NOT NULL DEFAULT true,
       badge_text TEXT NOT NULL DEFAULT 'سرویس اختصاصی مشترکین ایرانسل',
@@ -570,7 +549,7 @@ async function initDatabaseTables() {
 
   for (const q of ddlQueries) {
     try {
-      await pool.query(q);
+      await dbQuery(q);
     } catch (err) {
       console.warn('[PostgreSQL DDL Notice]', err.message);
     }
@@ -578,13 +557,13 @@ async function initDatabaseTables() {
 
   // Ensure there is at least one ACTIVE competition seeded
   try {
-    const compCheck = await pool.query(`SELECT id FROM public.competitions WHERE status = 'ACTIVE' LIMIT 1`);
+    const compCheck = await dbQuery(`SELECT id FROM competitions WHERE status = 'ACTIVE' LIMIT 1`);
     if (compCheck.rows.length === 0) {
       const defaultId = 'COMP_1';
-      await pool.query(
-        `INSERT INTO public.competitions (id, competition_number, title, status, started_at, created_by, created_at)
+      await dbQuery(
+        `INSERT INTO competitions (id, competition_number, title, status, started_at, created_by, created_at)
          VALUES ($1, 1, 'مسابقه شماره ۱ (جایزه آیفون و پلی‌استیشن)', 'ACTIVE', NOW(), 'admin', NOW())
-         ON CONFLICT (id) DO NOTHING`,
+         ON DUPLICATE KEY UPDATE id=id`,
         [defaultId]
       );
       console.log('[PostgreSQL] Initial ACTIVE competition initialized (COMP_1).');
@@ -595,14 +574,14 @@ async function initDatabaseTables() {
 
   // Ensure default active home announcement exists
   try {
-    const annCheck = await pool.query(`SELECT id FROM public.home_announcements LIMIT 1`);
+    const annCheck = await dbQuery(`SELECT id FROM home_announcements LIMIT 1`);
     if (annCheck.rows.length === 0) {
       const defaultAnnId = 'ANN_DEFAULT_1';
-      await pool.query(
-        `INSERT INTO public.home_announcements 
+      await dbQuery(
+        `INSERT INTO home_announcements 
           (id, title, content, type, is_active, competition_id, starts_at, created_by, created_at, updated_at)
          VALUES ($1, 'آغاز مسابقه بزرگ دوره‌ای!', 'به مسابقه «رقابت کن، جایزه ببر» خوش آمدید! با تکمیل روزانه ۱۰۰ مربع تبلیغاتی تپسل امتیاز کسب کنید و شانس برنده شدن آیفون ۱۶ و کنسول پلی‌استیشن را افزایش دهید.', 'COMPETITION_START', true, 'COMP_1', NOW(), 'admin', NOW(), NOW())
-         ON CONFLICT (id) DO NOTHING`,
+         ON DUPLICATE KEY UPDATE id=id`,
         [defaultAnnId]
       );
       console.log('[PostgreSQL] Initial default home announcement seeded.');
@@ -669,26 +648,26 @@ async function initDatabaseTables() {
     ];
 
     for (const p of canonicalProducts) {
-      await pool.query(
-        `INSERT INTO public.store_products 
+      await dbQuery(
+        `INSERT INTO store_products 
           (id, title, description, product_type, units_granted, price_toman, myket_sku, badge, is_active, is_ready_in_myket, sort_order, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
-         ON CONFLICT (id) DO UPDATE SET
-           title = EXCLUDED.title,
-           description = EXCLUDED.description,
-           product_type = EXCLUDED.product_type,
-           units_granted = EXCLUDED.units_granted,
-           myket_sku = EXCLUDED.myket_sku,
-           badge = EXCLUDED.badge,
-           sort_order = EXCLUDED.sort_order,
+         ON DUPLICATE KEY UPDATE
+           title = VALUES(title),
+           description = VALUES(description),
+           product_type = VALUES(product_type),
+           units_granted = VALUES(units_granted),
+           myket_sku = VALUES(myket_sku),
+           badge = VALUES(badge),
+           sort_order = VALUES(sort_order),
            is_active = true`,
         [p.id, p.title, p.description, p.product_type, p.units_granted, p.price_toman, p.myket_sku, p.badge, p.is_active, p.is_ready_in_myket, p.sort_order]
       );
     }
 
     // Safely deactivate any legacy products outside the 4 fixed canonical packages (preserving purchases/orders intact)
-    await pool.query(
-      `UPDATE public.store_products SET is_active = false WHERE id NOT IN ('pkg_squares_50', 'pkg_squares_100', 'pkg_upgrade_silver', 'pkg_upgrade_gold')`
+    await dbQuery(
+      `UPDATE store_products SET is_active = false WHERE id NOT IN ('pkg_squares_50', 'pkg_squares_100', 'pkg_upgrade_silver', 'pkg_upgrade_gold')`
     );
     console.log('[PostgreSQL] 4 canonical store packages ensured.');
   } catch (err) {
@@ -697,7 +676,7 @@ async function initDatabaseTables() {
 
   // 24. Ensure default reward categories exist
   try {
-    const catCheck = await pool.query(`SELECT id FROM public.reward_categories LIMIT 1`);
+    const catCheck = await dbQuery(`SELECT id FROM reward_categories LIMIT 1`);
     if (catCheck.rows.length === 0) {
       const defaultCats = [
         ['cat_recharge', 'کارت شارژ', 'recharge-cards', 'smartphone', 1],
@@ -706,8 +685,8 @@ async function initDatabaseTables() {
         ['cat_digital', 'گیفت کارت دیجیتال', 'digital-giftcards', 'gift', 4]
       ];
       for (const c of defaultCats) {
-        await pool.query(
-          `INSERT INTO public.reward_categories (id, name, slug, icon, sort_order) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING`,
+        await dbQuery(
+          `INSERT INTO reward_categories (id, name, slug, icon, sort_order) VALUES ($1, $2, $3, $4, $5) ON DUPLICATE KEY UPDATE id=id`,
           c
         );
       }
@@ -719,12 +698,12 @@ async function initDatabaseTables() {
 
   // 25. Ensure default reward appearance exists
   try {
-    const appCheck = await pool.query(`SELECT id FROM public.reward_appearance WHERE id = 'default' LIMIT 1`);
+    const appCheck = await dbQuery(`SELECT id FROM reward_appearance WHERE id = 'default' LIMIT 1`);
     if (appCheck.rows.length === 0) {
-      await pool.query(
-        `INSERT INTO public.reward_appearance (id, hero_title, hero_subtitle, hero_banner_url, primary_color)
+      await dbQuery(
+        `INSERT INTO reward_appearance (id, hero_title, hero_subtitle, hero_banner_url, primary_color)
          VALUES ('default', 'اینترنت ۲۰ گیگ برنده شو!', 'هدیه ویژه دوره جاری مسابقه رقابت کن، جایزه ببر', '', '#10B981')
-         ON CONFLICT DO NOTHING`
+         ON DUPLICATE KEY UPDATE id=id`
       );
       console.log('[PostgreSQL] Initial reward appearance seeded.');
     }
@@ -734,7 +713,7 @@ async function initDatabaseTables() {
 
   // 26. Ensure default rewards exist
   try {
-    const rewCheck = await pool.query(`SELECT id FROM public.rewards LIMIT 1`);
+    const rewCheck = await dbQuery(`SELECT id FROM rewards LIMIT 1`);
     if (rewCheck.rows.length === 0) {
       const defaultRewards = [
         ['rew_irancell_10k', 'کارت شارژ ۱۰ هزار تومانی ایرانسل', 'کد شارژ مستقیم ۱۰,۰۰۰ تومانی برای سیم‌کارت‌های اعتباری ایرانسل ارسال از طریق پیامک.', 'cat_recharge', 100, 50, 'https://images.unsplash.com/photo-1556742049-0a67568d0d9f?w=600&q=80', true, 1],
@@ -743,10 +722,10 @@ async function initDatabaseTables() {
         ['rew_cash_50k', 'جایزه نقدی ۵۰,۰۰۰ تومانی', 'واریز پایا مستقیم به کارت بانکی متصل به شماره همراه شما.', 'cat_cash', 500, 20, 'https://images.unsplash.com/photo-1580519542036-c47de6196ba5?w=600&q=80', true, 4]
       ];
       for (const r of defaultRewards) {
-        await pool.query(
-          `INSERT INTO public.rewards (id, title, description, category_id, cost_points, stock_quantity, image_url, is_featured, sort_order)
+        await dbQuery(
+          `INSERT INTO rewards (id, title, description, category_id, cost_points, stock_quantity, image_url, is_featured, sort_order)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-           ON CONFLICT DO NOTHING`,
+           ON DUPLICATE KEY UPDATE id=id`,
           r
         );
       }
@@ -758,10 +737,10 @@ async function initDatabaseTables() {
 
   // 27. Ensure default login notification settings exist
   try {
-    const loginNotifCheck = await pool.query(`SELECT id FROM public.login_notification_settings WHERE id = 'default' LIMIT 1`);
+    const loginNotifCheck = await dbQuery(`SELECT id FROM login_notification_settings WHERE id = 'default' LIMIT 1`);
     if (loginNotifCheck.rows.length === 0) {
-      await pool.query(
-        `INSERT INTO public.login_notification_settings (id) VALUES ('default') ON CONFLICT DO NOTHING`
+      await dbQuery(
+        `INSERT INTO login_notification_settings (id) VALUES ('default') ON DUPLICATE KEY UPDATE id=id`
       );
       console.log('[PostgreSQL] Initial login notification settings seeded.');
     }
@@ -776,7 +755,7 @@ async function initDatabaseTables() {
 async function detectSchemaColumns() {
   if (!pool || !isDbConnected) return;
   try {
-    const res = await pool.query(`
+    const res = await dbQuery(`
       SELECT table_name, column_name 
       FROM information_schema.columns 
       WHERE table_schema = 'public' 
@@ -818,10 +797,10 @@ async function migrateFromLocalJsonIfExists() {
         const regDate = u.registeredAt ? new Date(u.registeredAt) : new Date();
         const effectiveId = isValidUuid(u.id) ? u.id : crypto.randomUUID();
         // Strictly uses existing columns only (id, first_name, last_name, phone_number, total_score, status, created_at, updated_at)
-        const res = await pool.query(
-          `INSERT INTO public.users (id, first_name, last_name, phone_number, total_score, status, created_at, updated_at)
+        const res = await dbQuery(
+          `INSERT INTO users (id, first_name, last_name, phone_number, total_score, status, created_at, updated_at)
            VALUES ($1, $2, $3, $4, 0, 'active', $5, NOW())
-           ON CONFLICT (phone_number) DO NOTHING`,
+           ON DUPLICATE KEY UPDATE phone_number=phone_number`,
           [effectiveId, u.firstName || '', u.lastName || '', u.phoneNumber, regDate]
         );
         if (res.rowCount > 0) migratedUsers++;
@@ -831,10 +810,10 @@ async function migrateFromLocalJsonIfExists() {
     if (Array.isArray(parsed.userScores) && parsed.userScores.length > 0) {
       for (const s of parsed.userScores) {
         if (!s || !s.userId) continue;
-        const res = await pool.query(
-          `INSERT INTO public.user_scores (user_id, total_score, updated_at)
+        const res = await dbQuery(
+          `INSERT INTO user_scores (user_id, total_score, updated_at)
            VALUES ($1, $2, NOW())
-           ON CONFLICT (user_id) DO NOTHING`,
+           ON DUPLICATE KEY UPDATE user_id=user_id`,
           [s.userId, s.totalScore || 0]
         );
         if (res.rowCount > 0) migratedScores++;
@@ -844,10 +823,10 @@ async function migrateFromLocalJsonIfExists() {
     if (Array.isArray(parsed.dailyCycles) && parsed.dailyCycles.length > 0) {
       for (const c of parsed.dailyCycles) {
         if (!c || !c.cycleId) continue;
-        await pool.query(
-          `INSERT INTO public.daily_cycles (cycle_id, user_id, start_time, end_time, status)
+        await dbQuery(
+          `INSERT INTO daily_cycles (cycle_id, user_id, start_time, end_time, status)
            VALUES ($1, $2, $3, $4, $5)
-           ON CONFLICT (cycle_id) DO NOTHING`,
+           ON DUPLICATE KEY UPDATE cycle_id=cycle_id`,
           [c.cycleId, c.userId, c.startTime, c.endTime, c.status || 'ACTIVE']
         );
       }
@@ -861,10 +840,10 @@ async function migrateFromLocalJsonIfExists() {
         const cycleId = parts[1] || '';
         const squareNum = parseInt(parts[2], 10) || 1;
         const completedAt = sq.value?.completedAt || Date.now();
-        await pool.query(
-          `INSERT INTO public.square_states (state_key, user_id, cycle_id, square_number, status, completed_at)
+        await dbQuery(
+          `INSERT INTO square_states (state_key, user_id, cycle_id, square_number, status, completed_at)
            VALUES ($1, $2, $3, $4, $5, $6)
-           ON CONFLICT (state_key) DO NOTHING`,
+           ON DUPLICATE KEY UPDATE state_key=state_key`,
           [sq.key, userId, cycleId, squareNum, sq.value?.status || 'COMPLETED', completedAt]
         );
       }
@@ -873,10 +852,10 @@ async function migrateFromLocalJsonIfExists() {
     if (Array.isArray(parsed.adSessions) && parsed.adSessions.length > 0) {
       for (const a of parsed.adSessions) {
         if (!a || !a.sessionId) continue;
-        await pool.query(
-          `INSERT INTO public.ad_sessions (session_id, user_id, square_number, cycle_id, timestamp, ad_duration_seconds, status, token)
+        await dbQuery(
+          `INSERT INTO ad_sessions (session_id, user_id, square_number, cycle_id, timestamp, ad_duration_seconds, status, token)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-           ON CONFLICT (session_id) DO NOTHING`,
+           ON DUPLICATE KEY UPDATE session_id=session_id`,
           [a.sessionId, a.userId, a.squareNumber || 1, a.cycleId || '', a.timestamp || Date.now(), a.adDurationSeconds || 0, a.status || 'COMPLETED', a.token || null]
         );
       }
@@ -909,7 +888,7 @@ app.get(['/health', '/api/health'], async (req, res) => {
   let dbStatus = 'disconnected';
   if (pool) {
     try {
-      await pool.query('SELECT 1');
+      await dbQuery('SELECT 1');
       dbStatus = 'connected';
       isDbConnected = true;
     } catch (e) {
@@ -951,7 +930,7 @@ app.get('/api/admin/auth/verify', requireAdminAuth, (req, res) => {
   });
 });
 
-// User Authentication Middleware (Strict server-side validation against PostgreSQL public.users)
+// User Authentication Middleware (Strict server-side validation against PostgreSQL users)
 async function requireUserAuth(req, res, next) {
   try {
     const rawAuth = req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/i, '').trim() : '';
@@ -967,9 +946,9 @@ async function requireUserAuth(req, res, next) {
 
     let userRow = null;
     if (token) {
-      const tokenRes = await pool.query(
+      const tokenRes = await dbQuery(
         `SELECT id, first_name, last_name, phone_number, status, auth_token 
-         FROM public.users 
+         FROM users 
          WHERE auth_token = $1 LIMIT 1`,
         [token]
       );
@@ -980,16 +959,16 @@ async function requireUserAuth(req, res, next) {
 
     // Fallback if token was generated prior to persistence or matched via user id
     if (!userRow && headerUserId) {
-      const userRes = await pool.query(
+      const userRes = await dbQuery(
         `SELECT id, first_name, last_name, phone_number, status, auth_token 
-         FROM public.users 
+         FROM users 
          WHERE id = $1 LIMIT 1`,
         [headerUserId]
       );
       if (userRes.rows.length > 0) {
         userRow = userRes.rows[0];
         if (token && userRow.auth_token !== token) {
-          await pool.query(`UPDATE public.users SET auth_token = $1 WHERE id = $2`, [token, userRow.id]);
+          await dbQuery(`UPDATE users SET auth_token = $1 WHERE id = $2`, [token, userRow.id]);
         }
       }
     }
@@ -1026,7 +1005,7 @@ async function requireUserAuth(req, res, next) {
 async function generateUniqueTrackingCode() {
   for (let attempt = 0; attempt < 5; attempt++) {
     const code = "TRK-" + Math.floor(100000 + Math.random() * 900000);
-    const check = await pool.query(`SELECT id FROM public.support_tickets WHERE tracking_code = $1 LIMIT 1`, [code]);
+    const check = await dbQuery(`SELECT id FROM support_tickets WHERE tracking_code = $1 LIMIT 1`, [code]);
     if (check.rows.length === 0) return code;
   }
   return "TRK-" + Date.now().toString().slice(-6);
@@ -1059,8 +1038,8 @@ async function getUserActiveTierAndMultiplier(clientOrPool, userId) {
          COALESCE(u.account_tier, e.account_tier, 'NORMAL') AS account_tier,
          COALESCE(u.multiplier, e.multiplier, 1) AS multiplier,
          COALESCE(u.panel_type, 'free') AS panel_type
-       FROM public.users u
-       LEFT JOIN public.user_entitlements e ON u.id = e.user_id
+       FROM users u
+       LEFT JOIN user_entitlements e ON u.id = e.user_id
        WHERE u.id = $1 LIMIT 1`,
       [userId]
     );
@@ -1100,9 +1079,9 @@ async function getOrCreateActiveCycle(userId) {
   const { startTime, endTime } = getIranMidnightBounds(now);
 
   // 1. Check existing active cycle in database
-  const existing = await pool.query(
+  const existing = await dbQuery(
     `SELECT cycle_id, user_id, start_time, end_time, status 
-     FROM public.daily_cycles 
+     FROM daily_cycles 
      WHERE user_id = $1 AND start_time <= $2 AND end_time > $2 
      ORDER BY start_time DESC LIMIT 1`,
     [userId, now]
@@ -1125,10 +1104,10 @@ async function getOrCreateActiveCycle(userId) {
   // 2. Generate and store new cycle expiring at midnight Iran time
   const cycleId = "CYC_" + Math.floor(startTime / 1000);
 
-  await pool.query(
-    `INSERT INTO public.daily_cycles (cycle_id, user_id, start_time, end_time, status)
+  await dbQuery(
+    `INSERT INTO daily_cycles (cycle_id, user_id, start_time, end_time, status)
      VALUES ($1, $2, $3, $4, 'ACTIVE')
-     ON CONFLICT (cycle_id) DO UPDATE SET start_time = $3, end_time = $4, status = 'ACTIVE'`,
+     ON DUPLICATE KEY UPDATE start_time = VALUES(start_time), end_time = VALUES(end_time), status = 'ACTIVE' `,
     [cycleId, userId, startTime, endTime]
   );
 
@@ -1183,7 +1162,7 @@ function hashUserPassword(pass) {
 }
 
 // ====================================================================
-// 1. Direct Secure Authentication (Stored in PostgreSQL public.users)
+// 1. Direct Secure Authentication (Stored in PostgreSQL users)
 // ====================================================================
 app.post('/api/auth/login', ensureDatabaseReady, async (req, res) => {
   try {
@@ -1194,10 +1173,10 @@ app.post('/api/auth/login', ensureDatabaseReady, async (req, res) => {
 
     const inputPass = (password || "").trim();
 
-    // 1. Check if user already exists in public.users by phone_number
-    const userLookup = await pool.query(
+    // 1. Check if user already exists in users by phone_number
+    const userLookup = await dbQuery(
       `SELECT id, first_name, last_name, phone_number, password_hash, created_at, status
-       FROM public.users WHERE phone_number = $1 LIMIT 1`,
+       FROM users WHERE phone_number = $1 LIMIT 1`,
       [phoneNumber]
     );
 
@@ -1228,7 +1207,7 @@ app.post('/api/auth/login', ensureDatabaseReady, async (req, res) => {
         // Save password hash to upgrade security if password provided
         if (inputPass) {
           const newHash = hashUserPassword(inputPass);
-          await pool.query(`UPDATE public.users SET password_hash = $1, updated_at = NOW() WHERE id = $2`, [newHash, existing.id]);
+          await dbQuery(`UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2`, [newHash, existing.id]);
         }
       }
 
@@ -1236,8 +1215,8 @@ app.post('/api/auth/login', ensureDatabaseReady, async (req, res) => {
       const newLName = (lastName && lastName.trim()) ? lastName.trim() : existing.last_name;
 
       if (newFName !== existing.first_name || newLName !== existing.last_name) {
-        await pool.query(
-          `UPDATE public.users 
+        await dbQuery(
+          `UPDATE users 
            SET first_name = $1, last_name = $2, updated_at = NOW() 
            WHERE id = $3`,
           [newFName, newLName, existing.id]
@@ -1266,17 +1245,17 @@ app.post('/api/auth/login', ensureDatabaseReady, async (req, res) => {
       const lName = (lastName || "مسابقه").trim();
       const passHash = inputPass ? hashUserPassword(inputPass) : null;
 
-      await pool.query(
-        `INSERT INTO public.users (id, first_name, last_name, phone_number, password_hash, total_score, status, created_at, updated_at)
+      await dbQuery(
+        `INSERT INTO users (id, first_name, last_name, phone_number, password_hash, total_score, status, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, 0, 'active', NOW(), NOW())`,
         [userId, fName, lName, phoneNumber, passHash]
       );
 
-      // Initialize row in public.user_scores
-      await pool.query(
-        `INSERT INTO public.user_scores (user_id, total_score, updated_at)
+      // Initialize row in user_scores
+      await dbQuery(
+        `INSERT INTO user_scores (user_id, total_score, updated_at)
          VALUES ($1, 0, NOW())
-         ON CONFLICT (user_id) DO NOTHING`,
+         ON DUPLICATE KEY UPDATE user_id=user_id`,
         [userId]
       );
 
@@ -1288,28 +1267,28 @@ app.post('/api/auth/login', ensureDatabaseReady, async (req, res) => {
         registeredAt: Date.now(),
         authMethod: "DIRECT_CREDENTIALS"
       };
-      console.log(`[PostgreSQL Auth] Registered new user in public.users: ${user.id} (${phoneNumber})`);
+      console.log(`[PostgreSQL Auth] Registered new user in users: ${user.id} (${phoneNumber})`);
     }
 
-    // Fetch score from public.user_scores
-    const scoreRes = await pool.query(
-      `SELECT total_score FROM public.user_scores WHERE user_id = $1`,
+    // Fetch score from user_scores
+    const scoreRes = await dbQuery(
+      `SELECT total_score FROM user_scores WHERE user_id = $1`,
       [user.id]
     );
     const score = scoreRes.rows.length > 0 ? Number(scoreRes.rows[0].total_score) : 0;
 
     // Ensure score row exists
     if (scoreRes.rows.length === 0) {
-      await pool.query(
-        `INSERT INTO public.user_scores (user_id, total_score, updated_at)
+      await dbQuery(
+        `INSERT INTO user_scores (user_id, total_score, updated_at)
          VALUES ($1, $2, NOW())
-         ON CONFLICT (user_id) DO NOTHING`,
+         ON DUPLICATE KEY UPDATE user_id=user_id`,
         [user.id, score]
       );
     }
 
     const token = "SEC_JWT_" + crypto.createHash('sha256').update(`${user.id}:${phoneNumber}:${Date.now()}`).digest('hex');
-    await pool.query(`UPDATE public.users SET auth_token = $1, updated_at = NOW() WHERE id = $2`, [token, user.id]);
+    await dbQuery(`UPDATE users SET auth_token = $1, updated_at = NOW() WHERE id = $2`, [token, user.id]);
     const cycle = await getOrCreateActiveCycle(user.id);
 
     return res.json({
@@ -1374,7 +1353,7 @@ app.post('/api/auth/otp/request', async (req, res) => {
 });
 
 // ====================================================================
-// 2. Auth: Verify OTP & Login (Stored in PostgreSQL public.users)
+// 2. Auth: Verify OTP & Login (Stored in PostgreSQL users)
 // ====================================================================
 app.post('/api/auth/otp/verify', ensureDatabaseReady, async (req, res) => {
   try {
@@ -1400,10 +1379,10 @@ app.post('/api/auth/otp/verify', ensureDatabaseReady, async (req, res) => {
     // OTP verified successfully -> clear record
     otpStore.delete(phoneNumber);
 
-    // Check existing user in public.users
-    const userLookup = await pool.query(
+    // Check existing user in users
+    const userLookup = await dbQuery(
       `SELECT id, first_name, last_name, phone_number, created_at, status
-       FROM public.users WHERE phone_number = $1 LIMIT 1`,
+       FROM users WHERE phone_number = $1 LIMIT 1`,
       [phoneNumber]
     );
 
@@ -1428,16 +1407,16 @@ app.post('/api/auth/otp/verify', ensureDatabaseReady, async (req, res) => {
       const fName = (firstName || "کاربر").trim();
       const lName = (lastName || "مسابقه").trim();
 
-      await pool.query(
-        `INSERT INTO public.users (id, first_name, last_name, phone_number, total_score, status, created_at, updated_at)
+      await dbQuery(
+        `INSERT INTO users (id, first_name, last_name, phone_number, total_score, status, created_at, updated_at)
          VALUES ($1, $2, $3, $4, 0, 'active', NOW(), NOW())`,
         [userId, fName, lName, phoneNumber]
       );
 
-      await pool.query(
-        `INSERT INTO public.user_scores (user_id, total_score, updated_at)
+      await dbQuery(
+        `INSERT INTO user_scores (user_id, total_score, updated_at)
          VALUES ($1, 0, NOW())
-         ON CONFLICT (user_id) DO NOTHING`,
+         ON DUPLICATE KEY UPDATE user_id=user_id`,
         [userId]
       );
 
@@ -1451,14 +1430,14 @@ app.post('/api/auth/otp/verify', ensureDatabaseReady, async (req, res) => {
       };
     }
 
-    const scoreRes = await pool.query(
-      `SELECT total_score FROM public.user_scores WHERE user_id = $1`,
+    const scoreRes = await dbQuery(
+      `SELECT total_score FROM user_scores WHERE user_id = $1`,
       [user.id]
     );
     const score = scoreRes.rows.length > 0 ? Number(scoreRes.rows[0].total_score) : 0;
 
     const token = "SEC_JWT_" + crypto.createHash('sha256').update(`${user.id}:${phoneNumber}:${Date.now()}`).digest('hex');
-    await pool.query(`UPDATE public.users SET auth_token = $1, updated_at = NOW() WHERE id = $2`, [token, user.id]);
+    await dbQuery(`UPDATE users SET auth_token = $1, updated_at = NOW() WHERE id = $2`, [token, user.id]);
     const cycle = await getOrCreateActiveCycle(user.id);
 
     return res.json({
@@ -1483,9 +1462,9 @@ app.get('/api/squares', ensureDatabaseReady, async (req, res) => {
     const cycle = await getOrCreateActiveCycle(userId);
 
     // Fetch square states for this user and active cycle
-    const squareRes = await pool.query(
+    const squareRes = await dbQuery(
       `SELECT square_number, status, completed_at 
-       FROM public.square_states 
+       FROM square_states 
        WHERE user_id = $1 AND cycle_id = $2`,
       [userId, cycle.cycleId]
     );
@@ -1554,7 +1533,7 @@ app.get('/api/panels/me', ensureDatabaseReady, async (req, res) => {
 });
 
 app.post('/api/purchases/verify', ensureDatabaseReady, async (req, res) => {
-  const client = await pool.connect();
+  const client = await pool.getConnection();
   try {
     const userId = req.headers['x-user-id'] || req.body.userId;
     const { productId, purchaseToken, orderId } = req.body;
@@ -1564,9 +1543,10 @@ app.post('/api/purchases/verify', ensureDatabaseReady, async (req, res) => {
     }
 
     if (purchaseToken) {
-      const tokenCheck = await client.query(
-        `SELECT purchase_id FROM public.purchases WHERE purchase_token = $1 LIMIT 1`,
-        [purchaseToken]
+      const tokenCheck = await dbQuery(
+        `SELECT purchase_id FROM purchases WHERE purchase_token = $1 LIMIT 1`,
+        [purchaseToken],
+        client
       );
       if (tokenCheck.rows.length > 0) {
         return res.status(409).json({ error: "این توکن خرید قبلاً ثبت شده است (جلوگیری از ثبت تکراری)." });
@@ -1598,44 +1578,47 @@ app.post('/api/purchases/verify', ensureDatabaseReady, async (req, res) => {
     const cycle = await getOrCreateActiveCycle(userId);
     const purchaseId = orderId || ("PUR_" + crypto.randomBytes(8).toString('hex'));
 
-    await client.query('BEGIN');
+    await client.beginTransaction();
 
-    await client.query(
-      `INSERT INTO public.purchases (purchase_id, user_id, product_id, amount, status, purchase_token, created_at)
+    await dbQuery(
+      `INSERT INTO purchases (purchase_id, user_id, product_id, amount, status, purchase_token, created_at)
        VALUES ($1, $2, $3, $4, 'SUCCESS', $5, NOW())
-       ON CONFLICT (purchase_id) DO NOTHING`,
-      [purchaseId, userId, productId, amount, purchaseToken || null]
+       ON DUPLICATE KEY UPDATE purchase_id=purchase_id`,
+      [purchaseId, userId, productId, amount, purchaseToken || null],
+      client
     );
 
-    await client.query(
-      `INSERT INTO public.user_entitlements (user_id, instant_unlock_credits, is_vip, account_tier, multiplier, total_purchased_toman, updated_at)
+    await dbQuery(
+      `INSERT INTO user_entitlements (user_id, instant_unlock_credits, is_vip, account_tier, multiplier, total_purchased_toman, updated_at)
        VALUES ($1, 0, $2, $3, $4, $5, NOW())
-       ON CONFLICT (user_id) 
-       DO UPDATE SET 
-         is_vip = $2,
-         account_tier = $3,
-         multiplier = $4,
-         total_purchased_toman = public.user_entitlements.total_purchased_toman + $5,
+       ON DUPLICATE KEY UPDATE 
+         is_vip = VALUES(is_vip),
+         account_tier = VALUES(account_tier),
+         multiplier = VALUES(multiplier),
+         total_purchased_toman = total_purchased_toman + VALUES(total_purchased_toman),
          updated_at = NOW()`,
-      [userId, newTier === 'GOLD', newTier, multiplier, amount]
+      [userId, newTier === 'GOLD', newTier, multiplier, amount],
+      client
     );
 
-    await client.query(
-      `UPDATE public.users 
+    await dbQuery(
+      `UPDATE users 
        SET account_tier = $1, panel_type = $2, multiplier = $3, is_vip = $4, updated_at = NOW() 
        WHERE id = $5`,
-      [newTier, newTier.toLowerCase(), multiplier, newTier === 'GOLD', userId]
+      [newTier, newTier.toLowerCase(), multiplier, newTier === 'GOLD', userId],
+      client
     );
 
-    await client.query(
-      `INSERT INTO public.user_memberships (user_id, cycle_id, panel_type, multiplier, purchased_at)
+    await dbQuery(
+      `INSERT INTO user_memberships (user_id, cycle_id, panel_type, multiplier, purchased_at)
        VALUES ($1, $2, $3, $4, NOW())
-       ON CONFLICT (user_id, cycle_id) 
-       DO UPDATE SET panel_type = $3, multiplier = $4, purchased_at = NOW()`,
-      [userId, cycle.cycleId, newTier.toLowerCase(), multiplier]
+       ON DUPLICATE KEY UPDATE 
+         panel_type = VALUES(panel_type), multiplier = VALUES(multiplier), purchased_at = NOW()`,
+      [userId, cycle.cycleId, newTier.toLowerCase(), multiplier],
+      client
     );
 
-    await client.query('COMMIT');
+    await client.commit();
 
     console.log(`[Panel Purchase] User ${userId} upgraded to ${newTier} (Multiplier: ${multiplier}x)`);
 
@@ -1645,7 +1628,7 @@ app.post('/api/purchases/verify', ensureDatabaseReady, async (req, res) => {
       membership: { panelType: newTier.toLowerCase(), accountTier: newTier, multiplier, cycleId: cycle.cycleId }
     });
   } catch (err) {
-    await client.query('ROLLBACK');
+    await client.rollback();
     console.error('[Verify Purchase Error]', err);
     return res.status(500).json({ error: "خطا در تایید خرید و فعال‌سازی پنل." });
   } finally {
@@ -1660,9 +1643,9 @@ app.post('/api/purchases/verify', ensureDatabaseReady, async (req, res) => {
 // 1. Get Active Store Products (Dynamic pricing from DB/Admin Panel)
 app.get('/api/store/products', ensureDatabaseReady, async (req, res) => {
   try {
-    const result = await pool.query(`
+    const result = await dbQuery(`
       SELECT id, title, description, product_type, units_granted, price_toman, myket_sku, badge, is_active, is_ready_in_myket, sort_order
-      FROM public.store_products
+      FROM store_products
       WHERE is_active = true
       ORDER BY sort_order ASC, created_at ASC
     `);
@@ -1696,9 +1679,9 @@ app.get('/api/store/user-entitlements', ensureDatabaseReady, async (req, res) =>
       return res.status(401).json({ error: "شناسه کاربر نامعتبر است." });
     }
 
-    const entRes = await pool.query(
+    const entRes = await dbQuery(
       `SELECT instant_unlock_credits, is_vip, total_purchased_toman 
-       FROM public.user_entitlements 
+       FROM user_entitlements 
        WHERE user_id = $1 LIMIT 1`,
       [userId]
     );
@@ -1712,8 +1695,8 @@ app.get('/api/store/user-entitlements', ensureDatabaseReady, async (req, res) =>
       isVip = Boolean(entRes.rows[0].is_vip);
       totalPurchased = Number(entRes.rows[0].total_purchased_toman);
     } else {
-      const uRes = await pool.query(
-        `SELECT instant_unlock_credits, is_vip FROM public.users WHERE id = $1 LIMIT 1`,
+      const uRes = await dbQuery(
+        `SELECT instant_unlock_credits, is_vip FROM users WHERE id = $1 LIMIT 1`,
         [userId]
       );
       if (uRes.rows.length > 0) {
@@ -1742,7 +1725,7 @@ app.get('/api/store/user-entitlements', ensureDatabaseReady, async (req, res) =>
 
 // 3. Official Store Purchase Verification (Idempotent, Replay-Protected)
 app.post('/api/store/verify-purchase', ensureDatabaseReady, async (req, res) => {
-  const client = await pool.connect();
+  const client = await pool.getConnection();
   try {
     const userId = req.headers['x-user-id'] || req.body.userId;
     const { productId, purchaseToken, orderId, packageName } = req.body;
@@ -1753,9 +1736,10 @@ app.post('/api/store/verify-purchase', ensureDatabaseReady, async (req, res) => 
 
     // 1. Check idempotency: token replay protection
     if (purchaseToken) {
-      const tokenCheck = await client.query(
-        `SELECT purchase_id, product_id, status FROM public.purchases WHERE purchase_token = $1 LIMIT 1`,
-        [purchaseToken]
+      const tokenCheck = await dbQuery(
+        `SELECT purchase_id, product_id, status FROM purchases WHERE purchase_token = $1 LIMIT 1`,
+        [purchaseToken],
+        client
       );
       if (tokenCheck.rows.length > 0) {
         return res.status(409).json({
@@ -1766,11 +1750,12 @@ app.post('/api/store/verify-purchase', ensureDatabaseReady, async (req, res) => 
     }
 
     // 2. Fetch product configuration from store_products
-    const prodRes = await client.query(
+    const prodRes = await dbQuery(
       `SELECT id, title, product_type, units_granted, price_toman, myket_sku, is_active, is_ready_in_myket 
-       FROM public.store_products 
+       FROM store_products 
        WHERE id = $1 LIMIT 1`,
-      [productId]
+      [productId],
+      client
     );
 
     if (prodRes.rows.length === 0) {
@@ -1786,13 +1771,14 @@ app.post('/api/store/verify-purchase', ensureDatabaseReady, async (req, res) => 
     const unitsGranted = Number(product.units_granted);
     const amountToman = Number(product.price_toman);
 
-    await client.query('BEGIN');
+    await client.beginTransaction();
 
     // 3. Record purchase audit trail
-    await client.query(
-      `INSERT INTO public.purchases (purchase_id, user_id, product_id, amount, status, purchase_token, myket_order_id, units_granted, verification_source, created_at)
+    await dbQuery(
+      `INSERT INTO purchases (purchase_id, user_id, product_id, amount, status, purchase_token, myket_order_id, units_granted, verification_source, created_at)
        VALUES ($1, $2, $3, $4, 'SUCCESS', $5, $6, $7, 'MYKET_IAB', NOW())`,
-      [purchaseId, userId, productId, amountToman, purchaseToken || null, orderId || null, unitsGranted]
+      [purchaseId, userId, productId, amountToman, purchaseToken || null, orderId || null, unitsGranted],
+      client
     );
 
     // 4. Grant Entitlements Atomically
@@ -1800,23 +1786,30 @@ app.post('/api/store/verify-purchase', ensureDatabaseReady, async (req, res) => 
     let isVip = false;
 
     if (product.product_type === 'SQUARE_UNLOCK') {
-      const entUpdate = await client.query(
-        `INSERT INTO public.user_entitlements (user_id, instant_unlock_credits, is_vip, account_tier, multiplier, total_purchased_toman, updated_at)
+      await dbQuery(
+        `INSERT INTO user_entitlements (user_id, instant_unlock_credits, is_vip, account_tier, multiplier, total_purchased_toman, updated_at)
          VALUES ($1, $2, false, 'NORMAL', 1, $3, NOW())
-         ON CONFLICT (user_id) 
-         DO UPDATE SET 
-           instant_unlock_credits = public.user_entitlements.instant_unlock_credits + $2,
-           total_purchased_toman = public.user_entitlements.total_purchased_toman + $3,
-           updated_at = NOW()
-         RETURNING instant_unlock_credits, is_vip`,
-        [userId, unitsGranted, amountToman]
+         ON DUPLICATE KEY UPDATE 
+           instant_unlock_credits = instant_unlock_credits + VALUES(instant_unlock_credits),
+           total_purchased_toman = total_purchased_toman + VALUES(total_purchased_toman),
+           updated_at = NOW()`,
+        [userId, unitsGranted, amountToman],
+        client
       );
-      updatedCredits = Number(entUpdate.rows[0].instant_unlock_credits);
-      isVip = Boolean(entUpdate.rows[0].is_vip);
 
-      await client.query(
-        `UPDATE public.users SET instant_unlock_credits = $1, updated_at = NOW() WHERE id = $2`,
-        [updatedCredits, userId]
+      const entRes = await dbQuery(
+        `SELECT instant_unlock_credits, is_vip FROM user_entitlements WHERE user_id = $1`,
+        [userId],
+        client
+      );
+      
+      updatedCredits = Number(entRes.rows[0].instant_unlock_credits);
+      isVip = Boolean(entRes.rows[0].is_vip);
+
+      await dbQuery(
+        `UPDATE users SET instant_unlock_credits = $1, updated_at = NOW() WHERE id = $2`,
+        [updatedCredits, userId],
+        client
       );
     } else if (product.product_type === 'ACCOUNT_UPGRADE') {
       const currentTierInfo = await getUserActiveTierAndMultiplier(client, userId);
@@ -1837,40 +1830,48 @@ app.post('/api/store/verify-purchase', ensureDatabaseReady, async (req, res) => 
         }
       }
 
-      const entUpdate = await client.query(
-        `INSERT INTO public.user_entitlements (user_id, instant_unlock_credits, is_vip, account_tier, multiplier, total_purchased_toman, updated_at)
+      await dbQuery(
+        `INSERT INTO user_entitlements (user_id, instant_unlock_credits, is_vip, account_tier, multiplier, total_purchased_toman, updated_at)
          VALUES ($1, 0, $2, $3, $4, $5, NOW())
-         ON CONFLICT (user_id) 
-         DO UPDATE SET 
-           is_vip = $2,
-           account_tier = $3,
-           multiplier = $4,
-           total_purchased_toman = public.user_entitlements.total_purchased_toman + $5,
-           updated_at = NOW()
-         RETURNING instant_unlock_credits, is_vip, account_tier, multiplier`,
-        [userId, newTier === 'GOLD', newTier, newMultiplier, amountToman]
+         ON DUPLICATE KEY UPDATE 
+           is_vip = VALUES(is_vip),
+           account_tier = VALUES(account_tier),
+           multiplier = VALUES(multiplier),
+           total_purchased_toman = total_purchased_toman + VALUES(total_purchased_toman),
+           updated_at = NOW()`,
+        [userId, newTier === 'GOLD', newTier, newMultiplier, amountToman],
+        client
       );
-      updatedCredits = Number(entUpdate.rows[0].instant_unlock_credits);
+
+      const entRes = await dbQuery(
+        `SELECT instant_unlock_credits, is_vip, account_tier, multiplier FROM user_entitlements WHERE user_id = $1`,
+        [userId],
+        client
+      );
+
+      updatedCredits = Number(entRes.rows[0].instant_unlock_credits);
       isVip = (newTier === 'GOLD');
 
-      await client.query(
-        `UPDATE public.users 
+      await dbQuery(
+        `UPDATE users 
          SET account_tier = $1, panel_type = $2, multiplier = $3, is_vip = $4, updated_at = NOW() 
          WHERE id = $5`,
-        [newTier, newTier.toLowerCase(), newMultiplier, isVip, userId]
+        [newTier, newTier.toLowerCase(), newMultiplier, isVip, userId],
+        client
       );
 
       const cycle = await getOrCreateActiveCycle(userId);
-      await client.query(
-        `INSERT INTO public.user_memberships (user_id, cycle_id, panel_type, multiplier, purchased_at)
+      await dbQuery(
+        `INSERT INTO user_memberships (user_id, cycle_id, panel_type, multiplier, purchased_at)
          VALUES ($1, $2, $3, $4, NOW())
-         ON CONFLICT (user_id, cycle_id)
-         DO UPDATE SET panel_type = $3, multiplier = $4, purchased_at = NOW()`,
-        [userId, cycle.cycleId, newTier.toLowerCase(), newMultiplier]
+         ON DUPLICATE KEY UPDATE
+         panel_type = VALUES(panel_type), multiplier = VALUES(multiplier), purchased_at = NOW()`,
+        [userId, cycle.cycleId, newTier.toLowerCase(), newMultiplier],
+        client
       );
     }
 
-    await client.query('COMMIT');
+    await client.commit();
 
     console.log(`[Store Purchase SUCCESS] User: ${userId}, Product: ${productId}, Units: ${unitsGranted}, Paid: ${amountToman} Toman`);
 
@@ -1889,7 +1890,7 @@ app.post('/api/store/verify-purchase', ensureDatabaseReady, async (req, res) => 
       }
     });
   } catch (err) {
-    await client.query('ROLLBACK');
+    await client.rollback();
     console.error('[API Store Verify Purchase Error]', err);
     return res.status(500).json({ error: "خطا در اعتبارسنجی خرید و ثبت تراکنش در سرور." });
   } finally {
@@ -1899,7 +1900,7 @@ app.post('/api/store/verify-purchase', ensureDatabaseReady, async (req, res) => 
 
 // 4. Instant Unlock Square with Purchased Credits (No fake ad impressions)
 app.post('/api/squares/instant-unlock', ensureDatabaseReady, async (req, res) => {
-  const client = await pool.connect();
+  const client = await pool.getConnection();
   try {
     const userId = req.headers['x-user-id'] || req.body.userId;
     const { squareNumber } = req.body;
@@ -1915,14 +1916,14 @@ app.post('/api/squares/instant-unlock', ensureDatabaseReady, async (req, res) =>
     }
 
     // Check user has available instant unlock credits
-    const entRes = await client.query(
-      `SELECT instant_unlock_credits FROM public.user_entitlements WHERE user_id = $1 LIMIT 1`,
+    const entRes = await dbQuery(
+      `SELECT instant_unlock_credits FROM user_entitlements WHERE user_id = $1 LIMIT 1`,
       [userId]
     );
 
     let credits = entRes.rows.length > 0 ? Number(entRes.rows[0].instant_unlock_credits) : 0;
     if (credits <= 0) {
-      const uRes = await client.query(`SELECT instant_unlock_credits FROM public.users WHERE id = $1 LIMIT 1`, [userId]);
+      const uRes = await dbQuery(`SELECT instant_unlock_credits FROM users WHERE id = $1 LIMIT 1`, [userId]);
       credits = uRes.rows.length > 0 ? Number(uRes.rows[0].instant_unlock_credits || 0) : 0;
     }
 
@@ -1935,8 +1936,8 @@ app.post('/api/squares/instant-unlock', ensureDatabaseReady, async (req, res) =>
 
     // Check if square is already completed in current 24-hour cycle
     const squareKey = `${userId}:${cycle.cycleId}:${squareNumber}`;
-    const squareCheck = await client.query(
-      `SELECT state_key FROM public.square_states WHERE state_key = $1 LIMIT 1`,
+    const squareCheck = await dbQuery(
+      `SELECT state_key FROM square_states WHERE state_key = $1 LIMIT 1`,
       [squareKey]
     );
     if (squareCheck.rows.length > 0) {
@@ -1947,64 +1948,69 @@ app.post('/api/squares/instant-unlock', ensureDatabaseReady, async (req, res) =>
     const { tier: activeTier, multiplier: verifiedMultiplier } = await getUserActiveTierAndMultiplier(client, userId);
     const awardedPoints = verifiedMultiplier;
 
-    await client.query('BEGIN');
+    await client.beginTransaction();
 
     // Decrement credits
-    const updateEnt = await client.query(
-      `UPDATE public.user_entitlements 
+    const updateEnt = await dbQuery(
+      `UPDATE user_entitlements 
        SET instant_unlock_credits = instant_unlock_credits - 1, updated_at = NOW() 
-       WHERE user_id = $1 AND instant_unlock_credits >= 1 
-       RETURNING instant_unlock_credits`,
-      [userId]
+       WHERE user_id = $1 AND instant_unlock_credits >= 1`,
+      [userId],
+      client
     );
 
-    if (updateEnt.rows.length === 0) {
-      await client.query('ROLLBACK');
+    if (updateEnt.rowCount === 0) {
+      await client.rollback();
       return res.status(403).json({ error: "سهمیه بازگشایی سریع ناکافی است." });
     }
 
-    const remainingCredits = Number(updateEnt.rows[0].instant_unlock_credits);
+    const entFinalRes = await dbQuery(`SELECT instant_unlock_credits FROM user_entitlements WHERE user_id = $1`, [userId], client);
+    const remainingCredits = Number(entFinalRes.rows[0].instant_unlock_credits);
 
-    await client.query(
-      `UPDATE public.users SET instant_unlock_credits = $1, updated_at = NOW() WHERE id = $2`,
-      [remainingCredits, userId]
+    await dbQuery(
+      `UPDATE users SET instant_unlock_credits = $1, updated_at = NOW() WHERE id = $2`,
+      [remainingCredits, userId],
+      client
     );
 
     // Lock square in current cycle
-    await client.query(
-      `INSERT INTO public.square_states (state_key, user_id, cycle_id, square_number, status, completed_at, created_at)
+    await dbQuery(
+      `INSERT INTO square_states (state_key, user_id, cycle_id, square_number, status, completed_at, created_at)
        VALUES ($1, $2, $3, $4, 'COMPLETED', $5, NOW())`,
-      [squareKey, userId, cycle.cycleId, squareNumber, now]
+      [squareKey, userId, cycle.cycleId, squareNumber, now],
+      client
     );
 
     // Increment user score with real points (clean separation: no fake ad impression)
-    const scoreUpdate = await client.query(
-      `INSERT INTO public.user_scores (user_id, total_score, updated_at)
+    await dbQuery(
+      `INSERT INTO user_scores (user_id, total_score, updated_at)
        VALUES ($1, $2, NOW())
-       ON CONFLICT (user_id) 
-       DO UPDATE SET total_score = public.user_scores.total_score + $2, updated_at = NOW()
-       RETURNING total_score`,
-      [userId, awardedPoints]
+       ON DUPLICATE KEY UPDATE total_score = total_score + VALUES(total_score), updated_at = NOW()`,
+      [userId, awardedPoints],
+      client
     );
 
-    const newScore = Number(scoreUpdate.rows[0].total_score);
+    const scoreRes = await dbQuery(`SELECT total_score FROM user_scores WHERE user_id = $1`, [userId], client);
+    const newScore = Number(scoreRes.rows[0].total_score);
 
     if (schemaInfo.userHasTotalScore) {
-      await client.query(
-        `UPDATE public.users SET total_score = $1, updated_at = NOW() WHERE id = $2`,
-        [newScore, userId]
+      await dbQuery(
+        `UPDATE users SET total_score = $1, updated_at = NOW() WHERE id = $2`,
+        [newScore, userId],
+        client
       );
     }
 
     // Update active competition score
-    await client.query(
-      `UPDATE public.competitions 
+    await dbQuery(
+      `UPDATE competitions 
        SET total_score = total_score + $1 
        WHERE status = 'ACTIVE'`,
-      [awardedPoints]
+      [awardedPoints],
+      client
     );
 
-    await client.query('COMMIT');
+    await client.commit();
 
     console.log(`[Instant Unlock] User ${userId} unlocked square #${squareNumber}. Remaining credits: ${remainingCredits}, Points: +${awardedPoints}`);
 
@@ -2018,7 +2024,7 @@ app.post('/api/squares/instant-unlock', ensureDatabaseReady, async (req, res) =>
       cycleId: cycle.cycleId
     });
   } catch (err) {
-    await client.query('ROLLBACK');
+    await client.rollback();
     console.error('[API Instant Unlock Error]', err);
     return res.status(500).json({ error: "خطا در پردازش بازگشایی سریع مربع." });
   } finally {
@@ -2029,9 +2035,9 @@ app.post('/api/squares/instant-unlock', ensureDatabaseReady, async (req, res) =>
 // Admin Store Management Endpoints
 app.get('/api/admin/store/products', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
   try {
-    const resProducts = await pool.query(`
+    const resProducts = await dbQuery(`
       SELECT id, title, description, product_type, units_granted, price_toman, myket_sku, badge, is_active, is_ready_in_myket, sort_order, created_at, updated_at
-      FROM public.store_products
+      FROM store_products
       ORDER BY sort_order ASC, created_at ASC
     `);
     return res.json({ success: true, products: resProducts.rows });
@@ -2054,8 +2060,8 @@ app.post('/api/admin/store/products', requireAdminAuth, ensureDatabaseReady, asy
       return res.status(400).json({ error: "قیمت وارد شده نامعتبر است." });
     }
 
-    await pool.query(
-      `UPDATE public.store_products 
+    await dbQuery(
+      `UPDATE store_products 
        SET price_toman = $1, updated_at = NOW()
        WHERE id = $2`,
       [Number(price_toman), id]
@@ -2074,7 +2080,7 @@ app.delete('/api/admin/store/products/:id', requireAdminAuth, ensureDatabaseRead
 
 app.get('/api/admin/store/purchases', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
   try {
-    const resPurchases = await pool.query(`
+    const resPurchases = await dbQuery(`
       SELECT 
         p.purchase_id,
         p.user_id,
@@ -2091,9 +2097,9 @@ app.get('/api/admin/store/purchases', requireAdminAuth, ensureDatabaseReady, asy
         u.last_name,
         u.phone_number,
         sp.title as product_title
-      FROM public.purchases p
-      LEFT JOIN public.users u ON p.user_id = u.id
-      LEFT JOIN public.store_products sp ON p.product_id = sp.id
+      FROM purchases p
+      LEFT JOIN users u ON p.user_id = u.id
+      LEFT JOIN store_products sp ON p.product_id = sp.id
       ORDER BY p.created_at DESC
       LIMIT 100
     `);
@@ -2109,7 +2115,7 @@ app.get('/api/admin/store/purchases', requireAdminAuth, ensureDatabaseReady, asy
 // 4. ATOMIC Ad Completion & Point Awarding (Anti-Cheat & Anti-Replay)
 // ====================================================================
 app.post('/api/ads/complete', ensureDatabaseReady, async (req, res) => {
-  const client = await pool.connect();
+  const client = await pool.getConnection();
   try {
     const userId = req.headers['x-user-id'] || req.body.userId;
     const { squareNumber, rewardNonce, adDurationSeconds } = req.body;
@@ -2134,9 +2140,10 @@ app.post('/api/ads/complete', ensureDatabaseReady, async (req, res) => {
 
     // 1. Anti-Replay Token (Reward Nonce) Check
     if (rewardNonce) {
-      const nonceCheck = await client.query(
-        `SELECT session_id FROM public.ad_sessions WHERE token = $1 LIMIT 1`,
-        [rewardNonce]
+      const nonceCheck = await dbQuery(
+        `SELECT session_id FROM ad_sessions WHERE token = $1 LIMIT 1`,
+        [rewardNonce],
+        client
       );
       if (nonceCheck.rows.length > 0) {
         return res.status(409).json({ error: "این درخواست قبلاً ثبت شده است (توکن تکراری تبلیغ)." });
@@ -2145,57 +2152,61 @@ app.post('/api/ads/complete', ensureDatabaseReady, async (req, res) => {
 
     // 2. Check if square is already completed in current 24-hour cycle
     const squareKey = `${userId}:${cycle.cycleId}:${squareNumber}`;
-    const squareCheck = await client.query(
-      `SELECT state_key FROM public.square_states WHERE state_key = $1 LIMIT 1`,
-      [squareKey]
+    const squareCheck = await dbQuery(
+      `SELECT state_key FROM square_states WHERE state_key = $1 LIMIT 1`,
+      [squareKey],
+      client
     );
     if (squareCheck.rows.length > 0) {
       return res.status(409).json({ error: "این مربع قبلاً در این دوره ۲۴ ساعته تکمیل شده است." });
     }
 
     // 3. BEGIN ATOMIC TRANSACTION
-    await client.query('BEGIN');
+    await client.beginTransaction();
 
     // Insert square state (locks the square for this cycle)
-    await client.query(
-      `INSERT INTO public.square_states (state_key, user_id, cycle_id, square_number, status, completed_at, created_at)
+    await dbQuery(
+      `INSERT INTO square_states (state_key, user_id, cycle_id, square_number, status, completed_at, created_at)
        VALUES ($1, $2, $3, $4, 'COMPLETED', $5, NOW())`,
-      [squareKey, userId, cycle.cycleId, squareNumber, now]
+      [squareKey, userId, cycle.cycleId, squareNumber, now],
+      client
     );
 
     // Get active competition id to tag ad session
-    const compRes = await client.query(`SELECT id FROM public.competitions WHERE status = 'ACTIVE' LIMIT 1`);
+    const compRes = await dbQuery(`SELECT id FROM competitions WHERE status = 'ACTIVE' LIMIT 1`, [], client);
     const activeCompId = compRes.rows.length > 0 ? compRes.rows[0].id : 'COMP_1';
 
     // Insert ad session record with unique token and active competition id
     const sessionId = "ADS_" + crypto.randomBytes(6).toString('hex');
-    await client.query(
-      `INSERT INTO public.ad_sessions (session_id, user_id, square_number, cycle_id, timestamp, ad_duration_seconds, status, token, competition_id, created_at)
+    await dbQuery(
+      `INSERT INTO ad_sessions (session_id, user_id, square_number, cycle_id, timestamp, ad_duration_seconds, status, token, competition_id, created_at)
        VALUES ($1, $2, $3, $4, $5, $6, 'COMPLETED', $7, $8, NOW())`,
-      [sessionId, userId, squareNumber, cycle.cycleId, now, adDurationSeconds, rewardNonce || null, activeCompId]
+      [sessionId, userId, squareNumber, cycle.cycleId, now, adDurationSeconds, rewardNonce || null, activeCompId],
+      client
     );
 
-    // Atomic increment in public.user_scores by awardedMultiplier
-    const scoreUpdate = await client.query(
-      `INSERT INTO public.user_scores (user_id, total_score, updated_at)
+    // Atomic increment in user_scores by awardedMultiplier
+    await dbQuery(
+      `INSERT INTO user_scores (user_id, total_score, updated_at)
        VALUES ($1, $2, NOW())
-       ON CONFLICT (user_id) 
-       DO UPDATE SET total_score = public.user_scores.total_score + $2, updated_at = NOW()
-       RETURNING total_score`,
-      [userId, awardedMultiplier]
+       ON DUPLICATE KEY UPDATE total_score = total_score + VALUES(total_score), updated_at = NOW()`,
+      [userId, awardedMultiplier],
+      client
     );
 
-    const newScore = Number(scoreUpdate.rows[0].total_score);
+    const scoreRes = await dbQuery(`SELECT total_score FROM user_scores WHERE user_id = $1`, [userId], client);
+    const newScore = Number(scoreRes.rows[0].total_score);
 
-    // Keep public.users.total_score in sync if column exists
+    // Keep users.total_score in sync if column exists
     if (schemaInfo.userHasTotalScore) {
-      await client.query(
-        `UPDATE public.users SET total_score = $1, updated_at = NOW() WHERE id = $2`,
-        [newScore, userId]
+      await dbQuery(
+        `UPDATE users SET total_score = $1, updated_at = NOW() WHERE id = $2`,
+        [newScore, userId],
+        client
       );
     }
 
-    await client.query('COMMIT');
+    await client.commit();
 
     return res.json({
       success: true,
@@ -2205,7 +2216,7 @@ app.post('/api/ads/complete', ensureDatabaseReady, async (req, res) => {
       message: `${awardedMultiplier} امتیاز معتبر با موفقیت ثبت شد.`
     });
   } catch (err) {
-    await client.query('ROLLBACK');
+    await client.rollback();
     console.error('[Ad Complete Transaction Error]', err);
     return res.status(500).json({ error: "خطا در پردازش اتمیک امتیاز در پایگاه داده." });
   } finally {
@@ -2220,15 +2231,15 @@ app.get('/api/leaderboard', ensureDatabaseReady, async (req, res) => {
   try {
     const currentUserId = req.headers['x-user-id'] || req.query.userId;
 
-    const result = await pool.query(`
+    const result = await dbQuery(`
       SELECT 
         u.id AS user_id,
         u.first_name,
         u.last_name,
         COALESCE(s.total_score, u.total_score, 0) AS total_score,
         u.created_at
-      FROM public.users u
-      LEFT JOIN public.user_scores s ON u.id = s.user_id
+      FROM users u
+      LEFT JOIN user_scores s ON u.id = s.user_id
       ORDER BY total_score DESC, u.created_at ASC, u.id ASC
       LIMIT 100
     `);
@@ -2258,7 +2269,7 @@ app.get('/api/leaderboard', ensureDatabaseReady, async (req, res) => {
 // ====================================================================
 app.get('/api/admin/overview', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
   try {
-    const usersRes = await pool.query(`
+    const usersRes = await dbQuery(`
       SELECT 
         u.id,
         u.first_name,
@@ -2266,19 +2277,19 @@ app.get('/api/admin/overview', requireAdminAuth, ensureDatabaseReady, async (req
         u.phone_number,
         u.created_at,
         COALESCE(s.total_score, u.total_score, 0) AS score
-      FROM public.users u
-      LEFT JOIN public.user_scores s ON u.id = s.user_id
+      FROM users u
+      LEFT JOIN user_scores s ON u.id = s.user_id
       ORDER BY score DESC, u.created_at ASC
     `);
 
-    const sessionsRes = await pool.query(`
+    const sessionsRes = await dbQuery(`
       SELECT session_id, user_id, square_number, cycle_id, timestamp, ad_duration_seconds, status, token
-      FROM public.ad_sessions
+      FROM ad_sessions
       ORDER BY timestamp DESC
       LIMIT 100
     `);
 
-    const countRes = await pool.query(`SELECT COUNT(*) AS total_sessions FROM public.ad_sessions`);
+    const countRes = await dbQuery(`SELECT COUNT(*) AS total_sessions FROM ad_sessions`);
     const totalAdSessions = Number(countRes.rows[0]?.total_sessions || 0);
 
     const users = usersRes.rows.map(u => ({
@@ -2293,26 +2304,26 @@ app.get('/api/admin/overview', requireAdminAuth, ensureDatabaseReady, async (req
     const totalScoresSum = users.reduce((sum, u) => sum + (u.score || 0), 0);
 
     // Active Competition & Historical Competitions Overview
-    const activeCompRes = await pool.query(`SELECT * FROM public.competitions WHERE status = 'ACTIVE' LIMIT 1`);
+    const activeCompRes = await dbQuery(`SELECT * FROM competitions WHERE status = 'ACTIVE' LIMIT 1`);
     const activeComp = activeCompRes.rows.length > 0 ? activeCompRes.rows[0] : null;
 
-    const pastCompsRes = await pool.query(`
+    const pastCompsRes = await dbQuery(`
       SELECT id, competition_number, title, status, started_at, ended_at, total_participants, total_score 
-      FROM public.competitions 
+      FROM competitions 
       WHERE status = 'ARCHIVED' 
       ORDER BY competition_number DESC 
       LIMIT 10
     `);
 
-    const compLogsRes = await pool.query(`
+    const compLogsRes = await dbQuery(`
       SELECT log_id, action, admin_key_used, prev_title, new_title, participants_count, total_score_archived, details, created_at
-      FROM public.competition_logs
+      FROM competition_logs
       ORDER BY created_at DESC
       LIMIT 10
     `);
 
     // Home Announcements
-    const activeAnnRes = await pool.query(`SELECT * FROM public.home_announcements WHERE is_active = true ORDER BY updated_at DESC LIMIT 1`);
+    const activeAnnRes = await dbQuery(`SELECT * FROM home_announcements WHERE is_active = true ORDER BY updated_at DESC LIMIT 1`);
     const activeAnnouncement = activeAnnRes.rows.length > 0 ? {
       id: activeAnnRes.rows[0].id,
       title: activeAnnRes.rows[0].title,
@@ -2325,7 +2336,7 @@ app.get('/api/admin/overview', requireAdminAuth, ensureDatabaseReady, async (req
       updatedAt: new Date(activeAnnRes.rows[0].updated_at).getTime()
     } : null;
 
-    const allAnnRes = await pool.query(`SELECT * FROM public.home_announcements ORDER BY updated_at DESC LIMIT 20`);
+    const allAnnRes = await dbQuery(`SELECT * FROM home_announcements ORDER BY updated_at DESC LIMIT 20`);
 
     return res.json({
       totalUsers: users.length,
@@ -2412,15 +2423,15 @@ app.get('/api/admin/overview', requireAdminAuth, ensureDatabaseReady, async (req
 // ====================================================================
 app.get('/api/admin/users', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
   try {
-    const result = await pool.query(`
+    const result = await dbQuery(`
       SELECT 
         u.id,
         u.first_name,
         u.last_name,
         u.created_at,
         COALESCE(s.total_score, u.total_score, 0) AS total_score
-      FROM public.users u
-      LEFT JOIN public.user_scores s ON u.id = s.user_id
+      FROM users u
+      LEFT JOIN user_scores s ON u.id = s.user_id
       ORDER BY total_score DESC, u.created_at ASC, u.id ASC
     `);
 
@@ -2453,10 +2464,10 @@ app.post('/api/admin/cycle/reset', requireAdminAuth, ensureDatabaseReady, async 
     const newCycleId = "CYC_" + Math.floor(now / 1000);
     const endTime = now + (24 * 60 * 60 * 1000);
 
-    await pool.query(
-      `INSERT INTO public.daily_cycles (cycle_id, user_id, start_time, end_time, status)
+    await dbQuery(
+      `INSERT INTO daily_cycles (cycle_id, user_id, start_time, end_time, status)
        VALUES ($1, $2, $3, $4, 'ACTIVE')
-       ON CONFLICT (cycle_id) DO UPDATE SET start_time = $3, end_time = $4, status = 'ACTIVE'`,
+       ON DUPLICATE KEY UPDATE start_time = VALUES(start_time), end_time = VALUES(end_time), status = 'ACTIVE'`,
       [newCycleId, userId, now, endTime]
     );
 
@@ -2481,16 +2492,16 @@ let isCompetitionResetting = false;
 
 // Helper: Get active competition or create default
 async function getActiveCompetition(clientOrPool = pool) {
-  let compRes = await clientOrPool.query(`SELECT * FROM public.competitions WHERE status = 'ACTIVE' LIMIT 1`);
+  let compRes = await clientOrPool.query(`SELECT * FROM competitions WHERE status = 'ACTIVE' LIMIT 1`);
   if (compRes.rows.length === 0) {
     const defaultId = 'COMP_1';
     await clientOrPool.query(
-      `INSERT INTO public.competitions (id, competition_number, title, status, started_at, created_by, created_at)
+      `INSERT INTO competitions (id, competition_number, title, status, started_at, created_by, created_at)
        VALUES ($1, 1, 'مسابقه شماره ۱ (جایزه آیفون و پلی‌استیشن)', 'ACTIVE', NOW(), 'admin', NOW())
-       ON CONFLICT (id) DO NOTHING`,
+       ON DUPLICATE KEY UPDATE id=id`,
       [defaultId]
     );
-    compRes = await clientOrPool.query(`SELECT * FROM public.competitions WHERE status = 'ACTIVE' LIMIT 1`);
+    compRes = await clientOrPool.query(`SELECT * FROM competitions WHERE status = 'ACTIVE' LIMIT 1`);
   }
   return compRes.rows[0];
 }
@@ -2503,10 +2514,10 @@ app.get('/api/competition/current', ensureDatabaseReady, async (req, res) => {
 
     let userScore = 0;
     if (userId) {
-      const scoreRes = await pool.query(
+      const scoreRes = await dbQuery(
         `SELECT COALESCE(s.total_score, u.total_score, 0) AS score
-         FROM public.users u
-         LEFT JOIN public.user_scores s ON u.id = s.user_id
+         FROM users u
+         LEFT JOIN user_scores s ON u.id = s.user_id
          WHERE u.id = $1 LIMIT 1`,
         [userId]
       );
@@ -2538,9 +2549,9 @@ app.get('/api/competition/current', ensureDatabaseReady, async (req, res) => {
 // 8.2 Historical Competitions List
 app.get('/api/competitions/history', ensureDatabaseReady, async (req, res) => {
   try {
-    const result = await pool.query(`
+    const result = await dbQuery(`
       SELECT id, competition_number, title, status, started_at, ended_at, total_participants, total_score, created_at
-      FROM public.competitions
+      FROM competitions
       ORDER BY competition_number DESC
     `);
     const competitions = result.rows.map(r => ({
@@ -2564,15 +2575,15 @@ app.get('/api/competitions/history', ensureDatabaseReady, async (req, res) => {
 app.get('/api/competitions/:id/results', ensureDatabaseReady, async (req, res) => {
   try {
     const compId = req.params.id;
-    const compRes = await pool.query(`SELECT * FROM public.competitions WHERE id = $1 LIMIT 1`, [compId]);
+    const compRes = await dbQuery(`SELECT * FROM competitions WHERE id = $1 LIMIT 1`, [compId]);
     if (compRes.rows.length === 0) {
       return res.status(404).json({ error: "مسابقه مورد نظر یافت نشد." });
     }
     const comp = compRes.rows[0];
 
-    const archRes = await pool.query(`
+    const archRes = await dbQuery(`
       SELECT id, user_id, final_score, final_rank, first_name, last_name, phone_number, archived_at
-      FROM public.competition_archives
+      FROM competition_archives
       WHERE competition_id = $1
       ORDER BY final_rank ASC, final_score DESC
       LIMIT 200
@@ -2619,9 +2630,9 @@ app.get('/api/competitions/:id/results', ensureDatabaseReady, async (req, res) =
 // 8.4 Competition Audit Logs (Admin Protected)
 app.get('/api/admin/competition/logs', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
   try {
-    const logsRes = await pool.query(`
+    const logsRes = await dbQuery(`
       SELECT log_id, action, admin_key_used, prev_competition_id, new_competition_id, prev_title, new_title, participants_count, total_score_archived, details, created_at
-      FROM public.competition_logs
+      FROM competition_logs
       ORDER BY created_at DESC
       LIMIT 50
     `);
@@ -2668,13 +2679,13 @@ app.post('/api/admin/competition/start-new', requireAdminAuth, ensureDatabaseRea
   }
 
   isCompetitionResetting = true;
-  const client = await pool.connect();
+  const client = await pool.getConnection();
 
   try {
-    await client.query('BEGIN');
+    await client.beginTransaction();
 
     // 1. Get currently active competition with row lock
-    const activeCompRes = await client.query(`SELECT * FROM public.competitions WHERE status = 'ACTIVE' FOR UPDATE`);
+    const activeCompRes = await dbQuery(`SELECT * FROM competitions WHERE status = 'ACTIVE' FOR UPDATE`, [], client);
     const activeComp = activeCompRes.rows[0];
     let prevNumber = 1;
     let prevId = 'COMP_1';
@@ -2687,7 +2698,7 @@ app.post('/api/admin/competition/start-new', requireAdminAuth, ensureDatabaseRea
     }
 
     // 2. Query all users and their scores for snapshot
-    const usersRes = await client.query(`
+    const usersRes = await dbQuery(`
       SELECT 
         u.id AS user_id,
         u.first_name,
@@ -2695,10 +2706,10 @@ app.post('/api/admin/competition/start-new', requireAdminAuth, ensureDatabaseRea
         u.phone_number,
         COALESCE(s.total_score, u.total_score, 0) AS total_score,
         u.created_at
-      FROM public.users u
-      LEFT JOIN public.user_scores s ON u.id = s.user_id
+      FROM users u
+      LEFT JOIN user_scores s ON u.id = s.user_id
       ORDER BY total_score DESC, u.created_at ASC, u.id ASC
-    `);
+    `, [], client);
 
     let totalScoreArchived = 0;
     let participantsCount = 0;
@@ -2711,31 +2722,31 @@ app.post('/api/admin/competition/start-new', requireAdminAuth, ensureDatabaseRea
       totalScoreArchived += finalScore;
 
       const archId = `ARCH_${prevId}_${u.user_id}`;
-      await client.query(`
-        INSERT INTO public.competition_archives 
+      await dbQuery(`
+        INSERT INTO competition_archives 
           (id, competition_id, user_id, final_score, final_rank, first_name, last_name, phone_number, archived_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
-        ON CONFLICT (id) DO UPDATE SET 
-          final_score = $4, final_rank = $5, first_name = $6, last_name = $7, phone_number = $8, archived_at = NOW()
-      `, [archId, prevId, u.user_id, finalScore, rank, u.first_name || '', u.last_name || '', u.phone_number || '']);
+        ON DUPLICATE KEY UPDATE 
+          final_score = VALUES(final_score), final_rank = VALUES(final_rank), first_name = VALUES(first_name), last_name = VALUES(last_name), phone_number = VALUES(phone_number), archived_at = NOW()
+      `, [archId, prevId, u.user_id, finalScore, rank, u.first_name || '', u.last_name || '', u.phone_number || ''], client);
     }
 
     // 3. Mark previous active competition as ARCHIVED
     if (activeComp) {
-      await client.query(`
-        UPDATE public.competitions 
+      await dbQuery(`
+        UPDATE competitions 
         SET status = 'ARCHIVED', ended_at = NOW(), total_participants = $1, total_score = $2
         WHERE id = $3
-      `, [participantsCount, totalScoreArchived, prevId]);
+      `, [participantsCount, totalScoreArchived, prevId], client);
     } else {
-      await client.query(`
-        INSERT INTO public.competitions (id, competition_number, title, status, started_at, ended_at, total_participants, total_score, created_by, created_at)
+      await dbQuery(`
+        INSERT INTO competitions (id, competition_number, title, status, started_at, ended_at, total_participants, total_score, created_by, created_at)
         VALUES ($1, $2, $3, 'ARCHIVED', NOW(), NOW(), $4, $5, 'admin', NOW())
-        ON CONFLICT (id) DO NOTHING
-      `, [prevId, prevNumber, prevTitle, participantsCount, totalScoreArchived]);
+        ON DUPLICATE KEY UPDATE id=id
+      `, [prevId, prevNumber, prevTitle, participantsCount, totalScoreArchived], client);
     }
 
-    const { confirmationPhrase, newTitle, endDate, announcementTitle, announcementContent } = req.body || {};
+    const { confirmationPhrase: _, newTitle: _2, endDate, announcementTitle, announcementContent } = req.body || {};
 
     // 4. Create new ACTIVE competition
     const nextNumber = prevNumber + 1;
@@ -2743,41 +2754,41 @@ app.post('/api/admin/competition/start-new', requireAdminAuth, ensureDatabaseRea
     const competitionTitle = (newTitle && newTitle.trim()) ? newTitle.trim() : `مسابقه شماره ${nextNumber}`;
     const competitionEndDate = endDate ? new Date(endDate) : null;
 
-    await client.query(`
-      INSERT INTO public.competitions (id, competition_number, title, status, started_at, ended_at, created_by, created_at)
+    await dbQuery(`
+      INSERT INTO competitions (id, competition_number, title, status, started_at, ended_at, created_by, created_at)
       VALUES ($1, $2, $3, 'ACTIVE', NOW(), $4, 'admin', NOW())
-    `, [newCompId, nextNumber, competitionTitle, competitionEndDate]);
+    `, [newCompId, nextNumber, competitionTitle, competitionEndDate], client);
 
     // 5. Reset all user scores to 0
-    await client.query(`UPDATE public.user_scores SET total_score = 0, updated_at = NOW()`);
+    await dbQuery(`UPDATE user_scores SET total_score = 0, updated_at = NOW()`, [], client);
     if (schemaInfo.userHasTotalScore) {
-      await client.query(`UPDATE public.users SET total_score = 0, updated_at = NOW()`);
+      await dbQuery(`UPDATE users SET total_score = 0, updated_at = NOW()`, [], client);
     }
 
     // 6. Delete all square states so all 100 squares reset to READY
-    await client.query(`DELETE FROM public.square_states`);
+    await dbQuery(`DELETE FROM square_states`, [], client);
 
     // 7. Automatically publish linked Home Announcement for the new competition
-    await client.query(`UPDATE public.home_announcements SET is_active = false`);
+    await dbQuery(`UPDATE home_announcements SET is_active = false`, [], client);
     const newAnnId = `ANN_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
     const annTitle = (announcementTitle && announcementTitle.trim()) ? announcementTitle.trim() : `شروع ${competitionTitle}`;
     const annBody = (announcementContent && announcementContent.trim()) 
       ? announcementContent.trim() 
       : `دوره جدید مسابقه («${competitionTitle}») آغاز شد! با مشاهده تبلیغات و تکمیل ۱۰۰ مربع روزانه امتیاز کسب کرده و برنده جوایز ارزنده شوید.`;
 
-    await client.query(`
-      INSERT INTO public.home_announcements 
+    await dbQuery(`
+      INSERT INTO home_announcements 
         (id, title, content, type, is_active, competition_id, starts_at, ends_at, created_by, created_at, updated_at)
       VALUES ($1, $2, $3, 'COMPETITION_START', true, $4, NOW(), $5, 'admin', NOW(), NOW())
-    `, [newAnnId, annTitle, annBody, newCompId, competitionEndDate]);
+    `, [newAnnId, annTitle, annBody, newCompId, competitionEndDate], client);
 
     // 8. Insert audit log
     const logId = `CLOG_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
     const rawAdminKey = req.headers['x-admin-key'] || req.query.adminKey || 'ADMIN';
     const maskedKey = rawAdminKey.length > 4 ? rawAdminKey.substring(0, 4) + '***' : '***';
 
-    await client.query(`
-      INSERT INTO public.competition_logs 
+    await dbQuery(`
+      INSERT INTO competition_logs 
         (log_id, action, admin_key_used, prev_competition_id, new_competition_id, prev_title, new_title, participants_count, total_score_archived, details, created_at)
       VALUES ($1, 'START_NEW_COMPETITION', $2, $3, $4, $5, $6, $7, $8, $9, NOW())
     `, [
@@ -2790,9 +2801,9 @@ app.post('/api/admin/competition/start-new', requireAdminAuth, ensureDatabaseRea
       participantsCount,
       totalScoreArchived,
       `پایان مسابقه شماره ${prevNumber} با ${participantsCount} شرکت‌کننده و آرشیو ${totalScoreArchived} امتیاز. شروع مسابقه جدید «${competitionTitle}» و انتشار اطلاعیه صفحه اصلی.`
-    ]);
+    ], client);
 
-    await client.query('COMMIT');
+    await client.commit();
 
     console.log(`[Admin Competition] Successfully started competition ${nextNumber} ("${competitionTitle}") with announcement "${annTitle}".`);
 
@@ -2825,7 +2836,7 @@ app.post('/api/admin/competition/start-new', requireAdminAuth, ensureDatabaseRea
     });
 
   } catch (err) {
-    await client.query('ROLLBACK');
+    await client.rollback();
     console.error('[Start New Competition Transaction Error]', err);
     return res.status(500).json({ success: false, error: "خطا در پردازش اتمیک پایان مسابقه و آغاز مسابقه جدید در پایگاه داده." });
   } finally {
@@ -2841,7 +2852,7 @@ app.post('/api/admin/competition/start-new', requireAdminAuth, ensureDatabaseRea
 // 9.1 Public API: Get Active Announcement for App Home Screen
 app.get('/api/announcement/active', ensureDatabaseReady, async (req, res) => {
   try {
-    const result = await pool.query(`
+    const result = await dbQuery(`
       SELECT 
         a.id, 
         a.title, 
@@ -2854,8 +2865,8 @@ app.get('/api/announcement/active', ensureDatabaseReady, async (req, res) => {
         a.created_at, 
         a.updated_at,
         c.title AS competition_title
-      FROM public.home_announcements a
-      LEFT JOIN public.competitions c ON a.competition_id = c.id
+      FROM home_announcements a
+      LEFT JOIN competitions c ON a.competition_id = c.id
       WHERE a.is_active = true
       ORDER BY a.updated_at DESC
       LIMIT 1
@@ -2898,7 +2909,7 @@ app.get('/api/announcement/active', ensureDatabaseReady, async (req, res) => {
 // 9.2 Admin API: List All Announcements
 app.get('/api/admin/announcements', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
   try {
-    const result = await pool.query(`
+    const result = await dbQuery(`
       SELECT 
         a.id, 
         a.title, 
@@ -2912,8 +2923,8 @@ app.get('/api/admin/announcements', requireAdminAuth, ensureDatabaseReady, async
         a.created_at, 
         a.updated_at,
         c.title AS competition_title
-      FROM public.home_announcements a
-      LEFT JOIN public.competitions c ON a.competition_id = c.id
+      FROM home_announcements a
+      LEFT JOIN competitions c ON a.competition_id = c.id
       ORDER BY a.updated_at DESC
       LIMIT 50
     `);
@@ -2964,27 +2975,26 @@ app.post('/api/admin/announcements', requireAdminAuth, ensureDatabaseReady, asyn
 
     // If activating this announcement, deactivate other announcements to ensure single primary active banner
     if (activeBool) {
-      await pool.query(`UPDATE public.home_announcements SET is_active = false WHERE id != COALESCE($1, '')`, [id || '']);
+      await dbQuery(`UPDATE home_announcements SET is_active = false WHERE id != COALESCE($1, '')`, [id || '']);
     }
 
     let savedId = id;
     if (id) {
       // Update existing
-      const updateRes = await pool.query(`
-        UPDATE public.home_announcements 
+      const updateRes = await dbQuery(`
+        UPDATE home_announcements 
         SET title = $1, content = $2, type = $3, is_active = $4, competition_id = $5, starts_at = $6, ends_at = $7, updated_at = NOW()
         WHERE id = $8
-        RETURNING id
       `, [cleanTitle, cleanContent, cleanType, activeBool, competitionId || null, startsAtDate, endsAtDate, id]);
 
-      if (updateRes.rows.length === 0) {
+      if (updateRes.rowCount === 0) {
         return res.status(404).json({ error: "پیام مورد نظر جهت ویرایش یافت نشد." });
       }
     } else {
       // Insert new
       savedId = `ANN_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
-      await pool.query(`
-        INSERT INTO public.home_announcements 
+      await dbQuery(`
+        INSERT INTO home_announcements 
           (id, title, content, type, is_active, competition_id, starts_at, ends_at, created_by, created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'admin', NOW(), NOW())
       `, [savedId, cleanTitle, cleanContent, cleanType, activeBool, competitionId || null, startsAtDate, endsAtDate]);
@@ -3015,7 +3025,7 @@ app.post('/api/admin/announcements', requireAdminAuth, ensureDatabaseReady, asyn
 app.patch('/api/admin/announcements/:id/toggle', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
   try {
     const annId = req.params.id;
-    const checkRes = await pool.query(`SELECT is_active FROM public.home_announcements WHERE id = $1 LIMIT 1`, [annId]);
+    const checkRes = await dbQuery(`SELECT is_active FROM home_announcements WHERE id = $1 LIMIT 1`, [annId]);
     if (checkRes.rows.length === 0) {
       return res.status(404).json({ error: "پیام یافت نشد." });
     }
@@ -3025,11 +3035,11 @@ app.patch('/api/admin/announcements/:id/toggle', requireAdminAuth, ensureDatabas
 
     if (newStatus) {
       // Deactivate all others
-      await pool.query(`UPDATE public.home_announcements SET is_active = false`);
+      await dbQuery(`UPDATE home_announcements SET is_active = false`);
     }
 
-    await pool.query(`
-      UPDATE public.home_announcements 
+    await dbQuery(`
+      UPDATE home_announcements 
       SET is_active = $1, updated_at = NOW() 
       WHERE id = $2
     `, [newStatus, annId]);
@@ -3055,7 +3065,7 @@ const VALID_SUPPORT_STATUSES = ['NEW', 'IN_PROGRESS', 'ANSWERED', 'CLOSED'];
 
 // 10.1 User: Create New Support Ticket (Authenticated)
 app.post('/api/support/tickets', requireUserAuth, ensureDatabaseReady, async (req, res) => {
-  const client = await pool.connect();
+  const client = await pool.getConnection();
   try {
     const { subject, category, message } = req.body;
 
@@ -3076,21 +3086,21 @@ app.post('/api/support/tickets', requireUserAuth, ensureDatabaseReady, async (re
     const messageId = "MSG_" + crypto.randomUUID();
     const now = new Date();
 
-    await client.query('BEGIN');
+    await client.beginTransaction();
 
     // Insert Ticket
-    await client.query(`
-      INSERT INTO public.support_tickets (id, tracking_code, user_id, subject, category, status, created_at, updated_at, last_message_at)
+    await dbQuery(`
+      INSERT INTO support_tickets (id, tracking_code, user_id, subject, category, status, created_at, updated_at, last_message_at)
       VALUES ($1, $2, $3, $4, $5, 'NEW', $6, $6, $6)
-    `, [ticketId, trackingCode, req.user.id, subject.trim(), cleanCategory, now]);
+    `, [ticketId, trackingCode, req.user.id, subject.trim(), cleanCategory, now], client);
 
     // Insert Initial Message
-    await client.query(`
-      INSERT INTO public.support_messages (id, ticket_id, sender_type, sender_id, sender_name, message_text, created_at)
+    await dbQuery(`
+      INSERT INTO support_messages (id, ticket_id, sender_type, sender_id, sender_name, message_text, created_at)
       VALUES ($1, $2, 'USER', $3, $4, $5, $6)
-    `, [messageId, ticketId, req.user.id, req.user.fullName, message.trim(), now]);
+    `, [messageId, ticketId, req.user.id, req.user.fullName, message.trim(), now], client);
 
-    await client.query('COMMIT');
+    await client.commit();
 
     console.log(`[Support System] Created ticket ${trackingCode} by user ${req.user.id} (${req.user.fullName})`);
 
@@ -3110,7 +3120,7 @@ app.post('/api/support/tickets', requireUserAuth, ensureDatabaseReady, async (re
       }
     });
   } catch (err) {
-    await client.query('ROLLBACK');
+    await client.rollback();
     console.error('[Support Ticket Create Error]', err);
     return res.status(500).json({ error: "خطا در ثبت درخواست پشتیبانی در پایگاه داده." });
   } finally {
@@ -3121,7 +3131,7 @@ app.post('/api/support/tickets', requireUserAuth, ensureDatabaseReady, async (re
 // 10.2 User: List My Support Tickets (Authenticated & Filtered by req.user.id)
 app.get('/api/support/tickets', requireUserAuth, ensureDatabaseReady, async (req, res) => {
   try {
-    const result = await pool.query(`
+    const result = await dbQuery(`
       SELECT 
         t.id, 
         t.tracking_code, 
@@ -3131,9 +3141,9 @@ app.get('/api/support/tickets', requireUserAuth, ensureDatabaseReady, async (req
         t.created_at, 
         t.updated_at, 
         t.last_message_at,
-        (SELECT m.message_text FROM public.support_messages m WHERE m.ticket_id = t.id ORDER BY m.created_at DESC LIMIT 1) AS last_message,
-        (SELECT m.sender_type FROM public.support_messages m WHERE m.ticket_id = t.id ORDER BY m.created_at DESC LIMIT 1) AS last_sender_type
-      FROM public.support_tickets t
+        (SELECT m.message_text FROM support_messages m WHERE m.ticket_id = t.id ORDER BY m.created_at DESC LIMIT 1) AS last_message,
+        (SELECT m.sender_type FROM support_messages m WHERE m.ticket_id = t.id ORDER BY m.created_at DESC LIMIT 1) AS last_sender_type
+      FROM support_tickets t
       WHERE t.user_id = $1
       ORDER BY t.updated_at DESC
     `, [req.user.id]);
@@ -3167,9 +3177,9 @@ app.get('/api/support/tickets/:id', requireUserAuth, ensureDatabaseReady, async 
     const ticketId = req.params.id;
 
     // Strict user ownership check
-    const ticketRes = await pool.query(`
+    const ticketRes = await dbQuery(`
       SELECT id, tracking_code, user_id, subject, category, status, created_at, updated_at, last_message_at
-      FROM public.support_tickets 
+      FROM support_tickets 
       WHERE id = $1 AND user_id = $2
       LIMIT 1
     `, [ticketId, req.user.id]);
@@ -3180,9 +3190,9 @@ app.get('/api/support/tickets/:id', requireUserAuth, ensureDatabaseReady, async 
 
     const t = ticketRes.rows[0];
 
-    const messagesRes = await pool.query(`
+    const messagesRes = await dbQuery(`
       SELECT id, ticket_id, sender_type, sender_id, sender_name, message_text, created_at
-      FROM public.support_messages
+      FROM support_messages
       WHERE ticket_id = $1
       ORDER BY created_at ASC
     `, [ticketId]);
@@ -3219,7 +3229,7 @@ app.get('/api/support/tickets/:id', requireUserAuth, ensureDatabaseReady, async 
 
 // 10.4 User: Send Follow-up Message in an Open Ticket (Rejects if CLOSED)
 app.post('/api/support/tickets/:id/messages', requireUserAuth, ensureDatabaseReady, async (req, res) => {
-  const client = await pool.connect();
+  const client = await pool.getConnection();
   try {
     const ticketId = req.params.id;
     const { message } = req.body;
@@ -3229,12 +3239,12 @@ app.post('/api/support/tickets/:id/messages', requireUserAuth, ensureDatabaseRea
     }
 
     // Verify ownership and status
-    const ticketRes = await client.query(`
+    const ticketRes = await dbQuery(`
       SELECT id, status, tracking_code
-      FROM public.support_tickets 
+      FROM support_tickets 
       WHERE id = $1 AND user_id = $2
       LIMIT 1
-    `, [ticketId, req.user.id]);
+    `, [ticketId, req.user.id], client);
 
     if (ticketRes.rows.length === 0) {
       return res.status(404).json({ error: "درخواست پشتیبانی یافت نشد یا دسترسی به آن برای شما مجاز نمی‌باشد." });
@@ -3250,23 +3260,23 @@ app.post('/api/support/tickets/:id/messages', requireUserAuth, ensureDatabaseRea
     const messageId = "MSG_" + crypto.randomUUID();
     const now = new Date();
 
-    await client.query('BEGIN');
+    await client.beginTransaction();
 
     // Insert user message
-    await client.query(`
-      INSERT INTO public.support_messages (id, ticket_id, sender_type, sender_id, sender_name, message_text, created_at)
+    await dbQuery(`
+      INSERT INTO support_messages (id, ticket_id, sender_type, sender_id, sender_name, message_text, created_at)
       VALUES ($1, $2, 'USER', $3, $4, $5, $6)
-    `, [messageId, ticketId, req.user.id, req.user.fullName, message.trim(), now]);
+    `, [messageId, ticketId, req.user.id, req.user.fullName, message.trim(), now], client);
 
     // Update ticket to IN_PROGRESS / NEW and update timestamps
     const newStatus = currentTicket.status === 'ANSWERED' ? 'IN_PROGRESS' : currentTicket.status;
-    await client.query(`
-      UPDATE public.support_tickets
+    await dbQuery(`
+      UPDATE support_tickets
       SET status = $1, updated_at = $2, last_message_at = $2
       WHERE id = $3
-    `, [newStatus, now, ticketId]);
+    `, [newStatus, now, ticketId], client);
 
-    await client.query('COMMIT');
+    await client.commit();
 
     return res.status(201).json({
       success: true,
@@ -3282,7 +3292,7 @@ app.post('/api/support/tickets/:id/messages', requireUserAuth, ensureDatabaseRea
       ticketStatus: newStatus
     });
   } catch (err) {
-    await client.query('ROLLBACK');
+    await client.rollback();
     console.error('[Support User Send Message Error]', err);
     return res.status(500).json({ error: "خطا در ارسال پیام در پایگاه داده." });
   } finally {
@@ -3309,11 +3319,11 @@ app.get('/api/admin/support/tickets', requireAdminAuth, ensureDatabaseReady, asy
         u.first_name,
         u.last_name,
         u.phone_number,
-        (SELECT m.message_text FROM public.support_messages m WHERE m.ticket_id = t.id ORDER BY m.created_at DESC LIMIT 1) AS last_message,
-        (SELECT m.sender_type FROM public.support_messages m WHERE m.ticket_id = t.id ORDER BY m.created_at DESC LIMIT 1) AS last_sender_type,
-        (SELECT COUNT(*) FROM public.support_messages m WHERE m.ticket_id = t.id) AS total_messages
-      FROM public.support_tickets t
-      JOIN public.users u ON t.user_id = u.id
+        (SELECT m.message_text FROM support_messages m WHERE m.ticket_id = t.id ORDER BY m.created_at DESC LIMIT 1) AS last_message,
+        (SELECT m.sender_type FROM support_messages m WHERE m.ticket_id = t.id ORDER BY m.created_at DESC LIMIT 1) AS last_sender_type,
+        (SELECT COUNT(*) FROM support_messages m WHERE m.ticket_id = t.id) AS total_messages
+      FROM support_tickets t
+      JOIN users u ON t.user_id = u.id
       WHERE 1=1
     `;
     const params = [];
@@ -3330,22 +3340,22 @@ app.get('/api/admin/support/tickets', requireAdminAuth, ensureDatabaseReady, asy
 
     if (search && search.trim()) {
       params.push(`%${search.trim()}%`);
-      queryText += ` AND (t.tracking_code ILIKE $${params.length} OR u.phone_number ILIKE $${params.length} OR t.subject ILIKE $${params.length} OR u.first_name ILIKE $${params.length} OR u.last_name ILIKE $${params.length})`;
+      queryText += ` AND (t.tracking_code LIKE $${params.length} OR u.phone_number LIKE $${params.length} OR t.subject LIKE $${params.length} OR u.first_name LIKE $${params.length} OR u.last_name LIKE $${params.length})`;
     }
 
     queryText += ` ORDER BY t.updated_at DESC LIMIT 200`;
 
-    const result = await pool.query(queryText, params);
+    const result = await dbQuery(queryText, params);
 
     // Compute Status Counts
-    const countsRes = await pool.query(`
+    const countsRes = await dbQuery(`
       SELECT 
         COUNT(*) AS total,
-        COUNT(*) FILTER (WHERE status = 'NEW') AS new_count,
-        COUNT(*) FILTER (WHERE status = 'IN_PROGRESS') AS in_progress_count,
-        COUNT(*) FILTER (WHERE status = 'ANSWERED') AS answered_count,
-        COUNT(*) FILTER (WHERE status = 'CLOSED') AS closed_count
-      FROM public.support_tickets
+        SUM(CASE WHEN status = 'NEW' THEN 1 ELSE 0 END) AS new_count,
+        SUM(CASE WHEN status = 'IN_PROGRESS' THEN 1 ELSE 0 END) AS in_progress_count,
+        SUM(CASE WHEN status = 'ANSWERED' THEN 1 ELSE 0 END) AS answered_count,
+        SUM(CASE WHEN status = 'CLOSED' THEN 1 ELSE 0 END) AS closed_count
+      FROM support_tickets
     `);
     const counts = countsRes.rows[0];
 
@@ -3388,7 +3398,7 @@ app.get('/api/admin/support/tickets/:id', requireAdminAuth, ensureDatabaseReady,
   try {
     const ticketId = req.params.id;
 
-    const ticketRes = await pool.query(`
+    const ticketRes = await dbQuery(`
       SELECT 
         t.id, 
         t.tracking_code, 
@@ -3403,8 +3413,8 @@ app.get('/api/admin/support/tickets/:id', requireAdminAuth, ensureDatabaseReady,
         u.last_name,
         u.phone_number,
         u.total_score
-      FROM public.support_tickets t
-      JOIN public.users u ON t.user_id = u.id
+      FROM support_tickets t
+      JOIN users u ON t.user_id = u.id
       WHERE t.id = $1
       LIMIT 1
     `, [ticketId]);
@@ -3415,9 +3425,9 @@ app.get('/api/admin/support/tickets/:id', requireAdminAuth, ensureDatabaseReady,
 
     const t = ticketRes.rows[0];
 
-    const messagesRes = await pool.query(`
+    const messagesRes = await dbQuery(`
       SELECT id, ticket_id, sender_type, sender_id, sender_name, message_text, created_at
-      FROM public.support_messages
+      FROM support_messages
       WHERE ticket_id = $1
       ORDER BY created_at ASC
     `, [ticketId]);
@@ -3458,7 +3468,7 @@ app.get('/api/admin/support/tickets/:id', requireAdminAuth, ensureDatabaseReady,
 
 // 10.7 Admin API: Send Reply to User Ticket (Protected - Updates status to ANSWERED)
 app.post('/api/admin/support/tickets/:id/messages', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
-  const client = await pool.connect();
+  const client = await pool.getConnection();
   try {
     const ticketId = req.params.id;
     const { message, newStatus } = req.body;
@@ -3467,7 +3477,7 @@ app.post('/api/admin/support/tickets/:id/messages', requireAdminAuth, ensureData
       return res.status(400).json({ error: "متن پاسخ مدیر باید بین ۲ تا ۳۰۰۰ کاراکتر باشد." });
     }
 
-    const checkRes = await client.query(`SELECT id, status, tracking_code FROM public.support_tickets WHERE id = $1 LIMIT 1`, [ticketId]);
+    const checkRes = await dbQuery(`SELECT id, status, tracking_code FROM support_tickets WHERE id = $1 LIMIT 1`, [ticketId], client);
     if (checkRes.rows.length === 0) {
       return res.status(404).json({ error: "درخواست پشتیبانی یافت نشد." });
     }
@@ -3479,22 +3489,22 @@ app.post('/api/admin/support/tickets/:id/messages', requireAdminAuth, ensureData
     const messageId = "MSG_" + crypto.randomUUID();
     const now = new Date();
 
-    await client.query('BEGIN');
+    await client.beginTransaction();
 
     // Insert Admin Message
-    await client.query(`
-      INSERT INTO public.support_messages (id, ticket_id, sender_type, sender_id, sender_name, message_text, created_at)
+    await dbQuery(`
+      INSERT INTO support_messages (id, ticket_id, sender_type, sender_id, sender_name, message_text, created_at)
       VALUES ($1, $2, 'ADMIN', 'admin', 'پشتیبانی رقابت', $3, $4)
-    `, [messageId, ticketId, message.trim(), now]);
+    `, [messageId, ticketId, message.trim(), now], client);
 
     // Update Ticket Status and Timestamp
-    await client.query(`
-      UPDATE public.support_tickets
+    await dbQuery(`
+      UPDATE support_tickets
       SET status = $1, updated_at = $2, last_message_at = $2
       WHERE id = $3
-    `, [updatedStatus, now, ticketId]);
+    `, [updatedStatus, now, ticketId], client);
 
-    await client.query('COMMIT');
+    await client.commit();
 
     console.log(`[Support Admin Reply] Replied to ticket ${ticketId} (Status: ${updatedStatus})`);
 
@@ -3512,7 +3522,7 @@ app.post('/api/admin/support/tickets/:id/messages', requireAdminAuth, ensureData
       ticketStatus: updatedStatus
     });
   } catch (err) {
-    await client.query('ROLLBACK');
+    await client.rollback();
     console.error('[Admin Support Reply Error]', err);
     return res.status(500).json({ error: "خطا در ثبت پاسخ مدیریت در پایگاه داده." });
   } finally {
@@ -3532,16 +3542,18 @@ app.patch('/api/admin/support/tickets/:id/status', requireAdminAuth, ensureDatab
 
     const cleanStatus = status.toUpperCase();
 
-    const updateRes = await pool.query(`
-      UPDATE public.support_tickets
+    const updateRes = await dbQuery(`
+      UPDATE support_tickets
       SET status = $1, updated_at = NOW()
       WHERE id = $2
-      RETURNING id, tracking_code, status
     `, [cleanStatus, ticketId]);
 
-    if (updateRes.rows.length === 0) {
+    if (updateRes.rowCount === 0) {
       return res.status(404).json({ error: "درخواست پشتیبانی یافت نشد." });
     }
+    
+    const ticketRes = await dbQuery(`SELECT id, tracking_code, status FROM support_tickets WHERE id = $1`, [ticketId]);
+    const updatedTicket = ticketRes.rows[0];
 
     return res.json({
       success: true,
@@ -3611,7 +3623,7 @@ app.post('/api/admin/push-notification', requireAdminAuth, async (req, res) => {
 // 11. User Feedback & Reward System (Internal Feedback for Points)
 // ====================================================================
 app.post('/api/user/feedback', requireUserAuth, ensureDatabaseReady, async (req, res) => {
-  const client = await pool.connect();
+  const client = await pool.getConnection();
   try {
     const userId = req.user.id;
     const { rating, comment } = req.body;
@@ -3623,23 +3635,23 @@ app.post('/api/user/feedback', requireUserAuth, ensureDatabaseReady, async (req,
     const REWARD_POINTS = 2;
 
     // 1. Start atomic transaction
-    await client.query('BEGIN');
+    await client.beginTransaction();
 
     // 2. Conditional check and update to prevent race conditions
-    const updateRes = await client.query(
-      `UPDATE public.users 
+    const updateRes = await dbQuery(
+      `UPDATE users 
        SET feedback_reward_claimed = true, 
            total_score = total_score + $1, 
            updated_at = NOW() 
-       WHERE id = $2 AND feedback_reward_claimed = false
-       RETURNING total_score`,
-      [REWARD_POINTS, userId]
+       WHERE id = $2 AND feedback_reward_claimed = false`,
+      [REWARD_POINTS, userId],
+      client
     );
 
-    if (updateRes.rows.length === 0) {
+    if (updateRes.rowCount === 0) {
       // Either user doesn't exist or already claimed
-      await client.query('ROLLBACK');
-      const checkAgain = await client.query(`SELECT id, feedback_reward_claimed FROM public.users WHERE id = $1`, [userId]);
+      await client.rollback();
+      const checkAgain = await dbQuery(`SELECT id, feedback_reward_claimed FROM users WHERE id = $1`, [userId]);
       if (checkAgain.rows.length === 0) {
         return res.status(404).json({ error: "کاربر یافت نشد." });
       } else {
@@ -3647,28 +3659,27 @@ app.post('/api/user/feedback', requireUserAuth, ensureDatabaseReady, async (req,
       }
     }
 
-    const newScoreUsers = Number(updateRes.rows[0].total_score);
-
     // 3. Insert feedback record
-    await client.query(
-      `INSERT INTO public.user_feedback (user_id, rating, comment, created_at)
+    await dbQuery(
+      `INSERT INTO user_feedback (user_id, rating, comment, created_at)
        VALUES ($1, $2, $3, NOW())`,
-      [userId, rating, comment || null]
+      [userId, rating, comment || null],
+      client
     );
 
     // 4. Atomic increment in user_scores table (primary score source)
-    const scoreUpdate = await client.query(
-      `INSERT INTO public.user_scores (user_id, total_score, updated_at)
+    await dbQuery(
+      `INSERT INTO user_scores (user_id, total_score, updated_at)
        VALUES ($1, $2, NOW())
-       ON CONFLICT (user_id) 
-       DO UPDATE SET total_score = public.user_scores.total_score + $3, updated_at = NOW()
-       RETURNING total_score`,
-      [userId, REWARD_POINTS, REWARD_POINTS]
+       ON DUPLICATE KEY UPDATE total_score = total_score + VALUES(total_score), updated_at = NOW()`,
+      [userId, REWARD_POINTS],
+      client
     );
 
-    const finalScore = Number(scoreUpdate.rows[0].total_score);
+    const scoreRes = await dbQuery(`SELECT total_score FROM user_scores WHERE user_id = $1`, [userId], client);
+    const finalScore = Number(scoreRes.rows[0].total_score);
 
-    await client.query('COMMIT');
+    await client.commit();
 
     return res.json({
       success: true,
@@ -3678,7 +3689,7 @@ app.post('/api/user/feedback', requireUserAuth, ensureDatabaseReady, async (req,
     });
 
   } catch (err) {
-    await client.query('ROLLBACK');
+    await client.rollback();
     console.error('[User Feedback API Error]', err);
     return res.status(500).json({ error: "خطا در ثبت بازخورد و پرداخت پاداش در پایگاه داده." });
   } finally {
@@ -3712,7 +3723,7 @@ app.get('/api/app/login-notification', async (req, res) => {
   }
 
   try {
-    const result = await pool.query(`SELECT * FROM public.login_notification_settings WHERE id = 'default' LIMIT 1`);
+    const result = await dbQuery(`SELECT * FROM login_notification_settings WHERE id = 'default' LIMIT 1`);
     if (result.rows.length === 0) {
       return res.json({ success: true, data: defaultSettings, settings: defaultSettings });
     }
@@ -3727,7 +3738,7 @@ app.get('/api/app/login-notification', async (req, res) => {
 // Admin API: Get Current Settings
 app.get('/api/admin/login-notification', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
   try {
-    const result = await pool.query(`SELECT * FROM public.login_notification_settings WHERE id = 'default' LIMIT 1`);
+    const result = await dbQuery(`SELECT * FROM login_notification_settings WHERE id = 'default' LIMIT 1`);
     if (result.rows.length === 0) {
       return res.json({ success: true, data: null, settings: null });
     }
@@ -3747,13 +3758,12 @@ app.post('/api/admin/login-notification', requireAdminAuth, ensureDatabaseReady,
       warning_is_visible, warning_title, warning_description, warning_icon 
     } = req.body;
 
-    const result = await pool.query(`
-      UPDATE public.login_notification_settings 
+    const result = await dbQuery(`
+      UPDATE login_notification_settings 
       SET is_visible = $1, badge_text = $2, badge_icon = $3, main_title = $4, main_description = $5, 
           warning_is_visible = $6, warning_title = $7, warning_description = $8, warning_icon = $9, 
           updated_at = NOW()
       WHERE id = 'default'
-      RETURNING *
     `, [
       is_visible, badge_text, badge_icon, main_title, main_description, 
       warning_is_visible, warning_title, warning_description, warning_icon
@@ -3761,17 +3771,19 @@ app.post('/api/admin/login-notification', requireAdminAuth, ensureDatabaseReady,
 
     if (result.rowCount === 0) {
       // Create if not exists (should not happen due to seeding)
-      const insertResult = await pool.query(`
-        INSERT INTO public.login_notification_settings 
+      await dbQuery(`
+        INSERT INTO login_notification_settings 
         (id, is_visible, badge_text, badge_icon, main_title, main_description, warning_is_visible, warning_title, warning_description, warning_icon)
         VALUES ('default', $1, $2, $3, $4, $5, $6, $7, $8, $9)
-        RETURNING *
       `, [is_visible, badge_text, badge_icon, main_title, main_description, warning_is_visible, warning_title, warning_description, warning_icon]);
-      const created = insertResult.rows[0];
+      
+      const settingsRes = await dbQuery(`SELECT * FROM login_notification_settings WHERE id = 'default' LIMIT 1`);
+      const created = settingsRes.rows[0];
       return res.json({ success: true, data: created, settings: created });
     }
 
-    const updated = result.rows[0];
+    const settingsRes = await dbQuery(`SELECT * FROM login_notification_settings WHERE id = 'default' LIMIT 1`);
+    const updated = settingsRes.rows[0];
     res.json({ success: true, data: updated, settings: updated });
   } catch (err) {
     console.error('[Admin Update Login Notif API Error]', err);
