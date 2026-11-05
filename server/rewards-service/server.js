@@ -537,46 +537,51 @@ rewardsRouter.post('/admin/upload-banner', requireAdminAuth, upload.single('bann
     const ext = req.file.originalname.split('.').pop() || 'jpg';
     const fileName = `banner_${Date.now()}_${crypto.randomBytes(4).toString('hex')}.${ext}`;
 
-    // Supabase Storage Upload is now MANDATORY for banners
+    // Supabase Storage or Local Public Uploads Fallback
     const supabaseUrl = process.env.SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    if (!supabaseUrl || !serviceRoleKey) {
-      return res.status(501).json({ 
-        success: false, 
-        message: 'سرویس ذخیره‌سازی ابری (Supabase Storage) پیکربندی نشده است. آپلود بنر در این محیط غیرمجاز می‌باشد.' 
-      });
-    }
-
-    try {
-      const bucketName = 'gift-banners';
-      const uploadUrl = `${supabaseUrl}/storage/v1/object/${bucketName}/${fileName}`;
-      
-      const uploadRes = await fetch(uploadUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${serviceRoleKey}`,
-          'Content-Type': fileMime,
-          'x-upsert': 'true'
-        },
-        body: fileBuffer
-      });
-
-      if (uploadRes.ok) {
-        const publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucketName}/${fileName}`;
-        return res.json({ success: true, url: publicUrl, message: 'تصویر با موفقیت در فضای ابری ذخیره شد.' });
-      } else {
-        const errText = await uploadRes.text();
-        console.error('[Supabase Storage Error] Upload failed:', uploadRes.status, errText);
-        return res.status(502).json({ 
-          success: false, 
-          message: `خطای سرویس ابری (${uploadRes.status}): آپلود فایل با شکست مواجه شد. لطفاً وضعیت Bucket و دسترسی Key را بررسی کنید.` 
+    if (supabaseUrl && serviceRoleKey) {
+      try {
+        const bucketName = 'gift-banners';
+        const uploadUrl = `${supabaseUrl}/storage/v1/object/${bucketName}/${fileName}`;
+        
+        const uploadRes = await fetch(uploadUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${serviceRoleKey}`,
+            'Content-Type': fileMime,
+            'x-upsert': 'true'
+          },
+          body: fileBuffer
         });
+
+        if (uploadRes.ok) {
+          const publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucketName}/${fileName}`;
+          return res.json({ success: true, url: publicUrl, message: 'تصویر با موفقیت در فضای ابری ذخیره شد.' });
+        } else {
+          console.warn('[Supabase Storage Warning] Cloud upload failed, falling back to local server storage.');
+        }
+      } catch (supErr) {
+        console.warn('[Supabase Storage Warning] Cloud upload error, falling back to local storage:', supErr.message);
       }
-    } catch (supErr) {
-      console.error('[Supabase Storage Error] Exception:', supErr.message);
-      return res.status(500).json({ success: false, message: 'خطای ارتباطی در زمان آپلود به فضای ابری.' });
     }
+
+    // Fallback: Save directly to server's public/uploads directory
+    const uploadsDir = path.join(__dirname, '../public/uploads/banners');
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    const filePath = path.join(uploadsDir, fileName);
+    fs.writeFileSync(filePath, fileBuffer);
+
+    const relativeUrl = `/uploads/banners/${fileName}`;
+    return res.json({ 
+      success: true, 
+      url: relativeUrl, 
+      message: 'تصویر با موفقیت در فضای سرور ذخیره شد.' 
+    });
 
   } catch (err) {
     console.error('[Upload Banner Error]:', err);
