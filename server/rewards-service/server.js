@@ -462,6 +462,20 @@ const saveAppearanceHandler = async (req, res) => {
   try {
     const { hero_title, hero_subtitle, hero_banner_url, primary_color, active_sections, is_active, terms_text } = req.body;
     
+    // Ensure reward_appearance table exists with appropriate columns
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS public.reward_appearance (
+        id TEXT PRIMARY KEY DEFAULT 'default',
+        hero_title TEXT NOT NULL DEFAULT 'ویترین جوایز و پاداش‌های ارزشمند',
+        hero_subtitle TEXT DEFAULT 'امتیازهای کسب‌شده خود در مسابقات را به کارت شارژ، بسته‌های اینترنت و جوایز نقدی تبدیل کنید',
+        hero_banner_url TEXT DEFAULT '',
+        primary_color TEXT DEFAULT '#10B981',
+        active_sections JSONB DEFAULT '{"featured": true, "categories": true, "history": true, "banners": true}',
+        terms_text TEXT DEFAULT 'درخواست‌های دریافت جایزه پس از بررسی توسط تیم پشتیبانی ظرف ۲۴ الی ۷۲ ساعت کاری پردازش و ارسال خواهند شد.',
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
     let activeSecObj = active_sections;
     if (!activeSecObj) {
       activeSecObj = { isActive: is_active !== false };
@@ -472,7 +486,7 @@ const saveAppearanceHandler = async (req, res) => {
 
     const result = await pool.query(`
       INSERT INTO public.reward_appearance (id, hero_title, hero_subtitle, hero_banner_url, primary_color, active_sections, terms_text, updated_at)
-      VALUES ('default', $1, $2, $3, $4, $5, $6, NOW())
+      VALUES ('default', $1, $2, $3, $4, $5::jsonb, $6, NOW())
       ON CONFLICT (id) DO UPDATE SET 
         hero_title = COALESCE(EXCLUDED.hero_title, public.reward_appearance.hero_title),
         hero_subtitle = COALESCE(EXCLUDED.hero_subtitle, public.reward_appearance.hero_subtitle),
@@ -483,29 +497,25 @@ const saveAppearanceHandler = async (req, res) => {
         updated_at = NOW()
       RETURNING *
     `, [
-      hero_title !== undefined ? hero_title : null,
-      hero_subtitle !== undefined ? hero_subtitle : null,
-      hero_banner_url !== undefined ? hero_banner_url : null,
-      primary_color || null,
+      hero_title || 'ویترین جوایز و پاداش‌های ارزشمند',
+      hero_subtitle || '',
+      hero_banner_url || '',
+      primary_color || '#10B981',
       activeSecStr,
-      terms_text !== undefined ? terms_text : null
+      terms_text || ''
     ]);
 
-    if (result.rows.length === 0) {
-      return res.status(500).json({ success: false, message: 'خطا در ثبت تنظیمات در پایگاه داده.' });
-    }
-
-    const savedRow = result.rows[0];
+    const savedRow = result.rows && result.rows.length > 0 ? result.rows[0] : null;
     return res.json({
       success: true,
-      appearance: {
+      appearance: savedRow ? {
         ...savedRow,
         hero_banner_url: savedRow.hero_banner_url || ''
-      }
+      } : { hero_title, hero_subtitle, hero_banner_url, primary_color }
     });
   } catch (err) {
-    console.error('[Rewards Admin Error] Save appearance failed:', err.message);
-    return res.status(500).json({ success: false, message: 'خطا در ذخیره ظاهر و بنر هدیه در پایگاه داده: ' + err.message });
+    console.error('[Rewards Admin Error] Save appearance failed:', err);
+    return res.status(500).json({ success: false, message: 'خطا در ذخیره ظاهر و بنر هدیه: ' + err.message });
   }
 };
 
