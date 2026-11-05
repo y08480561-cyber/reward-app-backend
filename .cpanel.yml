@@ -1,0 +1,7 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/kalametg/reward-backend
+    - /bin/mkdir -p $DEPLOYPATH
+    - /usr/bin/rsync -av reward-backend/ $DEPLOYPATH --exclude .env --exclude node_modules --exclude .git --exclude .gitignore
+    - /bin/chmod -R 755 $DEPLOYPATH
