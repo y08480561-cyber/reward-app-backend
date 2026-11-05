@@ -27,6 +27,27 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// 1. Health Check (Move to top to ensure it's matched before any 404 handlers)
+app.get(['/api/health-check', '/api/health-check/'], async (req, res) => {
+  const dbStatus = isDbConnected ? "Connected" : "Disconnected";
+  let dbDetails = {};
+  if (isDbConnected && pool) {
+    try {
+      const [resDb] = await pool.query('SELECT DATABASE() as db_name, VERSION() as version');
+      dbDetails = resDb[0];
+    } catch (e) {
+      dbDetails = { error: e.message };
+    }
+  }
+  res.json({
+    status: "Online",
+    database: dbStatus,
+    dbDetails,
+    nodeVersion: process.version,
+    time: new Date().toISOString()
+  });
+});
+
 // Standalone Admin Users Page (Pure users table)
 app.get(['/admin/users', '/admin/users/'], (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'users.html'));
@@ -146,7 +167,7 @@ async function testAndInitDatabase() {
     console.error('[MySQL CONNECTION FAILED] Unable to establish connection to MySQL server!');
     console.error(`[MySQL Error Message]: ${err.message}`);
     console.error(`[MySQL Error Code]: ${err.code || 'N/A'}`);
-    console.error('====================================================');
+    console.log('====================================================');
     return false;
   }
 }
