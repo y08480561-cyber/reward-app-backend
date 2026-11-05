@@ -472,12 +472,7 @@
           </div>
         </a>
         <div class="nav-category-header">سیستم</div>
-        <a class="sidebar-link" onclick="navigateTo('settings')">
-          <div class="sidebar-link-content">
-            <i class="bi bi-gear-fill"></i>
-            <span>تنظیمات پنل</span>
-          </div>
-        </a>
+
         <a class="sidebar-link" onclick="navigateTo('login_notification')">
           <div class="sidebar-link-content">
             <i class="bi bi-megaphone-fill"></i>
@@ -497,17 +492,11 @@
       <div class="sidebar-footer">
         <div class="d-flex align-items-center justify-content-between mb-2">
           <div class="d-flex align-items-center gap-2">
-            <i class="bi bi-shield-check text-warning"></i>
-            <span class="small text-secondary">وضعیت سرور:</span>
+            <i class="bi bi-shield-check text-success"></i>
+            <span class="small text-secondary">وضعیت مدیریت:</span>
           </div>
-          <span id="authStatusBadge" class="badge bg-secondary" style="cursor: pointer;" onclick="openAdminAuthModal()" title="کلیک برای تنظیم یا ورود کلید">در حال بررسی...</span>
+          <span class="badge bg-success">دسترسی آزاد</span>
         </div>
-        <button class="btn btn-sm btn-outline-warning w-100 fw-bold py-2 mb-2" onclick="openAdminAuthModal()">
-          <i class="bi bi-key-fill me-1"></i> ورود / تغییر کلید مدیریت
-        </button>
-        <button class="btn btn-sm btn-outline-danger w-100 fw-bold py-2" onclick="logoutAdmin()">
-          <i class="bi bi-box-arrow-right me-1"></i> خروج امن از پنل
-        </button>
       </div>
     </aside>
 
@@ -1202,37 +1191,7 @@
         <!-- ============================================================== -->
         <!-- SECTION 9: تنظیمات و دسترسی (Settings) -->
         <!-- ============================================================== -->
-        <section id="section-settings" class="admin-section">
-          <div class="row g-4">
-            <div class="col-lg-6">
-              <div class="card p-4 shadow">
-                <h4 class="gold-text mb-3"><i class="bi bi-key-fill text-warning me-2"></i> احراز هویت مدیریت (ADMIN_KEY)</h4>
-                <p class="text-secondary small mb-3">
-                  برای امنیت پنل و جلوگیری از دسترسی غیرمجاز به اطلاعات کاربران، کلید امنیتی مدیریت در مرورگر شما ذخیره شده و با هر درخواست به سرور ارسال می‌شود.
-                </p>
-                <div class="mb-3">
-                  <label class="form-label text-secondary small fw-bold">کلید امنیتی فعلی:</label>
-                  <input type="password" id="adminKeyInput" class="form-control form-control-dark" placeholder="کلید امنیتی ادمین...">
-                </div>
-                <button class="btn btn-gold px-4" onclick="saveAdminKey()">
-                  <i class="bi bi-save me-1"></i> تایید و ذخیره کلید
-                </button>
-              </div>
-            </div>
 
-            <div class="col-lg-6">
-              <div class="card p-4 shadow">
-                <h4 class="text-info mb-3"><i class="bi bi-server me-2"></i> مشخصات فنی سرور و پایگاه داده</h4>
-                <ul class="list-unstyled text-secondary small d-flex flex-column gap-2 mb-0">
-                  <li><strong class="text-white">میزبانی سرور:</strong> Render Cloud Service (Node.js)</li>
-                  <li><strong class="text-white">پایگاه داده:</strong> Supabase Cloud PostgreSQL (Connection Pooler)</li>
-                  <li><strong class="text-white">اعلان‌های پوش:</strong> OneSignal REST API v1</li>
-                  <li><strong class="text-white">سیستم امنیت تبلیغات:</strong> توکن‌های یکبارمصرف و اعتبارسنجی تپسل پلاس</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </section>
 
       </main>
     </div>
@@ -1645,49 +1604,7 @@
       </div>
     </div>
   <!-- Modal: Admin Key Authentication Dialog -->
-  <div class="modal fade modal-dark" id="adminAuthModal" tabindex="-1" aria-labelledby="adminAuthModalLabel" aria-hidden="true" data-bs-backdrop="static">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content" style="background-color: #12253B; border: 2px solid #F59E0B; color: #fff; box-shadow: 0 10px 35px rgba(0,0,0,0.7); border-radius: 12px;">
-        <div class="modal-header border-secondary pb-3">
-          <h5 class="modal-title gold-text fw-bold" id="adminAuthModalLabel">
-            <i class="bi bi-shield-lock-fill text-warning me-2"></i> ورود به پنل مدیریت
-          </h5>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="بستن"></button>
-        </div>
-        <div class="modal-body p-4">
-          <div class="text-center mb-4">
-            <div class="display-6 text-warning mb-2"><i class="bi bi-key-fill"></i></div>
-            <h6 class="fw-bold text-white mb-2">کلید امنیتی مدیریت (ADMIN_KEY)</h6>
-            <p class="text-secondary small mb-0">
-              برای دسترسی به داشبورد، مدیریت کاربران، جوایز و تنظیمات، لطفاً کلید امنیتی مدیریت که در متغیرهای محیطی cPanel تنظیم کرده‌اید را وارد فرمایید:
-            </p>
-          </div>
-          
-          <div id="modalAuthAlert" class="alert alert-danger d-none py-2 px-3 small mb-3"></div>
 
-          <div class="mb-3">
-            <label class="form-label text-secondary small fw-bold">کلید امنیتی ادمین:</label>
-            <div class="input-group">
-              <input type="password" id="modalAdminKeyInput" class="form-control form-control-dark" placeholder="کلید امنیتی را وارد کنید..." style="direction: ltr; font-family: monospace;" autofocus>
-              <button class="btn btn-outline-secondary" type="button" onclick="toggleModalKeyVisibility()" title="نمایش / پنهان‌سازی کلید">
-                <i class="bi bi-eye" id="toggleKeyIcon"></i>
-              </button>
-            </div>
-            <div class="form-text text-secondary small mt-1">
-              این کلید به‌صورت محلی در حافظه مرورگر ذخیره خواهد شد.
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer border-secondary justify-content-between pt-3">
-          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">انصراف</button>
-          <button type="button" id="modalSubmitKeyBtn" class="btn btn-gold px-4 fw-bold" onclick="submitModalAdminKey()">
-            <span id="modalAuthSpinner" class="spinner-border spinner-border-sm d-none me-1" role="status"></span>
-            <i class="bi bi-box-arrow-in-right me-1"></i> ورود و تایید کلید
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
 
   <!-- Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -1816,136 +1733,8 @@
     });
 
     function getAdminKey() {
-      return localStorage.getItem('reqabat_admin_key') || "";
+      return "";
     }
-
-    function saveAdminKey() {
-      const input = document.getElementById('adminKeyInput').value.trim();
-      if (input) {
-        localStorage.setItem('reqabat_admin_key', input);
-        alert('کلید مدیریت با موفقیت در مرورگر شما ذخیره شد.');
-        loadDashboard();
-      }
-    }
-
-    function logoutAdmin() {
-      if (!confirm('آیا برای خروج امن از پنل اطمینان دارید؟')) return;
-      localStorage.removeItem('reqabat_admin_key');
-      window.location.reload();
-    }
-
-    // Initialize key field
-    const adminKeyField = document.getElementById('adminKeyInput');
-    if (adminKeyField) adminKeyField.value = getAdminKey();
-
-    function openAdminAuthModal() {
-      const modalEl = document.getElementById('adminAuthModal');
-      if (!modalEl) return;
-      const input = document.getElementById('modalAdminKeyInput');
-      if (input) {
-        input.value = getAdminKey();
-      }
-      const alertEl = document.getElementById('modalAuthAlert');
-      if (alertEl) alertEl.classList.add('d-none');
-      
-      if (!window.bootstrapAdminAuthModal) {
-        window.bootstrapAdminAuthModal = new bootstrap.Modal(modalEl);
-      }
-      window.bootstrapAdminAuthModal.show();
-      setTimeout(() => { if (input) input.focus(); }, 400);
-    }
-
-    function toggleModalKeyVisibility() {
-      const input = document.getElementById('modalAdminKeyInput');
-      const icon = document.getElementById('toggleKeyIcon');
-      if (!input || !icon) return;
-      if (input.type === 'password') {
-        input.type = 'text';
-        icon.className = 'bi bi-eye-slash';
-      } else {
-        input.type = 'password';
-        icon.className = 'bi bi-eye';
-      }
-    }
-
-    async function submitModalAdminKey() {
-      const input = document.getElementById('modalAdminKeyInput');
-      const key = (input ? input.value : '').trim();
-      const alertEl = document.getElementById('modalAuthAlert');
-      const spinner = document.getElementById('modalAuthSpinner');
-      const submitBtn = document.getElementById('modalSubmitKeyBtn');
-
-      if (!key) {
-        if (alertEl) {
-          alertEl.innerText = 'لطفاً کلید امنیتی مدیریت را وارد کنید.';
-          alertEl.className = 'alert alert-warning py-2 px-3 small mb-3';
-          alertEl.classList.remove('d-none');
-        }
-        return;
-      }
-
-      if (spinner) spinner.classList.remove('d-none');
-      if (submitBtn) submitBtn.setAttribute('disabled', 'true');
-      if (alertEl) alertEl.classList.add('d-none');
-
-      try {
-        const res = await fetch('/api/admin/auth/verify', {
-          headers: { 'x-admin-key': key }
-        });
-
-        if (res.status === 401) {
-          if (alertEl) {
-            alertEl.innerText = '❌ کلید وارد شده نامعتبر است. لطفاً مقدار ADMIN_KEY در متغیرهای محیطی cPanel هاست را بررسی نمایید.';
-            alertEl.className = 'alert alert-danger py-2 px-3 small mb-3';
-            alertEl.classList.remove('d-none');
-          }
-          return;
-        }
-
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.error || 'خطا در اعتبارسنجی کلید (کد ' + res.status + ')');
-        }
-
-        // Key verified! Save key to localStorage
-        localStorage.setItem('reqabat_admin_key', key);
-        const kField = document.getElementById('adminKeyInput');
-        if (kField) kField.value = key;
-
-        if (alertEl) {
-          alertEl.innerText = '✓ کلید با موفقیت تایید شد. در حال بارگذاری اطلاعات پنل...';
-          alertEl.className = 'alert alert-success py-2 px-3 small mb-3';
-          alertEl.classList.remove('d-none');
-        }
-
-        setTimeout(() => {
-          if (window.bootstrapAdminAuthModal) {
-            window.bootstrapAdminAuthModal.hide();
-          }
-          loadDashboard();
-        }, 500);
-
-      } catch (err) {
-        if (alertEl) {
-          alertEl.innerText = 'خطای ارتباط: ' + err.message;
-          alertEl.className = 'alert alert-danger py-2 px-3 small mb-3';
-          alertEl.classList.remove('d-none');
-        }
-      } finally {
-        if (spinner) spinner.classList.add('d-none');
-        if (submitBtn) submitBtn.removeAttribute('disabled');
-      }
-    }
-
-    // Support Enter key in modal key input
-    document.addEventListener('DOMContentLoaded', () => {
-      const modalInput = document.getElementById('modalAdminKeyInput');
-      if (modalInput) {
-        modalInput.addEventListener('keyup', (e) => {
-          if (e.key === 'Enter') submitModalAdminKey();
-        });
-      }
-    });
 
     function showAlert(msg) {
       const el = document.getElementById('alertBox');
@@ -2127,7 +1916,7 @@
       const endsAtRaw = document.getElementById('annEndsAtInput').value;
       const endsAt = endsAtRaw ? new Date(endsAtRaw).getTime() : null;
       const isActive = document.getElementById('annIsActiveSwitch').checked;
-      const key = getAdminKey();
+      
 
       const btn = document.getElementById('saveAnnBtn');
       const spinner = document.getElementById('saveAnnSpinner');
@@ -2139,7 +1928,7 @@
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-admin-key': key
+            
           },
           body: JSON.stringify({ id, title, content, type, isActive, endsAt })
         });
@@ -2165,11 +1954,11 @@
     }
 
     async function toggleAnnouncement(annId) {
-      const key = getAdminKey();
+      
       try {
         const res = await fetch(`/api/admin/announcements/${annId}/toggle`, {
           method: 'PATCH',
-          headers: { 'x-admin-key': key }
+          headers: { }
         });
         const data = await res.json();
         if (data.success) {
@@ -2188,50 +1977,18 @@
       if (spinner) spinner.classList.remove('d-none');
       hideAlert();
 
-      const key = getAdminKey();
+      
 
       try {
         const res = await fetch('/api/admin/overview', {
-          headers: { 'x-admin-key': key }
+          headers: { }
         });
-
-        if (res.status === 401) {
-          if (authBadge) {
-            authBadge.className = 'badge bg-danger';
-            authBadge.innerText = 'کلید نامعتبر';
-            authBadge.style.cursor = 'pointer';
-            authBadge.onclick = openAdminAuthModal;
-          }
-          showAlertHtml(`
-            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 py-1">
-              <div class="d-flex align-items-center gap-2">
-                <i class="bi bi-shield-lock-fill fs-5 text-warning"></i>
-                <span><strong>خطای دسترسی مدیریت:</strong> کلید امنیتی (ADMIN_KEY) وارد نشده یا نامعتبر است.</span>
-              </div>
-              <button class="btn btn-warning btn-sm fw-bold px-3 py-1 shadow-sm" onclick="openAdminAuthModal()">
-                <i class="bi bi-key-fill me-1"></i> ورود / وارد کردن کلید مدیریت
-              </button>
-            </div>
-          `);
-          setElHtml('usersTbody', '<tr><td colspan="6" class="text-center text-danger py-4">دسترسی نیازمند کلید معتبر مدیریت است.<br><button class="btn btn-outline-warning btn-sm mt-2" onclick="openAdminAuthModal()"><i class="bi bi-key me-1"></i> وارد کردن کلید مدیریت</button></td></tr>');
-          setElHtml('sessionsTbody', '<tr><td colspan="6" class="text-center text-danger py-4">دسترسی مسدود است.</td></tr>');
-          
-          if (!key && !window.adminAuthModalOpenedOnce) {
-            window.adminAuthModalOpenedOnce = true;
-            openAdminAuthModal();
-          }
-          return;
-        }
 
         if (!res.ok) {
           throw new Error('خطا در ارتباط با سرور (کد ' + res.status + ')');
         }
 
         const data = await res.json();
-        if (authBadge) {
-          authBadge.className = 'badge bg-success';
-          authBadge.innerText = 'متصل و معتبر';
-        }
 
         // Stats
         setElText('totalUsers', (data.totalUsers || 0) + ' نفر');
@@ -2508,7 +2265,7 @@
       const endDate = endDateRaw ? new Date(endDateRaw).toISOString() : null;
       const annContent = document.getElementById('newCompAnnContentInput').value.trim();
 
-      const key = getAdminKey();
+      
       const btn = document.getElementById('confirmStartCompBtn');
       const spinner = document.getElementById('startCompSpinner');
 
@@ -2520,7 +2277,7 @@
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-admin-key': key
+            
           },
           body: JSON.stringify({
             confirmationPhrase: phrase,
@@ -2607,13 +2364,13 @@
 
     async function resetUserCycle(userId) {
       if (!confirm('آیا از بازنشانی چرخه ۲۴ ساعته کاربر ' + userId + ' اطمینان دارید؟')) return;
-      const key = getAdminKey();
+      
       try {
         const res = await fetch('/api/admin/cycle/reset', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-admin-key': key
+            
           },
           body: JSON.stringify({ userId })
         });
@@ -2660,10 +2417,10 @@
     };
 
     async function loadAdminSupportTickets() {
-      const key = getAdminKey();
+      
       try {
         const res = await fetch('/api/admin/support/tickets', {
-          headers: { 'x-admin-key': key }
+          headers: { }
         });
         if (!res.ok) return;
         const data = await res.json();
@@ -2778,7 +2535,7 @@
 
     async function openSupportTicketModal(ticketId) {
       currentOpenTicket = null;
-      const key = getAdminKey();
+      
 
       setElText('ticketConvTitle', 'در حال بارگذاری...');
       setElText('ticketConvCode', '...');
@@ -2793,7 +2550,7 @@
 
       try {
         const res = await fetch(`/api/admin/support/tickets/${ticketId}`, {
-          headers: { 'x-admin-key': key }
+          headers: { }
         });
         if (!res.ok) throw new Error('خطا در دریافت تیکت');
         const data = await res.json();
@@ -2886,13 +2643,13 @@
       if (btn) btn.setAttribute('disabled', 'true');
       if (spinner) spinner.classList.remove('d-none');
 
-      const key = getAdminKey();
+      
       try {
         const res = await fetch(`/api/admin/support/tickets/${currentOpenTicket.id}/messages`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-admin-key': key
+            
           },
           body: JSON.stringify({ message: text, newStatus })
         });
@@ -2918,14 +2675,14 @@
       const select = document.getElementById('ticketConvStatusSelect');
       const status = select ? select.value : null;
       if (!status) return;
-      const key = getAdminKey();
+      
 
       try {
         const res = await fetch(`/api/admin/support/tickets/${currentOpenTicket.id}/status`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
-            'x-admin-key': key
+            
           },
           body: JSON.stringify({ status })
         });
@@ -2948,11 +2705,11 @@
     // OneSignal & Push Notification
     // ====================================================================
     async function checkOneSignalStatus() {
-      const key = getAdminKey();
+      
       const badge = document.getElementById('onesignalBadge');
       try {
         const res = await fetch('/api/admin/onesignal/status', {
-          headers: { 'x-admin-key': key }
+          headers: { }
         });
         if (!res.ok) return;
         const data = await res.json();
@@ -2988,13 +2745,13 @@
       if (btn) btn.setAttribute('disabled', 'true');
       if (spinner) spinner.classList.remove('d-none');
 
-      const key = getAdminKey();
+      
       try {
         const res = await fetch('/api/admin/push-notification', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-admin-key': key
+            
           },
           body: JSON.stringify({ title, message, audience })
         });
@@ -3032,11 +2789,11 @@
 
     async function loadStoreProducts() {
       const tbody = document.getElementById('storeProductsTbody');
-      const key = getAdminKey();
+      
 
       try {
         const res = await fetch('/api/admin/store/products', {
-          headers: { 'x-admin-key': key }
+          headers: { }
         });
         if (!res.ok) throw new Error('خطا در دریافت بسته‌ها (کد ' + res.status + ')');
         const data = await res.json();
@@ -3105,11 +2862,11 @@
 
     async function loadStorePurchases() {
       const tbody = document.getElementById('storePurchasesTbody');
-      const key = getAdminKey();
+      
 
       try {
         const res = await fetch('/api/admin/store/purchases', {
-          headers: { 'x-admin-key': key }
+          headers: { }
         });
         if (!res.ok) throw new Error('خطا در دریافت سوابق تراکنش‌ها');
         const data = await res.json();
@@ -3203,13 +2960,13 @@
       const is_active = document.getElementById('storeProdIsActive').checked;
       const is_ready_in_myket = document.getElementById('storeProdIsReadyInMyket').checked;
 
-      const key = getAdminKey();
+      
       try {
         const res = await fetch('/api/admin/store/products', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-admin-key': key
+            
           },
           body: JSON.stringify({
             id: id || undefined,
@@ -3240,12 +2997,12 @@
 
     async function deleteStoreProduct(id) {
       if (!confirm('آیا از حذف این بسته از فروشگاه اطمینان دارید؟')) return;
-      const key = getAdminKey();
+      
 
       try {
         const res = await fetch(`/api/admin/store/products/${id}`, {
           method: 'DELETE',
-          headers: { 'x-admin-key': key }
+          headers: { }
         });
         const data = await res.json();
         if (data.success) {
@@ -3269,9 +3026,9 @@
 
     async function loadRewardsData() {
       const tbody = document.getElementById('rewardsTbody');
-      const key = getAdminKey();
+      
       try {
-        const res = await fetch('/api/rewards/admin/rewards', { headers: { 'x-admin-key': key } });
+        const res = await fetch('/api/rewards/admin/rewards', { headers: { } });
         if (!res.ok) throw new Error('خطا در دریافت لیست جوایز');
         const data = await res.json();
         cachedRewards = data.rewards || [];
@@ -3366,14 +3123,14 @@
       const is_featured = document.getElementById('rewModalIsFeatured').checked;
       const is_active = document.getElementById('rewModalIsActive').checked;
 
-      const key = getAdminKey();
+      
       const url = id ? `/api/rewards/admin/rewards/${id}` : '/api/rewards/admin/rewards';
       const method = id ? 'PUT' : 'POST';
 
       try {
         const res = await fetch(url, {
           method,
-          headers: { 'Content-Type': 'application/json', 'x-admin-key': key },
+          headers: { 'Content-Type': 'application/json',  },
           body: JSON.stringify({ title, category_id, cost_points, stock_quantity, image_url, description, is_featured, is_active })
         });
         const data = await res.json();
@@ -3390,9 +3147,9 @@
 
     async function deleteReward(id) {
       if (!confirm('آیا از حذف این جایزه اطمینان دارید؟')) return;
-      const key = getAdminKey();
+      
       try {
-        const res = await fetch(`/api/rewards/admin/rewards/${id}`, { method: 'DELETE', headers: { 'x-admin-key': key } });
+        const res = await fetch(`/api/rewards/admin/rewards/${id}`, { method: 'DELETE', headers: { } });
         const data = await res.json();
         if (data.success) {
           loadRewardsData();
@@ -3467,7 +3224,7 @@
       const formData = new FormData();
       formData.append('banner', file);
 
-      const key = getAdminKey();
+      
       try {
         if (progressBar) progressBar.style.width = '60%';
         if (percentText) percentText.innerText = '۶۰٪';
@@ -3475,7 +3232,7 @@
 
         const res = await fetch('/api/rewards/admin/upload-banner', {
           method: 'POST',
-          headers: { 'x-admin-key': key },
+          headers: { },
           body: formData
         });
         const data = await res.json();
@@ -3500,7 +3257,7 @@
 
             await fetch('/api/rewards/admin/appearance', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'x-admin-key': key },
+              headers: { 'Content-Type': 'application/json',  },
               body: JSON.stringify({
                 hero_title,
                 primary_color,
@@ -3552,11 +3309,11 @@
       const terms_text = document.getElementById('rewAppTermsText')?.value.trim() || '';
       const is_active = document.getElementById('rewAppIsActive')?.checked ?? true;
 
-      const key = getAdminKey();
+      
       try {
         const res = await fetch('/api/rewards/admin/appearance', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'x-admin-key': key },
+          headers: { 'Content-Type': 'application/json',  },
           body: JSON.stringify({
             hero_title,
             primary_color,
@@ -3580,9 +3337,9 @@
 
     async function loadRewardClaims() {
       const tbody = document.getElementById('rewardClaimsTbody');
-      const key = getAdminKey();
+      
       try {
-        const res = await fetch('/api/rewards/admin/claims', { headers: { 'x-admin-key': key } });
+        const res = await fetch('/api/rewards/admin/claims', { headers: { } });
         if (!res.ok) throw new Error('خطا در دریافت لیست درخواست‌ها');
         const data = await res.json();
         cachedClaims = data.claims || [];
@@ -3655,11 +3412,11 @@
       const tracking_number = document.getElementById('claimModalTracking').value.trim();
       const admin_notes = document.getElementById('claimModalNotes').value.trim();
 
-      const key = getAdminKey();
+      
       try {
         const res = await fetch(`/api/rewards/admin/claims/${id}`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', 'x-admin-key': key },
+          headers: { 'Content-Type': 'application/json',  },
           body: JSON.stringify({ status, tracking_number, admin_notes })
         });
         const data = await res.json();
@@ -3678,10 +3435,10 @@
     // LOGIN NOTIFICATION MANAGEMENT
     // ====================================================================
     async function loadLoginNotification() {
-      const key = getAdminKey();
+      
       try {
         const res = await fetch('/api/admin/login-notification', {
-          headers: { 'x-admin-key': key }
+          headers: { }
         });
         if (!res.ok) return;
         const data = await res.json();
@@ -3754,7 +3511,7 @@
 
     async function saveLoginNotification(e) {
       if (e) e.preventDefault();
-      const key = getAdminKey();
+      
       
       const payload = {
         is_visible: document.getElementById('ln_isVisible').checked,
@@ -3771,7 +3528,7 @@
       try {
         const res = await fetch('/api/admin/login-notification', {
           method: 'POST',
-          headers: { 'x-admin-key': key, 'Content-Type': 'application/json' },
+          headers: {  'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
         const data = await res.json();

@@ -752,13 +752,15 @@ async function detectSchemaColumns() {
     const res = await dbQuery(`
       SELECT table_name, column_name 
       FROM information_schema.columns 
-      WHERE table_schema = 'public' 
+      WHERE table_schema = DATABASE()
         AND table_name IN ('users', 'user_scores', 'leaderboard')
     `);
     const colMap = {};
     for (const r of res.rows) {
-      if (!colMap[r.table_name]) colMap[r.table_name] = new Set();
-      colMap[r.table_name].add(r.column_name);
+      const tableName = (r.table_name || r.TABLE_NAME).toLowerCase();
+      const colName = (r.column_name || r.COLUMN_NAME).toLowerCase();
+      if (!colMap[tableName]) colMap[tableName] = new Set();
+      colMap[tableName].add(colName);
     }
     if (colMap['users']) {
       schemaInfo.userHasTotalScore = colMap['users'].has('total_score');
@@ -767,9 +769,9 @@ async function detectSchemaColumns() {
       schemaInfo.userScoresUserIdCol = colMap['user_scores'].has('user_id') ? 'user_id' : 'id';
       schemaInfo.userScoresScoreCol = colMap['user_scores'].has('total_score') ? 'total_score' : 'score';
     }
-    console.log('[PostgreSQL] Schema column mapping detected:', schemaInfo);
+    console.log('[MySQL] Schema column mapping detected:', schemaInfo);
   } catch (err) {
-    console.warn('[PostgreSQL Column Detection Warning]', err.message);
+    console.warn('[MySQL Column Detection Warning]', err.message);
   }
 }
 
@@ -869,9 +871,9 @@ function ensureDatabaseReady(req, res, next) {
   if (!pool || !isDbConnected) {
     return res.status(503).json({
       success: false,
-      error: "اتصال به پایگاه داده ابری Supabase برقرار نیست. لطفاً متغیر محیطی DATABASE_URL را در پنل هاست cPanel تنظیم نمایید.",
+      error: "اتصال به پایگاه داده MySQL برقرار نیست. لطفاً تنظیمات دیتابیس را در بخش Environment Variables پنل هاست cPanel بررسی نمایید.",
       dbStatus: "DISCONNECTED",
-      tip: "در هاست اشتراکی، حتماً از رشته اتصال Connection Pooler در Supabase (پورت 6543 با دامنه pooler.supabase.com) استفاده کنید تا با محدودیت IPv6 مواجه نشوید."
+      tip: "اطمینان حاصل کنید که متغیرهای DB_USER و DB_PASSWORD به درستی تنظیم شده باشند."
     });
   }
   next();
@@ -897,7 +899,7 @@ app.get(['/health', '/api/health'], async (req, res) => {
     server: 'Reqabat Backend (cPanel)',
     database: {
       status: dbStatus,
-      configured: Boolean(DATABASE_URL),
+      configured: Boolean(process.env.DB_USER),
       target: DATABASE_URL ? getSanitizedDbUrl(DATABASE_URL) : 'NOT_SET'
     }
   });
