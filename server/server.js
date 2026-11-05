@@ -16,12 +16,12 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Standalone Admin Users Page (Pure users table)
-app.get(['/admin/users', '/admin/users/'], requireAdminAuth, (req, res) => {
+app.get(['/admin/users', '/admin/users/'], (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'users.html'));
 });
 
 // Admin Dashboard Alias
-app.get(['/admin', '/admin/dashboard'], requireAdminAuth, (req, res) => {
+app.get(['/admin', '/admin/dashboard'], (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
