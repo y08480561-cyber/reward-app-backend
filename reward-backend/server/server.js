@@ -1799,10 +1799,10 @@ app.get('/api/store/user-entitlements', ensureDatabaseReady, async (req, res) =>
 });
 
 // 3. Official Store Purchase Verification (Idempotent, Replay-Protected)
-app.post('/api/store/verify-purchase', ensureDatabaseReady, async (req, res) => {
+app.post('/api/store/verify-purchase', requireUserAuth, ensureDatabaseReady, async (req, res) => {
   const client = await pool.connect();
   try {
-    const userId = req.headers['x-user-id'] || req.body.userId;
+    const userId = req.user ? req.user.id : (req.headers['x-user-id'] || req.body.userId);
     const { productId, purchaseToken, orderId, packageName } = req.body;
 
     if (!userId || !productId) {

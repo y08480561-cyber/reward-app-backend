@@ -211,6 +211,14 @@ class MyketBillingManager(private val context: Context) {
             return null
         }
         val purchaseDataString = data.getStringExtra("INAPP_PURCHASE_DATA") ?: return null
+        val signature = data.getStringExtra("INAPP_DATA_SIGNATURE") ?: ""
+
+        // RSA Signature Security Verification against Myket Public Key
+        if (signature.isNotBlank() && !verifyPurchaseSignature(purchaseDataString, signature)) {
+            Log.e(TAG, "Myket purchase RSA signature verification failed!")
+            return null
+        }
+
         return try {
             val json = JSONObject(purchaseDataString)
             PurchaseData(
@@ -228,6 +236,26 @@ class MyketBillingManager(private val context: Context) {
     }
 
     /**
+     * Verifies RSA SHA1withRSA signature against Myket Base64 Public Key
+     */
+    fun verifyPurchaseSignature(signedData: String, signature: String): Boolean {
+        if (signedData.isBlank() || signature.isBlank()) return false
+        return try {
+            val keyBytes = android.util.Base64.decode(MYKET_PUBLIC_KEY, android.util.Base64.DEFAULT)
+            val keySpec = java.security.spec.X509EncodedKeySpec(keyBytes)
+            val keyFactory = java.security.KeyFactory.getInstance("RSA")
+            val publicKey = keyFactory.generatePublic(keySpec)
+            val sig = java.security.Signature.getInstance("SHA1withRSA")
+            sig.initVerify(publicKey)
+            sig.update(signedData.toByteArray())
+            sig.verify(android.util.Base64.decode(signature, android.util.Base64.DEFAULT))
+        } catch (e: Exception) {
+            Log.e(TAG, "RSA Signature verification exception: ${e.message}")
+            false
+        }
+    }
+
+    /**
      * Queries unconsumed purchases to support purchase restoration.
      */
     suspend fun queryPurchases(): List<PurchaseData> = withContext(Dispatchers.IO) {
@@ -240,8 +268,15 @@ class MyketBillingManager(private val context: Context) {
                 val responseCode = ownedItems.getInt("RESPONSE_CODE", -1)
                 if (responseCode == 0) {
                     val purchaseDataList = ownedItems.getStringArrayList("INAPP_PURCHASE_DATA_LIST")
+                    val signatureList = ownedItems.getStringArrayList("INAPP_DATA_SIGNATURE_LIST")
                     if (purchaseDataList != null) {
-                        for (raw in purchaseDataList) {
+                        for (i in purchaseDataList.indices) {
+                            val raw = purchaseDataList[i]
+                            val sig = signatureList?.getOrNull(i) ?: ""
+                            if (sig.isNotBlank() && !verifyPurchaseSignature(raw, sig)) {
+                                Log.w(TAG, "Query purchase signature mismatch, skipping item: $raw")
+                                continue
+                            }
                             try {
                                 val json = JSONObject(raw)
                                 results.add(
