@@ -1636,7 +1636,7 @@ app.post('/api/purchases/verify', ensureDatabaseReady, async (req, res) => {
     let multiplier = 1;
     let amount = 0;
 
-    if (productId === "pkg_upgrade_silver" || productId === "silver_panel") {
+    if (productId === "pkg_upgrade_silver" || productId === "silver_panel" || productId === "reqabat_upgrade_silver") {
       if (currentTierInfo.tier === 'GOLD') {
         newTier = 'GOLD';
         multiplier = 6;
@@ -1645,7 +1645,7 @@ app.post('/api/purchases/verify', ensureDatabaseReady, async (req, res) => {
         multiplier = 3;
       }
       amount = 70000;
-    } else if (productId === "pkg_upgrade_gold" || productId === "gold_panel" || productId === "gold_upgrade") {
+    } else if (productId === "pkg_upgrade_gold" || productId === "gold_panel" || productId === "gold_upgrade" || productId === "reqabat_upgrade_gold") {
       newTier = 'GOLD';
       multiplier = 6;
       amount = 120000;
@@ -1827,7 +1827,7 @@ app.post('/api/store/verify-purchase', ensureDatabaseReady, async (req, res) => 
     const prodRes = await client.query(
       `SELECT id, title, product_type, units_granted, price_toman, myket_sku, is_active, is_ready_in_myket 
        FROM public.store_products 
-       WHERE id = $1 LIMIT 1`,
+       WHERE id = $1 OR myket_sku = $1 LIMIT 1`,
       [productId]
     );
 

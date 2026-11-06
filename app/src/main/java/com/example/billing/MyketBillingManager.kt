@@ -43,6 +43,7 @@ class MyketBillingManager(private val context: Context) {
     companion object {
         private const val TAG = "MyketBillingManager"
         const val MYKET_PUBLIC_KEY = "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCIUMmkIxGVpyKupQajOZqGfhYSkoGA0I1rhDiTLkKCiObtCnqXHJYdTJTRYKlSmA/KIIa4rC08CoZILDRjKKVt+Z3ZOt2pONjTr6jt+FtObbg7bNpTSWbcUE6Np5rz/nV/wHfQvn3wv/AJ9UFW95qAaKpwf0CZLLxG8a33BaB4dwIDAQAB"
+        const val REQUEST_CODE_MYKET_PURCHASE = 1001
     }
 
     private val MYKET_PACKAGE = "ir.mservices.market"

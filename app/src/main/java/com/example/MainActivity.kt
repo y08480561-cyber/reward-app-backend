@@ -146,7 +146,7 @@ class MainActivity : ComponentActivity() {
                                             errorMessage = uiState.errorMessage,
                                             infoMessage = uiState.infoMessage,
                                             onRefresh = { viewModel.loadMembershipData() },
-                                            onPurchase = { productId -> viewModel.purchasePanel(productId) },
+                                            onPurchase = { productId -> viewModel.startMyketPurchaseFlow(this@MainActivity, productId) },
                                             onDismissMessage = { viewModel.clearMessages() }
                                         )
                                     }
@@ -156,7 +156,7 @@ class MainActivity : ComponentActivity() {
                                             entitlements = uiState.userEntitlements,
                                             isLoading = uiState.isStoreLoading,
                                             errorMessage = uiState.storeErrorMessage,
-                                            onPurchase = { productId -> viewModel.purchaseStoreProduct(productId) },
+                                            onPurchase = { productId -> viewModel.startMyketPurchaseFlow(this@MainActivity, productId) },
                                             onRefresh = { viewModel.loadStoreData() },
                                             onDismissError = { viewModel.clearStoreMessages() }
                                         )
@@ -252,6 +252,32 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == com.example.billing.MyketBillingManager.REQUEST_CODE_MYKET_PURCHASE) {
+            val viewModel: MainViewModel = androidx.lifecycle.ViewModelProvider(this)[MainViewModel::class.java]
+            val purchaseData = viewModel.myketBillingManager.parsePurchaseResult(resultCode, data)
+            if (purchaseData != null) {
+                viewModel.processMyketPurchaseResult(purchaseData)
+            } else if (resultCode == RESULT_CANCELED) {
+                android.widget.Toast.makeText(this, "عملیات پرداخت لغو گردید.", android.widget.Toast.LENGTH_SHORT).show()
+            } else {
+                android.widget.Toast.makeText(this, "خطا در دریافت اطلاعات پرداخت از مایکت.", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        try {
+            val viewModel: MainViewModel = androidx.lifecycle.ViewModelProvider(this)[MainViewModel::class.java]
+            viewModel.myketBillingManager.endConnection()
+        } catch (e: Exception) {
+            // Ignore if viewmodel or context is already cleared
         }
     }
 }

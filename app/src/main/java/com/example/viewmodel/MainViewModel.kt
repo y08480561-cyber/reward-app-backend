@@ -31,6 +31,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val database = AppDatabase.getInstance(application)
     val backendRepository = BackendRepository(application, database, prefs)
     val tapsellAdsManager = TapsellAdsManager(application, prefs)
+    val myketBillingManager = com.example.billing.MyketBillingManager(application)
 
     private val _uiState = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
@@ -970,44 +971,147 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun purchaseStoreProduct(productId: String) {
+    fun startMyketPurchaseFlow(activity: Activity?, productId: String) {
+        val user = _uiState.value.currentUser ?: return
+        if (activity == null) {
+            _uiState.update { 
+                it.copy(
+                    storeErrorMessage = "خطا در دسترسی به محیط برنامه.",
+                    errorMessage = "خطا در دسترسی به محیط برنامه."
+                ) 
+            }
+            return
+        }
+
+        val product = _uiState.value.storeProducts.find { it.id == productId || it.myketSku == productId }
+        val targetSku = product?.myketSku?.ifBlank { null } ?: when (productId) {
+            "pkg_squares_50" -> "reqabat_unlock_50"
+            "pkg_squares_100" -> "reqabat_unlock_100"
+            "pkg_upgrade_silver", "silver_panel" -> "reqabat_upgrade_silver"
+            "pkg_upgrade_gold", "gold_panel", "gold_upgrade" -> "reqabat_upgrade_gold"
+            else -> productId
+        }
+
+        if (!myketBillingManager.isMyketInstalled()) {
+            val msg = "برنامه مایکت روی دستگاه شما نصب نیست. لطفاً برای انجام خرید درون‌برنامه‌ای، ابتدا اپلیکیشن مایکت را نصب فرمایید."
+            _uiState.update { 
+                it.copy(
+                    storeErrorMessage = msg,
+                    errorMessage = msg,
+                    isStoreLoading = false,
+                    isMembershipLoading = false
+                ) 
+            }
+            return
+        }
+
+        viewModelScope.launch {
+            _uiState.update { 
+                it.copy(
+                    isStoreLoading = true, 
+                    isMembershipLoading = true, 
+                    storeErrorMessage = null, 
+                    errorMessage = null 
+                ) 
+            }
+
+            val result = myketBillingManager.launchPurchaseFlow(
+                activity = activity,
+                sku = targetSku,
+                isReadyInMyket = product?.isReadyInMyket ?: true,
+                requestCode = com.example.billing.MyketBillingManager.REQUEST_CODE_MYKET_PURCHASE
+            )
+
+            _uiState.update { it.copy(isStoreLoading = false, isMembershipLoading = false) }
+
+            when (result) {
+                is com.example.billing.BillingResult.Success -> {
+                    // Myket payment activity opened successfully! Wait for Activity result in MainActivity
+                }
+                is com.example.billing.BillingResult.UnderPreparation -> {
+                    _uiState.update { it.copy(storeErrorMessage = result.message, errorMessage = result.message) }
+                }
+                is com.example.billing.BillingResult.MyketNotInstalled -> {
+                    _uiState.update { it.copy(storeErrorMessage = result.message, errorMessage = result.message) }
+                }
+                is com.example.billing.BillingResult.Error -> {
+                    _uiState.update { it.copy(storeErrorMessage = result.message, errorMessage = result.message) }
+                }
+            }
+        }
+    }
+
+    fun purchasePanel(activity: Activity?, productId: String) {
+        startMyketPurchaseFlow(activity, productId)
+    }
+
+    fun purchaseStoreProduct(activity: Activity?, productId: String) {
+        startMyketPurchaseFlow(activity, productId)
+    }
+
+    fun processMyketPurchaseResult(purchaseData: com.example.billing.PurchaseData) {
         val user = _uiState.value.currentUser ?: return
         viewModelScope.launch {
-            _uiState.update { it.copy(isStoreLoading = true, storeErrorMessage = null) }
-            // Secure server verification payload
-            val purchaseToken = "STORE_PUR_" + System.currentTimeMillis() + "_" + java.util.UUID.randomUUID().toString().take(6)
-            when (val result = backendRepository.verifyStorePurchase(user.id, productId, purchaseToken)) {
+            _uiState.update { it.copy(isStoreLoading = true, isMembershipLoading = true, storeErrorMessage = null, errorMessage = null) }
+
+            val product = _uiState.value.storeProducts.find { 
+                it.id == purchaseData.productId || it.myketSku == purchaseData.productId 
+            }
+            val canonicalId = product?.id ?: when (purchaseData.productId) {
+                "reqabat_unlock_50" -> "pkg_squares_50"
+                "reqabat_unlock_100" -> "pkg_squares_100"
+                "reqabat_upgrade_silver" -> "pkg_upgrade_silver"
+                "reqabat_upgrade_gold" -> "pkg_upgrade_gold"
+                else -> purchaseData.productId
+            }
+
+            when (val result = backendRepository.verifyStorePurchase(
+                userId = user.id, 
+                productId = canonicalId, 
+                purchaseToken = purchaseData.purchaseToken, 
+                orderId = purchaseData.orderId,
+                packageName = purchaseData.packageName
+            )) {
                 is Result.Success -> {
-                    val product = _uiState.value.storeProducts.find { it.id == productId }
-                    val title = product?.title ?: "محصول فروشگاه"
+                    // Consume purchase token if square unlock item so user can buy again next time
+                    if (canonicalId.contains("50") || canonicalId.contains("100") || canonicalId.contains("squares")) {
+                        myketBillingManager.consumePurchase(purchaseData.purchaseToken)
+                    }
+
+                    val title = product?.title ?: "محصول فروشگاه مایکت"
                     val benefitText = when {
-                        product?.productType == "SQUARE_UNLOCK" -> "+${product.unitsGranted.toString().toPersianDigits()} اعتبار بازگشایی آنی"
-                        product?.productType == "ACCOUNT_UPGRADE" && (product.id.contains("gold") || product.unitsGranted >= 6) -> "ارتقای سطح به طلایی (۶X)"
-                        product?.productType == "ACCOUNT_UPGRADE" -> "ارتقای سطح به نقره‌ای (۳X)"
+                        product?.productType == "SQUARE_UNLOCK" || canonicalId.contains("squares") -> 
+                            "+${(product?.unitsGranted ?: if (canonicalId.contains("50")) 50 else 100).toString().toPersianDigits()} اعتبار بازگشایی آنی"
+                        canonicalId.contains("gold") -> "ارتقای سطح به طلایی (۶X)"
+                        canonicalId.contains("silver") -> "ارتقای سطح به نقره‌ای (۳X)"
                         else -> "اعتبار و امتیاز عینا به حساب کاربر اضافه شد"
                     }
                     val price = product?.priceToman ?: 0L
-                    val orderId = "MYKET_ORD_" + System.currentTimeMillis().toString().takeLast(8)
 
                     _uiState.update {
                         it.copy(
                             isStoreLoading = false,
+                            isMembershipLoading = false,
+                            infoMessage = "خرید درون‌برنامه‌ای مایکت با موفقیت تایید و اعمال شد.",
                             purchaseSuccessModal = com.example.model.PurchaseSuccessModalData(
                                 productTitle = title,
                                 unitsOrMultiplierText = benefitText,
                                 priceToman = price,
-                                orderId = orderId
+                                orderId = purchaseData.orderId
                             )
                         )
                     }
                     loadStoreData()
+                    loadMembershipData()
                     refreshData()
                 }
                 is Result.Error -> {
                     _uiState.update {
                         it.copy(
                             isStoreLoading = false,
-                            storeErrorMessage = result.message
+                            isMembershipLoading = false,
+                            storeErrorMessage = result.message,
+                            errorMessage = result.message
                         )
                     }
                 }
