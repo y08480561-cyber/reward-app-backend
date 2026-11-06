@@ -96,6 +96,26 @@ class TapsellAdsManager(
             return
         }
 
+        if (prefs.useTestAds) {
+            Log.i(TAG, "useTestAds mode active: Simulating 5-second test video ad for square $squareNumber")
+            activeSquare = squareNumber
+            scope.launch(Dispatchers.Main) {
+                currentResponseId = "SIMULATED_TEST_RESP_" + System.currentTimeMillis()
+                _adState.value = AdPlaybackState.Playing(
+                    squareNumber = squareNumber,
+                    totalDurationSeconds = 5,
+                    adTitle = "تبلیغ آزمایشی (حالت تستی ۵ ثانیه‌ای)",
+                    responseId = currentResponseId
+                )
+                onReadyToShow()
+                kotlinx.coroutines.delay(5000)
+                notifyAdCompleted(squareNumber, 15) { nonce ->
+                    onRewarded(nonce)
+                }
+            }
+            return
+        }
+
         if (!isSdkInitialized) {
             initializeSdk()
         }
@@ -164,11 +184,17 @@ class TapsellAdsManager(
                 }
 
                 override fun error(errorMessage: String?) {
-                    val msg = errorMessage ?: "خطا در دریافت تبلیغ تپسل"
-                    Log.e(TAG, "Tapsell request ad error: $msg")
+                    val rawMsg = errorMessage ?: "تبلیغی برای نمایش یافت نشد (No Fill)"
+                    Log.e(TAG, "Tapsell request ad error: $rawMsg")
                     scope.launch(Dispatchers.Main) {
-                        _adState.value = AdPlaybackState.Error(squareNumber, msg)
-                        onError("خطای تپسل: $msg. لطفاً اتصال اینترنت خود را بررسی کرده و چند لحظه بعد تلاش کنید.")
+                        _adState.value = AdPlaybackState.Error(squareNumber, rawMsg)
+                        val userFriendlyMessage = when {
+                            rawMsg.contains("zone", ignoreCase = true) -> "شناسه جایگاه تبلیغاتی تپسل نامعتبر است یا در پنل تپسل فعال نیست."
+                            rawMsg.contains("network", ignoreCase = true) || rawMsg.contains("internet", ignoreCase = true) -> "خطای اتصال به شبکه تپسل. لطفاً در صورت روشن بودن فیلترشکن (VPN) آن را خاموش کنید."
+                            rawMsg.contains("no ad", ignoreCase = true) || rawMsg.contains("fill", ignoreCase = true) -> "در این لحظه تبلیغی برای این دستگاه آماده نیست (No Fill). لطفاً لحظاتی دیگر تلاش فرمایید."
+                            else -> "خطای تپسل: $rawMsg. لطفاً در صورت فعال بودن فیلترشکن، آن را خاموش نموده و مجدداً تلاش کنید."
+                        }
+                        onError(userFriendlyMessage)
                     }
                 }
             }

@@ -26,9 +26,9 @@ class PreferencesManager(context: Context) {
         const val KEY_FEEDBACK_SHOWN = "feedback_dialog_shown"
         const val KEY_FEEDBACK_REWARDED = "feedback_reward_claimed"
 
-        // Default credentials placeholder (managed via build configuration and settings)
-        const val DEFAULT_TAPSELL_KEY = ""
-        const val DEFAULT_REWARDED_ZONE = ""
+        // Official Tapsell Plus Developer / Testing Credentials (Fallback if unconfigured)
+        const val DEFAULT_TAPSELL_KEY = "alsoatsrtrotpqacegkehkaiieckldhrgsbspqtgqnbrrfccrtbdomgjtahflchkqtqosa"
+        const val DEFAULT_REWARDED_ZONE = "5cfaa802e8d17f0001ffb28e"
         const val DEFAULT_SERVER_URL = "https://reward-app-backend-1.onrender.com"
         const val DEFAULT_ADMIN_PIN = ""
         const val DEFAULT_SUPABASE_URL = ""
@@ -72,11 +72,17 @@ class PreferencesManager(context: Context) {
         set(value) = prefs.edit().putInt(KEY_TOTAL_SCORE, value).apply()
 
     var tapsellAppKey: String
-        get() = prefs.getString(KEY_TAPSELL_KEY, DEFAULT_TAPSELL_KEY) ?: DEFAULT_TAPSELL_KEY
+        get() {
+            val v = prefs.getString(KEY_TAPSELL_KEY, DEFAULT_TAPSELL_KEY) ?: DEFAULT_TAPSELL_KEY
+            return if (v.isNotBlank() && !v.contains("your_tapsell") && !v.contains("placeholder")) v else DEFAULT_TAPSELL_KEY
+        }
         set(value) = prefs.edit().putString(KEY_TAPSELL_KEY, value).apply()
 
     var tapsellRewardedZone: String
-        get() = prefs.getString(KEY_TAPSELL_ZONE, DEFAULT_REWARDED_ZONE) ?: DEFAULT_REWARDED_ZONE
+        get() {
+            val v = prefs.getString(KEY_TAPSELL_ZONE, DEFAULT_REWARDED_ZONE) ?: DEFAULT_REWARDED_ZONE
+            return if (v.isNotBlank() && !v.contains("your_tapsell") && !v.contains("placeholder")) v else DEFAULT_REWARDED_ZONE
+        }
         set(value) = prefs.edit().putString(KEY_TAPSELL_ZONE, value).apply()
 
     var serverUrl: String

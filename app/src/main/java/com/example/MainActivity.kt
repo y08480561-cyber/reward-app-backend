@@ -104,6 +104,8 @@ class MainActivity : ComponentActivity() {
                                             squares = uiState.squares,
                                             cycle = uiState.dailyCycle,
                                             announcement = uiState.activeAnnouncement,
+                                            errorMessage = uiState.errorMessage,
+                                            onDismissError = { viewModel.clearMessages() },
                                             onSquareClick = { act, square -> viewModel.onSquareClicked(act, square) }
                                         )
                                     }
@@ -129,6 +131,8 @@ class MainActivity : ComponentActivity() {
                                                 onLogout = { viewModel.logout() },
                                                 onNavigateToStore = { viewModel.navigateTo(AppScreen.STORE) },
                                                 onNavigateToSupport = { viewModel.navigateTo(AppScreen.SUPPORT) },
+                                                isTestAdsEnabled = uiState.isTestAdsEnabled,
+                                                onToggleTestAds = { enabled -> viewModel.toggleTestAds(enabled) },
                                                 onToggleNotifications = { enabled -> viewModel.toggleNotificationPreference(enabled) }
                                             )
                                         }

@@ -99,7 +99,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             it.copy(
                 currentUser = user,
                 activeAnnouncement = cachedAnn,
-                currentScreen = AppScreen.PROFILE
+                currentScreen = AppScreen.PROFILE,
+                isTestAdsEnabled = prefs.useTestAds
             )
         }
         viewModelScope.launch {
@@ -932,6 +933,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
+    }
+
+    fun toggleTestAds(enabled: Boolean) {
+        prefs.useTestAds = enabled
+        _uiState.update { it.copy(isTestAdsEnabled = enabled) }
     }
 
     fun loadStoreData() {

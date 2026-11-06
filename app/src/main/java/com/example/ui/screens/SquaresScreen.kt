@@ -59,6 +59,8 @@ fun SquaresScreen(
     squares: List<AdSquare>,
     cycle: DailyCycle?,
     announcement: HomeAnnouncement? = null,
+    errorMessage: String? = null,
+    onDismissError: () -> Unit = {},
     onSquareClick: (Activity, AdSquare) -> Unit
 ) {
     val context = LocalContext.current
@@ -196,6 +198,50 @@ fun SquaresScreen(
                 announcement = announcement,
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
             )
+        }
+
+        // Error message banner (e.g. Tapsell ad fill, network, or VPN error)
+        if (!errorMessage.isNullOrBlank()) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                shape = RoundedCornerShape(14.dp),
+                color = Color(0xFF2A1215),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE53935).copy(alpha = 0.6f))
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Refresh,
+                        contentDescription = null,
+                        tint = Color(0xFFFF6B6B),
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = errorMessage,
+                        color = Color(0xFFFFD1D1),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        lineHeight = 18.sp,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "بستن",
+                        color = GoldAccent,
+                        fontSize = 11.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .clickable { onDismissError() }
+                            .padding(horizontal = 6.dp, vertical = 4.dp)
+                    )
+                }
+            }
         }
 
         // 100 Squares Professional Grid (Luxury Dark Cards)

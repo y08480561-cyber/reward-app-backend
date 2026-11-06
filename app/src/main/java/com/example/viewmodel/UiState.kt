@@ -93,6 +93,8 @@ data class MainUiState(
     val isSubmittingFeedback: Boolean = false,
     val feedbackSuccessMessage: String? = null,
     // Login Notification State
-    val loginNotification: com.example.model.LoginNotificationConfig = com.example.model.LoginNotificationConfig()
+    val loginNotification: com.example.model.LoginNotificationConfig = com.example.model.LoginNotificationConfig(),
+    // Developer & Sandbox Mode
+    val isTestAdsEnabled: Boolean = false
 )
 

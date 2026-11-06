@@ -62,6 +62,8 @@ fun ProfileScreen(
     onLogout: () -> Unit,
     onNavigateToStore: () -> Unit,
     onNavigateToSupport: () -> Unit = {},
+    isTestAdsEnabled: Boolean = false,
+    onToggleTestAds: (Boolean) -> Unit = {},
     onToggleNotifications: (Boolean) -> Unit
 ) {
     var showLogoutDialog by remember { mutableStateOf(false) }
@@ -344,6 +346,40 @@ fun ProfileScreen(
                         Switch(
                             checked = user.notificationsEnabled,
                             onCheckedChange = onToggleNotifications,
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = LuxuryBlack,
+                                checkedTrackColor = GoldAccent
+                            )
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider(color = LuxuryBorder.copy(alpha = 0.3f), thickness = 1.dp)
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                            Text(
+                                text = "حالت تستی شبیه‌ساز تبلیغات",
+                                fontSize = 12.sp,
+                                color = WarmWhite,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "تست فوری بدون معطلی در صورت روشن بودن VPN یا عدم وجود تبلیغ تپسل",
+                                fontSize = 10.sp,
+                                color = SilverAccent,
+                                lineHeight = 14.sp
+                            )
+                        }
+                        Switch(
+                            checked = isTestAdsEnabled,
+                            onCheckedChange = onToggleTestAds,
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = LuxuryBlack,
                                 checkedTrackColor = GoldAccent
