@@ -158,6 +158,7 @@ async function testAndInitDatabase() {
     console.log(`[PostgreSQL Engine]: ${res.rows[0].pg_version.split(' ')[0]} ${res.rows[0].pg_version.split(' ')[1]}`);
 
     await verifyDatabaseSchema();
+    await initDatabaseTables();
     await detectSchemaColumns();
     await migrateFromLocalJsonIfExists();
     console.log('====================================================');
@@ -1221,11 +1222,27 @@ app.post('/api/auth/login', ensureDatabaseReady, async (req, res) => {
     const inputPass = (password || "").trim();
 
     // 1. Check if user already exists in public.users by phone_number
-    const userLookup = await pool.query(
-      `SELECT id, first_name, last_name, phone_number, password_hash, created_at, status
-       FROM public.users WHERE phone_number = $1 LIMIT 1`,
-      [phoneNumber]
-    );
+    let userLookup;
+    try {
+      userLookup = await pool.query(
+        `SELECT id, first_name, last_name, phone_number, password_hash, created_at, status
+         FROM public.users WHERE phone_number = $1 LIMIT 1`,
+        [phoneNumber]
+      );
+    } catch (lookupErr) {
+      if (lookupErr.code === '42703' || (lookupErr.message && lookupErr.message.includes('password_hash'))) {
+        console.warn('[PostgreSQL Auto-Migration] Column password_hash missing in public.users. Adding column now...');
+        await pool.query(`ALTER TABLE public.users ADD COLUMN IF NOT EXISTS password_hash TEXT;`);
+        await pool.query(`ALTER TABLE public.users ADD COLUMN IF NOT EXISTS auth_token TEXT;`);
+        userLookup = await pool.query(
+          `SELECT id, first_name, last_name, phone_number, password_hash, created_at, status
+           FROM public.users WHERE phone_number = $1 LIMIT 1`,
+          [phoneNumber]
+        );
+      } else {
+        throw lookupErr;
+      }
+    }
 
     let user;
     if (userLookup.rows.length > 0) {
@@ -1292,11 +1309,27 @@ app.post('/api/auth/login', ensureDatabaseReady, async (req, res) => {
       const lName = (lastName || "مسابقه").trim();
       const passHash = inputPass ? hashUserPassword(inputPass) : null;
 
-      await pool.query(
-        `INSERT INTO public.users (id, first_name, last_name, phone_number, password_hash, total_score, status, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, 0, 'active', NOW(), NOW())`,
-        [userId, fName, lName, phoneNumber, passHash]
-      );
+      try {
+        await pool.query(
+          `INSERT INTO public.users (id, first_name, last_name, phone_number, password_hash, total_score, status, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, 0, 'active', NOW(), NOW())`,
+          [userId, fName, lName, phoneNumber, passHash]
+        );
+      } catch (insertErr) {
+        if (insertErr.code === '42703' || (insertErr.message && insertErr.message.includes('password_hash'))) {
+          console.warn('[PostgreSQL Auto-Migration] Column password_hash missing during insert. Adding column and retrying...');
+          await pool.query(`ALTER TABLE public.users ADD COLUMN IF NOT EXISTS password_hash TEXT;`);
+          await pool.query(`ALTER TABLE public.users ADD COLUMN IF NOT EXISTS total_score INTEGER NOT NULL DEFAULT 0;`);
+          await pool.query(`ALTER TABLE public.users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';`);
+          await pool.query(
+            `INSERT INTO public.users (id, first_name, last_name, phone_number, password_hash, total_score, status, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, 0, 'active', NOW(), NOW())`,
+            [userId, fName, lName, phoneNumber, passHash]
+          );
+        } else {
+          throw insertErr;
+        }
+      }
 
       // Initialize row in public.user_scores
       await pool.query(

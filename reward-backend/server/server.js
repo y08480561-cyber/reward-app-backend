@@ -1184,11 +1184,26 @@ app.post('/api/auth/login', ensureDatabaseReady, async (req, res) => {
     const inputPass = (password || "").trim();
 
     // 1. Check if user already exists in users by phone_number
-    const userLookup = await dbQuery(
-      `SELECT id, first_name, last_name, phone_number, password_hash, created_at, status
-       FROM users WHERE phone_number = $1 LIMIT 1`,
-      [phoneNumber]
-    );
+    let userLookup;
+    try {
+      userLookup = await dbQuery(
+        `SELECT id, first_name, last_name, phone_number, password_hash, created_at, status
+         FROM users WHERE phone_number = $1 LIMIT 1`,
+        [phoneNumber]
+      );
+    } catch (lookupErr) {
+      if (lookupErr.code === '42703' || lookupErr.code === 'ER_BAD_FIELD_ERROR' || (lookupErr.message && lookupErr.message.includes('password_hash'))) {
+        console.warn('[DB Auto-Migration] Column password_hash missing in users. Adding column now...');
+        await dbQuery(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;`);
+        userLookup = await dbQuery(
+          `SELECT id, first_name, last_name, phone_number, password_hash, created_at, status
+           FROM users WHERE phone_number = $1 LIMIT 1`,
+          [phoneNumber]
+        );
+      } else {
+        throw lookupErr;
+      }
+    }
 
     let user;
     if (userLookup.rows.length > 0) {
@@ -1255,11 +1270,27 @@ app.post('/api/auth/login', ensureDatabaseReady, async (req, res) => {
       const lName = (lastName || "مسابقه").trim();
       const passHash = inputPass ? hashUserPassword(inputPass) : null;
 
-      await dbQuery(
-        `INSERT INTO users (id, first_name, last_name, phone_number, password_hash, total_score, status, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, 0, 'active', NOW(), NOW())`,
-        [userId, fName, lName, phoneNumber, passHash]
-      );
+      try {
+        await dbQuery(
+          `INSERT INTO users (id, first_name, last_name, phone_number, password_hash, total_score, status, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, 0, 'active', NOW(), NOW())`,
+          [userId, fName, lName, phoneNumber, passHash]
+        );
+      } catch (insertErr) {
+        if (insertErr.code === '42703' || insertErr.code === 'ER_BAD_FIELD_ERROR' || (insertErr.message && insertErr.message.includes('password_hash'))) {
+          console.warn('[DB Auto-Migration] Column password_hash missing during insert. Adding column and retrying...');
+          await dbQuery(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;`);
+          await dbQuery(`ALTER TABLE users ADD COLUMN IF NOT EXISTS total_score INTEGER NOT NULL DEFAULT 0;`);
+          await dbQuery(`ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active';`);
+          await dbQuery(
+            `INSERT INTO users (id, first_name, last_name, phone_number, password_hash, total_score, status, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, 0, 'active', NOW(), NOW())`,
+            [userId, fName, lName, phoneNumber, passHash]
+          );
+        } else {
+          throw insertErr;
+        }
+      }
 
       // Initialize row in user_scores
       await dbQuery(
