@@ -49,7 +49,7 @@ class MyketBillingManager(private val context: Context) {
     }
 
     private val MYKET_PACKAGE = "ir.mservices.market"
-    private val BILLING_SERVICE_ACTION = "ir.mservices.market.billing.InAppBillingService.BIND"
+    private val BILLING_SERVICE_ACTION = "ir.mservices.market.InAppBillingService.BIND"
     private val BILLING_API_VERSION = 3
 
     private var billingService: IInAppBillingService? = null
@@ -70,6 +70,18 @@ class MyketBillingManager(private val context: Context) {
             billingService = null
             isBound = false
             Log.d(TAG, "Disconnected from Myket InAppBillingService.")
+        }
+
+        override fun onNullBinding(name: ComponentName?) {
+            billingService = null
+            isBound = false
+            Log.e(TAG, "Myket service returned null binding.")
+        }
+
+        override fun onBindingDied(name: ComponentName?) {
+            billingService = null
+            isBound = false
+            Log.e(TAG, "Myket service binding died.")
         }
     }
 
