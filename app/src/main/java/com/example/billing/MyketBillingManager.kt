@@ -40,7 +40,9 @@ data class PurchaseData(
  * Communicates with Myket Service via standard V3 AIDL IPC.
  * Keeps all validation secrets strictly on the backend.
  */
-class MyketBillingManager(private val context: Context) {
+class MyketBillingManager(context: Context) {
+
+    private val appContext: Context = context.applicationContext
 
     companion object {
         private const val TAG = "MyketBillingManager"
@@ -52,16 +54,22 @@ class MyketBillingManager(private val context: Context) {
     private val BILLING_SERVICE_ACTION = "ir.mservices.market.InAppBillingService.BIND"
     private val BILLING_API_VERSION = 3
 
+    @Volatile
     private var billingService: IInAppBillingService? = null
+    @Volatile
     private var isBound = false
+    @Volatile
+    private var isBinding = false
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             try {
                 billingService = IInAppBillingService.Stub.asInterface(service)
                 isBound = true
+                isBinding = false
                 Log.d(TAG, "Connected to Myket InAppBillingService successfully.")
             } catch (e: Exception) {
+                isBinding = false
                 Log.e(TAG, "Error binding to Myket service", e)
             }
         }
@@ -69,18 +77,21 @@ class MyketBillingManager(private val context: Context) {
         override fun onServiceDisconnected(name: ComponentName?) {
             billingService = null
             isBound = false
+            isBinding = false
             Log.d(TAG, "Disconnected from Myket InAppBillingService.")
         }
 
         override fun onNullBinding(name: ComponentName?) {
             billingService = null
             isBound = false
+            isBinding = false
             Log.e(TAG, "Myket service returned null binding.")
         }
 
         override fun onBindingDied(name: ComponentName?) {
             billingService = null
             isBound = false
+            isBinding = false
             Log.e(TAG, "Myket service binding died.")
         }
     }
@@ -89,17 +100,24 @@ class MyketBillingManager(private val context: Context) {
      * Connects to Myket billing service if Myket is installed.
      */
     fun startConnection() {
+        if (billingService != null) return
         if (!isMyketInstalled()) {
             Log.w(TAG, "Myket is not installed on this device.")
             return
         }
-        if (isBound && billingService != null) return
+        if (isBinding) return
+        isBinding = true
         try {
             val intent = Intent(BILLING_SERVICE_ACTION).apply {
                 setPackage(MYKET_PACKAGE)
             }
-            context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+            val success = appContext.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+            if (!success) {
+                isBinding = false
+                Log.e(TAG, "bindService returned false for Myket Billing Service action $BILLING_SERVICE_ACTION")
+            }
         } catch (e: Exception) {
+            isBinding = false
             Log.e(TAG, "Failed to bind to Myket Billing Service: ${e.message}")
         }
     }
@@ -110,11 +128,12 @@ class MyketBillingManager(private val context: Context) {
     fun endConnection() {
         if (isBound) {
             try {
-                context.unbindService(serviceConnection)
+                appContext.unbindService(serviceConnection)
             } catch (e: Exception) {
                 Log.w(TAG, "Error unbinding service: ${e.message}")
             }
             isBound = false
+            isBinding = false
             billingService = null
         }
     }
@@ -124,17 +143,20 @@ class MyketBillingManager(private val context: Context) {
      */
     fun isMyketInstalled(): Boolean {
         return try {
-            val pm = context.packageManager
-            pm.getPackageInfo(MYKET_PACKAGE, 0)
-            true
-        } catch (e: PackageManager.NameNotFoundException) {
-            try {
-                // Secondary check for alternative package if present
-                context.packageManager.getPackageInfo("com.myket.android", 0)
-                true
-            } catch (e2: Exception) {
-                false
+            val pm = appContext.packageManager
+            val packages = listOf(MYKET_PACKAGE, "com.myket.android")
+            for (pkg in packages) {
+                try {
+                    pm.getPackageInfo(pkg, 0)
+                    return true
+                } catch (e: Exception) {
+                    // check next
+                }
             }
+            // Fallback intent check
+            val intent = Intent(BILLING_SERVICE_ACTION).apply { setPackage(MYKET_PACKAGE) }
+            val list = pm.queryIntentServices(intent, 0)
+            !list.isNullOrEmpty()
         } catch (e: Exception) {
             false
         }
@@ -178,20 +200,25 @@ class MyketBillingManager(private val context: Context) {
         }
 
         if (service == null) {
-            return@withContext BillingResult.Error("امکان برقراری ارتباط با سرویس پرداخت مایکت فراهم نشد. لطفاً مطمئن شوید مایکت روی دستگاه شما فعال است.")
+            return@withContext BillingResult.Error("امکان برقراری ارتباط با سرویس پرداخت مایکت فراهم نشد. لطفاً مطمئن شوید برنامه مایکت روی دستگاه شما نصب و به حساب خود وارد شده‌اید.")
         }
 
         try {
             // Check billing support
-            val isSupported = service.isBillingSupported(BILLING_API_VERSION, context.packageName, "inapp")
+            val isSupported = service.isBillingSupported(BILLING_API_VERSION, appContext.packageName, "inapp")
             if (isSupported != 0) {
-                return@withContext BillingResult.Error("پرداخت درون‌برنامه‌ای مایکت در حساب یا دستگاه شما پشتیبانی نمی‌شود (کد $isSupported).", isSupported)
+                val msg = when (isSupported) {
+                    3 -> "لطفاً ابتدا در اپلیکیشن مایکت وارد حساب کاربری خود شوید."
+                    2 -> "اتصال به شبکه مایکت برقرار نیست. لطفاً اتصال اینترنت خود را بررسی کنید."
+                    else -> "پرداخت درون‌برنامه‌ای مایکت در حساب یا دستگاه شما پشتیبانی نمی‌شود (کد $isSupported)."
+                }
+                return@withContext BillingResult.Error(msg, isSupported)
             }
 
             // Request buy intent from Myket
             val buyIntentBundle = service.getBuyIntent(
                 BILLING_API_VERSION,
-                context.packageName,
+                appContext.packageName,
                 sku,
                 "inapp",
                 developerPayload
@@ -215,6 +242,10 @@ class MyketBillingManager(private val context: Context) {
                 } else {
                     return@withContext BillingResult.Error("اطلاعات اتصال به درگاه پرداخت مایکت دریافت نشد.")
                 }
+            } else if (responseCode == 3) {
+                return@withContext BillingResult.Error("لطفاً ابتدا در اپلیکیشن مایکت وارد حساب کاربری خود شوید.", responseCode)
+            } else if (responseCode == 4) {
+                return@withContext BillingResult.Error("این محصول در مایکت یافت نشد یا در حالت آماده‌سازی است.", responseCode)
             } else if (responseCode == 7) {
                 // ITEM_ALREADY_OWNED: user already has an unconsumed purchase token
                 return@withContext BillingResult.Error("این محصول قبلاً خریداری شده اما هنوز مصرف نشده است. گزینه «بازیابی خریدهای قبلی» را بزنید.", responseCode)
@@ -247,7 +278,7 @@ class MyketBillingManager(private val context: Context) {
             val json = JSONObject(purchaseDataString)
             PurchaseData(
                 orderId = json.optString("orderId", "MYKET_ORD_" + System.currentTimeMillis()),
-                packageName = json.optString("packageName", context.packageName),
+                packageName = json.optString("packageName", appContext.packageName),
                 productId = json.optString("productId"),
                 purchaseTime = json.optLong("purchaseTime", System.currentTimeMillis()),
                 purchaseToken = json.optString("purchaseToken", json.optString("token")),
@@ -300,7 +331,7 @@ class MyketBillingManager(private val context: Context) {
         try {
             var continuationToken: String? = null
             do {
-                val ownedItems = currentService.getPurchases(BILLING_API_VERSION, context.packageName, "inapp", continuationToken)
+                val ownedItems = currentService.getPurchases(BILLING_API_VERSION, appContext.packageName, "inapp", continuationToken)
                 val responseCode = ownedItems.getInt("RESPONSE_CODE", -1)
                 if (responseCode == 0) {
                     val purchaseDataList = ownedItems.getStringArrayList("INAPP_PURCHASE_DATA_LIST")
@@ -359,7 +390,7 @@ class MyketBillingManager(private val context: Context) {
         }
         val currentService = service ?: return@withContext false
         try {
-            val response = currentService.consumePurchase(BILLING_API_VERSION, context.packageName, purchaseToken)
+            val response = currentService.consumePurchase(BILLING_API_VERSION, appContext.packageName, purchaseToken)
             response == 0
         } catch (e: Exception) {
             Log.e(TAG, "Consume purchase exception", e)
