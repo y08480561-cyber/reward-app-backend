@@ -653,6 +653,30 @@
                 </div>
               </div>
             </div>
+
+            <!-- Active Home Page Announcement Banner (Direct Control) -->
+            <div class="col-lg-12">
+              <div class="card p-3 shadow" style="border: 1.5px solid rgba(212, 175, 55, 0.4);">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-megaphone-fill text-info fs-5"></i>
+                    <h6 class="gold-text mb-0">پیام زنده بالای ۱۰۰ مربع در اپلیکیشن</h6>
+                  </div>
+                  <div class="d-flex gap-2">
+                    <button class="btn btn-sm btn-outline-info" onclick="editCurrentActiveAnn()"><i class="bi bi-pencil-square me-1"></i> ویرایش پیام</button>
+                    <button class="btn btn-sm btn-outline-danger d-none" id="dashAnnToggleBtn" onclick="toggleCurrentActiveAnn()">غیرفعال‌سازی</button>
+                  </div>
+                </div>
+                <div class="p-3 rounded" style="background: linear-gradient(135deg, #0E1E36, #16253D); border: 1px solid rgba(255,183,3,0.3);">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="badge bg-primary" id="dashAnnType">اطلاعیه</span>
+                    <span class="badge bg-success" id="dashAnnStatus">در حال نمایش</span>
+                  </div>
+                  <h5 class="text-warning mb-1 fw-bold" id="dashAnnTitle">در حال بارگذاری...</h5>
+                  <p class="text-white small mb-0" id="dashAnnContent">متن پیام...</p>
+                </div>
+              </div>
+            </div>
           </div>
         </section>
 

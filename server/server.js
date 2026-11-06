@@ -2899,6 +2899,10 @@ app.post('/api/admin/competition/start-new', requireAdminAuth, ensureDatabaseRea
 // 9.1 Public API: Get Active Announcement for App Home Screen
 app.get('/api/announcement/active', ensureDatabaseReady, async (req, res) => {
   try {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+
     const result = await pool.query(`
       SELECT 
         a.id, 
