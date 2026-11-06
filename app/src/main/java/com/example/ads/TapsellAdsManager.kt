@@ -96,25 +96,7 @@ class TapsellAdsManager(
             return
         }
 
-        if (prefs.useTestAds) {
-            Log.i(TAG, "useTestAds mode active: Simulating 5-second test video ad for square $squareNumber")
-            activeSquare = squareNumber
-            scope.launch(Dispatchers.Main) {
-                currentResponseId = "SIMULATED_TEST_RESP_" + System.currentTimeMillis()
-                _adState.value = AdPlaybackState.Playing(
-                    squareNumber = squareNumber,
-                    totalDurationSeconds = 5,
-                    adTitle = "تبلیغ آزمایشی (حالت تستی ۵ ثانیه‌ای)",
-                    responseId = currentResponseId
-                )
-                onReadyToShow()
-                kotlinx.coroutines.delay(5000)
-                notifyAdCompleted(squareNumber, 15) { nonce ->
-                    onRewarded(nonce)
-                }
-            }
-            return
-        }
+
 
         if (!isSdkInitialized) {
             initializeSdk()

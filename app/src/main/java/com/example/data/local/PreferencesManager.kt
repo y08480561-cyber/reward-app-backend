@@ -112,8 +112,8 @@ class PreferencesManager(context: Context) {
         set(value) = prefs.edit().putString(KEY_ADMIN_PIN, value).apply()
 
     var useTestAds: Boolean
-        get() = prefs.getBoolean(KEY_USE_TEST_ADS, false)
-        set(value) = prefs.edit().putBoolean(KEY_USE_TEST_ADS, value).apply()
+        get() = false // Production release mode: real Tapsell ads active
+        set(value) { prefs.edit().putBoolean(KEY_USE_TEST_ADS, false).apply() }
 
     var isFeedbackShown: Boolean
         get() {
