@@ -357,6 +357,37 @@ fun ProfileScreen(
                     HorizontalDivider(color = LuxuryBorder.copy(alpha = 0.3f), thickness = 1.dp)
                     Spacer(modifier = Modifier.height(12.dp))
 
+                    // Comprehensive Guide & Rules Card
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = GoldAccent,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "راهنمای جامع مسابقه و کسب امتیاز",
+                                fontSize = 13.sp,
+                                color = GoldLight,
+                                fontWeight = FontWeight.ExtraBold
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "• کسب امتیاز: با مشاهده هر تبلیغ و تکمیل مربع‌های صفحه اصلی، امتیاز شما افزایش می‌یابد (هر مربع = ۱ امتیاز).\n• جوایز و رتبه‌بندی: در پایان دوره‌ها، بر اساس جدول رتبه‌بندی به نفرات برتر جوایز ارزنده‌ای تعلق می‌گیرد.\n• فروشگاه و بازگشایی: از طریق بخش فروشگاه و پنل‌های ارتقا می‌توانید امتیازات خود را مدیریت کرده و شانس پیروزی خود را چند برابر کنید.",
+                            fontSize = 11.sp,
+                            color = SilverAccent,
+                            lineHeight = 17.sp,
+                            fontWeight = FontWeight.Normal
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+                    HorizontalDivider(color = LuxuryBorder.copy(alpha = 0.3f), thickness = 1.dp)
+                    Spacer(modifier = Modifier.height(12.dp))
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -371,7 +402,7 @@ fun ProfileScreen(
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "تست فوری بدون معطلی در صورت روشن بودن VPN یا عدم وجود تبلیغ تپسل",
+                                text = "تست فوری بدون معطلی در صورت روشن بودن VPN یا عدم وجود تبلیغ",
                                 fontSize = 10.sp,
                                 color = SilverAccent,
                                 lineHeight = 14.sp
