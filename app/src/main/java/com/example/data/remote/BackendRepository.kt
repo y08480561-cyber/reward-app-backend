@@ -1654,7 +1654,7 @@ class BackendRepository(
                                 myketSku = item.optString("myketSku"),
                                 badge = item.optString("badge"),
                                 isActive = item.optBoolean("isActive", true),
-                                isReadyInMyket = item.optBoolean("isReadyInMyket", false),
+                                isReadyInMyket = item.optBoolean("isReadyInMyket", true),
                                 sortOrder = item.optInt("sortOrder")
                             )
                         )

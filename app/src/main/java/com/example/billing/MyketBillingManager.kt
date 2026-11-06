@@ -11,6 +11,7 @@ import android.os.IBinder
 import android.util.Log
 import ir.mservices.market.billing.IInAppBillingService
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
@@ -43,6 +44,7 @@ data class PurchaseData(
 class MyketBillingManager(context: Context) {
 
     private val appContext: Context = context.applicationContext
+    private val purchaseMutex = kotlinx.coroutines.sync.Mutex()
 
     companion object {
         private const val TAG = "MyketBillingManager"
@@ -60,17 +62,22 @@ class MyketBillingManager(context: Context) {
     private var isBound = false
     @Volatile
     private var isBinding = false
+    @Volatile
+    var isBillingReady = false
+        private set
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             try {
                 billingService = IInAppBillingService.Stub.asInterface(service)
-                isBound = true
+                isBound = (billingService != null)
                 isBinding = false
-                Log.d(TAG, "Connected to Myket InAppBillingService successfully.")
+                Log.d(TAG, "ON_SERVICE_CONNECTED: Connected to Myket InAppBillingService successfully.")
             } catch (e: Exception) {
                 isBinding = false
-                Log.e(TAG, "Error binding to Myket service", e)
+                isBound = false
+                isBillingReady = false
+                Log.e(TAG, "ON_SERVICE_CONNECTED_ERROR: Error binding to Myket service", e)
             }
         }
 
@@ -78,21 +85,24 @@ class MyketBillingManager(context: Context) {
             billingService = null
             isBound = false
             isBinding = false
-            Log.d(TAG, "Disconnected from Myket InAppBillingService.")
+            isBillingReady = false
+            Log.d(TAG, "ON_SERVICE_DISCONNECTED: Disconnected from Myket InAppBillingService.")
         }
 
         override fun onNullBinding(name: ComponentName?) {
             billingService = null
             isBound = false
             isBinding = false
-            Log.e(TAG, "Myket service returned null binding.")
+            isBillingReady = false
+            Log.e(TAG, "ON_NULL_BINDING: Myket service returned null binding.")
         }
 
         override fun onBindingDied(name: ComponentName?) {
             billingService = null
             isBound = false
             isBinding = false
-            Log.e(TAG, "Myket service binding died.")
+            isBillingReady = false
+            Log.e(TAG, "ON_BINDING_DIED: Myket service binding died.")
         }
     }
 
@@ -100,25 +110,30 @@ class MyketBillingManager(context: Context) {
      * Connects to Myket billing service if Myket is installed.
      */
     fun startConnection() {
-        if (billingService != null) return
+        if (billingService != null && isBillingReady) return
         if (!isMyketInstalled()) {
-            Log.w(TAG, "Myket is not installed on this device.")
+            isBillingReady = false
+            Log.w(TAG, "BIND_SERVICE_SKIPPED: Myket is not installed on this device.")
             return
         }
         if (isBinding) return
         isBinding = true
+        Log.d(TAG, "BIND_SERVICE_STARTED: Initiating bindService for action $BILLING_SERVICE_ACTION...")
         try {
             val intent = Intent(BILLING_SERVICE_ACTION).apply {
                 setPackage(MYKET_PACKAGE)
             }
             val success = appContext.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+            Log.d(TAG, "BIND_SERVICE_RESULT: bindService returned $success")
             if (!success) {
                 isBinding = false
-                Log.e(TAG, "bindService returned false for Myket Billing Service action $BILLING_SERVICE_ACTION")
+                isBillingReady = false
+                Log.e(TAG, "BIND_SERVICE_FAILED: bindService returned false for Myket Billing Service")
             }
         } catch (e: Exception) {
             isBinding = false
-            Log.e(TAG, "Failed to bind to Myket Billing Service: ${e.message}")
+            isBillingReady = false
+            Log.e(TAG, "BIND_SERVICE_EXCEPTION: Failed to bind to Myket Billing Service: ${e.message}")
         }
     }
 
@@ -134,6 +149,7 @@ class MyketBillingManager(context: Context) {
             }
             isBound = false
             isBinding = false
+            isBillingReady = false
             billingService = null
         }
     }
@@ -163,98 +179,108 @@ class MyketBillingManager(context: Context) {
     }
 
     /**
-     * Launches the official Myket purchase flow.
-     * If product is marked as under preparation, gracefully informs user.
+     * Launches the official Myket purchase flow with thread-safe Mutex lock.
      */
     suspend fun launchPurchaseFlow(
         activity: Activity,
         sku: String,
-        isReadyInMyket: Boolean,
+        isReadyInMyket: Boolean = true,
         requestCode: Int = 1001,
         developerPayload: String = ""
     ): BillingResult<Unit> = withContext(Dispatchers.IO) {
-        // 1. Preparation status guard
-        if (!isReadyInMyket) {
-            return@withContext BillingResult.UnderPreparation(
-                "این بسته در حال حاضر در کنسول توسعه‌دهندگان مایکت در حال آماده‌سازی است و به زودی پس از تایید نهایی فعال می‌گردد."
-            )
+        if (purchaseMutex.isLocked) {
+            Log.w(TAG, "PURCHASE_LOCKED: Another purchase flow is already in progress.")
+            return@withContext BillingResult.Error("درخواست خرید دیگری در حال پردازش است. لطفاً شکیبا باشید.")
         }
 
-        // 2. Check Myket installed
-        if (!isMyketInstalled()) {
-            return@withContext BillingResult.MyketNotInstalled(
-                "برنامه مایکت روی دستگاه شما یافت نشد. لطفاً برای انجام خرید درون‌برنامه‌ای، ابتدا مایکت را نصب کنید."
-            )
-        }
-
-        // 3. Ensure service connection & wait if binding in progress
-        startConnection()
-        var service = billingService
-        if (service == null) {
-            var waitCount = 0
-            while (billingService == null && waitCount < 30) {
-                kotlinx.coroutines.delay(100)
-                waitCount++
+        purchaseMutex.withLock {
+            // 1. Check Myket installed
+            if (!isMyketInstalled()) {
+                isBillingReady = false
+                return@withLock BillingResult.MyketNotInstalled(
+                    "برنامه مایکت روی دستگاه شما یافت نشد. لطفاً برای انجام خرید درون‌برنامه‌ای، ابتدا مایکت را نصب کنید."
+                )
             }
-            service = billingService
-        }
 
-        if (service == null) {
-            return@withContext BillingResult.Error("امکان برقراری ارتباط با سرویس پرداخت مایکت فراهم نشد. لطفاً مطمئن شوید برنامه مایکت روی دستگاه شما نصب و به حساب خود وارد شده‌اید.")
-        }
-
-        try {
-            // Check billing support
-            val isSupported = service.isBillingSupported(BILLING_API_VERSION, appContext.packageName, "inapp")
-            if (isSupported != 0) {
-                val msg = when (isSupported) {
-                    3 -> "لطفاً ابتدا در اپلیکیشن مایکت وارد حساب کاربری خود شوید."
-                    2 -> "اتصال به شبکه مایکت برقرار نیست. لطفاً اتصال اینترنت خود را بررسی کنید."
-                    else -> "پرداخت درون‌برنامه‌ای مایکت در حساب یا دستگاه شما پشتیبانی نمی‌شود (کد $isSupported)."
+            // 2. Ensure service connection & wait if binding in progress
+            startConnection()
+            var service = billingService
+            if (service == null) {
+                var waitCount = 0
+                while (billingService == null && waitCount < 30) {
+                    kotlinx.coroutines.delay(100)
+                    waitCount++
                 }
-                return@withContext BillingResult.Error(msg, isSupported)
+                service = billingService
             }
 
-            // Request buy intent from Myket
-            val buyIntentBundle = service.getBuyIntent(
-                BILLING_API_VERSION,
-                appContext.packageName,
-                sku,
-                "inapp",
-                developerPayload
-            )
+            if (service == null) {
+                isBillingReady = false
+                Log.e(TAG, "BIND_SERVICE_TIMEOUT: Service connection failed to establish.")
+                return@withLock BillingResult.Error("امکان برقراری ارتباط با سرویس پرداخت مایکت فراهم نشد. لطفاً مطمئن شوید برنامه مایکت روی دستگاه شما نصب و فعال است.")
+            }
 
-            val responseCode = buyIntentBundle.getInt("RESPONSE_CODE", -1)
-            if (responseCode == 0) {
-                val pendingIntent = buyIntentBundle.getParcelable<android.app.PendingIntent>("BUY_INTENT")
-                if (pendingIntent != null) {
-                    withContext(Dispatchers.Main) {
-                        activity.startIntentSenderForResult(
-                            pendingIntent.intentSender,
-                            requestCode,
-                            Intent(),
-                            0,
-                            0,
-                            0
-                        )
+            try {
+                // 3. Verify billing support
+                val isSupported = service.isBillingSupported(BILLING_API_VERSION, appContext.packageName, "inapp")
+                if (isSupported != 0) {
+                    isBillingReady = false
+                    Log.e(TAG, "BILLING_NOT_SUPPORTED: Response code $isSupported")
+                    val msg = when (isSupported) {
+                        3 -> "لطفاً ابتدا در اپلیکیشن مایکت وارد حساب کاربری خود شوید."
+                        2 -> "اتصال به شبکه مایکت برقرار نیست. لطفاً اتصال اینترنت خود را بررسی کنید."
+                        else -> "پرداخت درون‌برنامه‌ای مایکت در حساب یا دستگاه شما پشتیبانی نمی‌شود (کد $isSupported)."
                     }
-                    return@withContext BillingResult.Success(Unit)
-                } else {
-                    return@withContext BillingResult.Error("اطلاعات اتصال به درگاه پرداخت مایکت دریافت نشد.")
+                    return@withLock BillingResult.Error(msg, isSupported)
                 }
-            } else if (responseCode == 3) {
-                return@withContext BillingResult.Error("لطفاً ابتدا در اپلیکیشن مایکت وارد حساب کاربری خود شوید.", responseCode)
-            } else if (responseCode == 4) {
-                return@withContext BillingResult.Error("این محصول در مایکت یافت نشد یا در حالت آماده‌سازی است.", responseCode)
-            } else if (responseCode == 7) {
-                // ITEM_ALREADY_OWNED: user already has an unconsumed purchase token
-                return@withContext BillingResult.Error("این محصول قبلاً خریداری شده اما هنوز مصرف نشده است. گزینه «بازیابی خریدهای قبلی» را بزنید.", responseCode)
-            } else {
-                return@withContext BillingResult.Error("خطا در ایجاد تراکنش خرید مایکت (کد $responseCode).", responseCode)
+
+                isBillingReady = true
+                Log.d(TAG, "BILLING_SUPPORTED: Myket V3 Billing API is supported and ready.")
+
+                // 4. Request buy intent from Myket
+                val buyIntentBundle = service.getBuyIntent(
+                    BILLING_API_VERSION,
+                    appContext.packageName,
+                    sku,
+                    "inapp",
+                    developerPayload
+                )
+
+                val responseCode = buyIntentBundle.getInt("RESPONSE_CODE", -1)
+                Log.d(TAG, "GET_BUY_INTENT_RESULT: Response code $responseCode for SKU $sku")
+
+                if (responseCode == 0) {
+                    val pendingIntent = buyIntentBundle.getParcelable<android.app.PendingIntent>("BUY_INTENT")
+                    if (pendingIntent != null) {
+                        Log.d(TAG, "PAYMENT_INTENT_LAUNCHED: Launching Myket payment intent sender for SKU $sku")
+                        withContext(Dispatchers.Main) {
+                            activity.startIntentSenderForResult(
+                                pendingIntent.intentSender,
+                                requestCode,
+                                Intent(),
+                                0,
+                                0,
+                                0
+                            )
+                        }
+                        return@withLock BillingResult.Success(Unit)
+                    } else {
+                        Log.e(TAG, "GET_BUY_INTENT_ERROR: BUY_INTENT bundle parcelable is null")
+                        return@withLock BillingResult.Error("اطلاعات اتصال به درگاه پرداخت مایکت دریافت نشد.")
+                    }
+                } else if (responseCode == 3) {
+                    return@withLock BillingResult.Error("لطفاً ابتدا در اپلیکیشن مایکت وارد حساب کاربری خود شوید.", responseCode)
+                } else if (responseCode == 4) {
+                    return@withLock BillingResult.Error("این محصول در مایکت یافت نشد یا در حالت آماده‌سازی است.", responseCode)
+                } else if (responseCode == 7) {
+                    return@withLock BillingResult.Error("این محصول قبلاً خریداری شده اما هنوز مصرف نشده است. گزینه «بازیابی خریدهای قبلی» را بزنید.", responseCode)
+                } else {
+                    return@withLock BillingResult.Error("خطا در ایجاد تراکنش خرید مایکت (کد $responseCode).", responseCode)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "PURCHASE_FLOW_EXCEPTION: Exception during purchase flow", e)
+                return@withLock BillingResult.Error("خطا در ارتباط با مایکت: ${e.message}")
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Exception during launchPurchaseFlow", e)
-            return@withContext BillingResult.Error("خطا در ارتباط با مایکت: ${e.message}")
         }
     }
 
