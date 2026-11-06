@@ -311,6 +311,16 @@ data class UserEntitlements(
 )
 
 /**
+ * Data payload for high-trust luxury purchase success dialog
+ */
+data class PurchaseSuccessModalData(
+    val productTitle: String,
+    val unitsOrMultiplierText: String,
+    val priceToman: Long,
+    val orderId: String = ""
+)
+
+/**
  * Login notification configuration (Frosted Glass message for Irancell users)
  */
 data class LoginNotificationConfig(

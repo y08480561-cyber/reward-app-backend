@@ -14,6 +14,7 @@ import com.example.model.AdSquare
 import com.example.model.DailyCycle
 import com.example.model.SquareStatus
 import com.example.model.User
+import com.example.ui.components.toPersianDigits
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -971,10 +972,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val purchaseToken = "STORE_PUR_" + System.currentTimeMillis() + "_" + java.util.UUID.randomUUID().toString().take(6)
             when (val result = backendRepository.verifyStorePurchase(user.id, productId, purchaseToken)) {
                 is Result.Success -> {
+                    val product = _uiState.value.storeProducts.find { it.id == productId }
+                    val title = product?.title ?: "محصول فروشگاه"
+                    val benefitText = when {
+                        product?.productType == "SQUARE_UNLOCK" -> "+${product.unitsGranted.toString().toPersianDigits()} اعتبار بازگشایی آنی"
+                        product?.productType == "ACCOUNT_UPGRADE" && (product.id.contains("gold") || product.unitsGranted >= 6) -> "ارتقای سطح به طلایی (۶X)"
+                        product?.productType == "ACCOUNT_UPGRADE" -> "ارتقای سطح به نقره‌ای (۳X)"
+                        else -> "اعتبار و امتیاز عینا به حساب کاربر اضافه شد"
+                    }
+                    val price = product?.priceToman ?: 0L
+                    val orderId = "MYKET_ORD_" + System.currentTimeMillis().toString().takeLast(8)
+
                     _uiState.update {
                         it.copy(
                             isStoreLoading = false,
-                            infoMessage = "خرید شما با موفقیت تایید و اعمال شد."
+                            purchaseSuccessModal = com.example.model.PurchaseSuccessModalData(
+                                productTitle = title,
+                                unitsOrMultiplierText = benefitText,
+                                priceToman = price,
+                                orderId = orderId
+                            )
                         )
                     }
                     loadStoreData()
@@ -990,6 +1007,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
+    }
+
+    fun dismissPurchaseSuccessModal() {
+        _uiState.update { it.copy(purchaseSuccessModal = null) }
     }
 
     fun clearStoreMessages() {

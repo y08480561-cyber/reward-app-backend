@@ -87,6 +87,7 @@ data class MainUiState(
     val userEntitlements: com.example.model.UserEntitlements = com.example.model.UserEntitlements(),
     val isStoreLoading: Boolean = false,
     val storeErrorMessage: String? = null,
+    val purchaseSuccessModal: com.example.model.PurchaseSuccessModalData? = null,
     // Feedback State
     val showFeedbackDialog: Boolean = false,
     val isSubmittingFeedback: Boolean = false,

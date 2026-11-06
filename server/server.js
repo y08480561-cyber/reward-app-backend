@@ -641,7 +641,7 @@ async function initDatabaseTables() {
         myket_sku: 'reqabat_unlock_50',
         badge: 'محبوب',
         is_active: true,
-        is_ready_in_myket: false,
+        is_ready_in_myket: true,
         sort_order: 1
       },
       {
@@ -654,7 +654,7 @@ async function initDatabaseTables() {
         myket_sku: 'reqabat_unlock_100',
         badge: 'به‌صرفه',
         is_active: true,
-        is_ready_in_myket: false,
+        is_ready_in_myket: true,
         sort_order: 2
       },
       {
@@ -667,7 +667,7 @@ async function initDatabaseTables() {
         myket_sku: 'reqabat_upgrade_silver',
         badge: 'نقره‌ای (۳X)',
         is_active: true,
-        is_ready_in_myket: false,
+        is_ready_in_myket: true,
         sort_order: 3
       },
       {
@@ -680,7 +680,7 @@ async function initDatabaseTables() {
         myket_sku: 'reqabat_upgrade_gold',
         badge: 'طلایی (۶X)',
         is_active: true,
-        is_ready_in_myket: false,
+        is_ready_in_myket: true,
         sort_order: 4
       }
     ];
@@ -698,6 +698,7 @@ async function initDatabaseTables() {
            myket_sku = EXCLUDED.myket_sku,
            badge = EXCLUDED.badge,
            sort_order = EXCLUDED.sort_order,
+           is_ready_in_myket = true,
            is_active = true`,
         [p.id, p.title, p.description, p.product_type, p.units_granted, p.price_toman, p.myket_sku, p.badge, p.is_active, p.is_ready_in_myket, p.sort_order]
       );

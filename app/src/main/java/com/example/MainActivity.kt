@@ -236,6 +236,14 @@ class MainActivity : ComponentActivity() {
                                     }
                                 )
                             }
+
+                            // High-Trust Animated Purchase Success Dialog
+                            uiState.purchaseSuccessModal?.let { modalData ->
+                                com.example.ui.components.PurchaseSuccessModal(
+                                    data = modalData,
+                                    onDismiss = { viewModel.dismissPurchaseSuccessModal() }
+                                )
+                            }
                         }
                     }
                 }
