@@ -40,7 +40,11 @@ data class PurchaseData(
  */
 class MyketBillingManager(private val context: Context) {
 
-    private val TAG = "MyketBillingManager"
+    companion object {
+        private const val TAG = "MyketBillingManager"
+        const val MYKET_PUBLIC_KEY = "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCIUMmkIxGVpyKupQajOZqGfhYSkoGA0I1rhDiTLkKCiObtCnqXHJYdTJTRYKlSmA/KIIa4rC08CoZILDRjKKVt+Z3ZOt2pONjTr6jt+FtObbg7bNpTSWbcUE6Np5rz/nV/wHfQvn3wv/AJ9UFW95qAaKpwf0CZLLxG8a33BaB4dwIDAQAB"
+    }
+
     private val MYKET_PACKAGE = "ir.mservices.market"
     private val BILLING_SERVICE_ACTION = "ir.mservices.market.billing.InAppBillingService.BIND"
     private val BILLING_API_VERSION = 3
