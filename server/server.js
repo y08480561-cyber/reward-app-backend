@@ -129,13 +129,12 @@ async function testAndInitDatabase() {
   console.log('====================================================');
   console.log('[PostgreSQL] Initializing database subsystem...');
 
-  if (!DATABASE_URL || !pool || !process.env.ADMIN_KEY) {
-    if (!process.env.ADMIN_KEY) {
-      console.error('[PostgreSQL CRITICAL] ADMIN_KEY is NOT set! Admin panel will be inaccessible.');
-    }
-    if (!DATABASE_URL || !pool) {
-      console.error('[PostgreSQL CRITICAL] DATABASE_URL is NOT set in environment variables!');
-    }
+  if (!process.env.ADMIN_KEY) {
+    console.warn('[PostgreSQL Warning] ADMIN_KEY is not set in environment variables! Using default admin key for admin panel access.');
+  }
+
+  if (!DATABASE_URL || !pool) {
+    console.error('[PostgreSQL CRITICAL] DATABASE_URL is NOT set in environment variables!');
     console.log('====================================================');
     isDbConnected = false;
     return false;
