@@ -81,6 +81,7 @@ class MyketBillingManager(private val context: Context) {
             Log.w(TAG, "Myket is not installed on this device.")
             return
         }
+        if (isBound && billingService != null) return
         try {
             val intent = Intent(BILLING_SERVICE_ACTION).apply {
                 setPackage(MYKET_PACKAGE)
@@ -152,11 +153,20 @@ class MyketBillingManager(private val context: Context) {
             )
         }
 
-        // 3. Ensure service connection
-        val service = billingService
+        // 3. Ensure service connection & wait if binding in progress
+        startConnection()
+        var service = billingService
         if (service == null) {
-            startConnection()
-            return@withContext BillingResult.Error("در حال برقراری ارتباط با مایکت... لطفاً لحظاتی دیگر مجدداً تلاش فرمایید.")
+            var waitCount = 0
+            while (billingService == null && waitCount < 30) {
+                kotlinx.coroutines.delay(100)
+                waitCount++
+            }
+            service = billingService
+        }
+
+        if (service == null) {
+            return@withContext BillingResult.Error("امکان برقراری ارتباط با سرویس پرداخت مایکت فراهم نشد. لطفاً مطمئن شوید مایکت روی دستگاه شما فعال است.")
         }
 
         try {
@@ -263,12 +273,22 @@ class MyketBillingManager(private val context: Context) {
      * Queries unconsumed purchases to support purchase restoration.
      */
     suspend fun queryPurchases(): List<PurchaseData> = withContext(Dispatchers.IO) {
-        val service = billingService ?: return@withContext emptyList()
+        startConnection()
+        var service = billingService
+        if (service == null) {
+            var waitCount = 0
+            while (billingService == null && waitCount < 20) {
+                kotlinx.coroutines.delay(100)
+                waitCount++
+            }
+            service = billingService
+        }
+        val currentService = service ?: return@withContext emptyList()
         val results = mutableListOf<PurchaseData>()
         try {
             var continuationToken: String? = null
             do {
-                val ownedItems = service.getPurchases(BILLING_API_VERSION, context.packageName, "inapp", continuationToken)
+                val ownedItems = currentService.getPurchases(BILLING_API_VERSION, context.packageName, "inapp", continuationToken)
                 val responseCode = ownedItems.getInt("RESPONSE_CODE", -1)
                 if (responseCode == 0) {
                     val purchaseDataList = ownedItems.getStringArrayList("INAPP_PURCHASE_DATA_LIST")
@@ -315,9 +335,19 @@ class MyketBillingManager(private val context: Context) {
      * Consumes purchase so non-consumable lock is released in Myket.
      */
     suspend fun consumePurchase(purchaseToken: String): Boolean = withContext(Dispatchers.IO) {
-        val service = billingService ?: return@withContext false
+        startConnection()
+        var service = billingService
+        if (service == null) {
+            var waitCount = 0
+            while (billingService == null && waitCount < 20) {
+                kotlinx.coroutines.delay(100)
+                waitCount++
+            }
+            service = billingService
+        }
+        val currentService = service ?: return@withContext false
         try {
-            val response = service.consumePurchase(BILLING_API_VERSION, context.packageName, purchaseToken)
+            val response = currentService.consumePurchase(BILLING_API_VERSION, context.packageName, purchaseToken)
             response == 0
         } catch (e: Exception) {
             Log.e(TAG, "Consume purchase exception", e)

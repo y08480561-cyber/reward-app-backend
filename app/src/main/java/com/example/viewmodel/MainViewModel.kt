@@ -61,6 +61,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         observeTapsellAdState()
         startCycleCountdownTicker()
         fetchLoginNotification()
+        myketBillingManager.startConnection()
     }
 
     private fun fetchLoginNotification() {
@@ -697,6 +698,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun loadMembershipData() {
+        myketBillingManager.startConnection()
         val user = _uiState.value.currentUser ?: return
         viewModelScope.launch {
             _uiState.update { it.copy(isMembershipLoading = true, errorMessage = null) }
@@ -942,6 +944,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun loadStoreData() {
+        myketBillingManager.startConnection()
         val user = _uiState.value.currentUser ?: return
         viewModelScope.launch {
             _uiState.update { it.copy(isStoreLoading = true, storeErrorMessage = null) }
@@ -967,6 +970,34 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         storeErrorMessage = (productsResult as? Result.Error)?.message ?: "خطا در دریافت اطلاعات فروشگاه"
                     )
                 }
+            }
+        }
+    }
+
+    fun restoreMyketPurchases() {
+        val user = _uiState.value.currentUser ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isStoreLoading = true, storeErrorMessage = null) }
+            val unconsumed = myketBillingManager.queryPurchases()
+            if (unconsumed.isEmpty()) {
+                _uiState.update {
+                    it.copy(
+                        isStoreLoading = false,
+                        infoMessage = "هیچ خرید معلقی برای بازیابی یافت نشد."
+                    )
+                }
+                return@launch
+            }
+            var restoredCount = 0
+            for (purchase in unconsumed) {
+                processMyketPurchaseResult(purchase)
+                restoredCount++
+            }
+            _uiState.update {
+                it.copy(
+                    isStoreLoading = false,
+                    infoMessage = "$restoredCount خرید معلق با موفقیت بازیابی و اعمال شد."
+                )
             }
         }
     }

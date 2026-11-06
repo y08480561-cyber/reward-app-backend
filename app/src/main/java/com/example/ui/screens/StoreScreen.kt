@@ -34,7 +34,8 @@ fun StoreScreen(
     errorMessage: String?,
     onPurchase: (String) -> Unit,
     onRefresh: () -> Unit,
-    onDismissError: () -> Unit
+    onDismissError: () -> Unit,
+    onRestorePurchases: (() -> Unit)? = null
 ) {
     Box(
         modifier = Modifier
@@ -102,7 +103,7 @@ fun StoreScreen(
 
             // Store Footer / Info
             item {
-                StoreFooter()
+                StoreFooter(onRestorePurchases = onRestorePurchases)
             }
         }
     }
@@ -386,7 +387,7 @@ fun ErrorMessage(message: String, onDismiss: () -> Unit) {
 }
 
 @Composable
-fun StoreFooter() {
+fun StoreFooter(onRestorePurchases: (() -> Unit)? = null) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
@@ -394,10 +395,23 @@ fun StoreFooter() {
         border = androidx.compose.foundation.BorderStroke(1.dp, LuxuryBorder)
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(imageVector = Icons.Default.Info, contentDescription = null, tint = GoldLight, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(text = "شرایط و قوانین خرید", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = GoldLight)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(imageVector = Icons.Default.Info, contentDescription = null, tint = GoldLight, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(text = "شرایط و قوانین خرید", fontWeight = FontWeight.Bold, fontSize = 13.sp, color = GoldLight)
+                }
+                if (onRestorePurchases != null) {
+                    TextButton(onClick = onRestorePurchases) {
+                        Icon(imageVector = Icons.Default.Refresh, contentDescription = null, tint = GoldAccent, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(text = "بازیابی خریدها", fontSize = 11.sp, color = GoldAccent, fontWeight = FontWeight.Bold)
+                    }
+                }
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text(

@@ -158,7 +158,8 @@ class MainActivity : ComponentActivity() {
                                             errorMessage = uiState.storeErrorMessage,
                                             onPurchase = { productId -> viewModel.startMyketPurchaseFlow(this@MainActivity, productId) },
                                             onRefresh = { viewModel.loadStoreData() },
-                                            onDismissError = { viewModel.clearStoreMessages() }
+                                            onDismissError = { viewModel.clearStoreMessages() },
+                                            onRestorePurchases = { viewModel.restoreMyketPurchases() }
                                         )
                                     }
                                     AppScreen.SUPPORT -> {
@@ -268,6 +269,16 @@ class MainActivity : ComponentActivity() {
             } else {
                 android.widget.Toast.makeText(this, "خطا در دریافت اطلاعات پرداخت از مایکت.", android.widget.Toast.LENGTH_SHORT).show()
             }
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        try {
+            val viewModel: MainViewModel = androidx.lifecycle.ViewModelProvider(this)[MainViewModel::class.java]
+            viewModel.myketBillingManager.startConnection()
+        } catch (e: Exception) {
+            // Ignore if viewmodel is not yet ready
         }
     }
 
