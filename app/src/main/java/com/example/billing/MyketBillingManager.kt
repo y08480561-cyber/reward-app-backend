@@ -30,7 +30,9 @@ data class PurchaseData(
     val productId: String,
     val purchaseTime: Long,
     val purchaseToken: String,
-    val developerPayload: String = ""
+    val developerPayload: String = "",
+    val rawPurchaseData: String = "",
+    val signature: String = ""
 )
 
 /**
@@ -227,7 +229,9 @@ class MyketBillingManager(private val context: Context) {
                 productId = json.optString("productId"),
                 purchaseTime = json.optLong("purchaseTime", System.currentTimeMillis()),
                 purchaseToken = json.optString("purchaseToken", json.optString("token")),
-                developerPayload = json.optString("developerPayload", "")
+                developerPayload = json.optString("developerPayload", ""),
+                rawPurchaseData = purchaseDataString,
+                signature = signature
             )
         } catch (e: Exception) {
             Log.e(TAG, "Error parsing purchase JSON", e)
@@ -286,7 +290,9 @@ class MyketBillingManager(private val context: Context) {
                                         productId = json.optString("productId"),
                                         purchaseTime = json.optLong("purchaseTime"),
                                         purchaseToken = json.optString("purchaseToken", json.optString("token")),
-                                        developerPayload = json.optString("developerPayload")
+                                        developerPayload = json.optString("developerPayload"),
+                                        rawPurchaseData = raw,
+                                        signature = sig
                                     )
                                 )
                             } catch (e: Exception) {

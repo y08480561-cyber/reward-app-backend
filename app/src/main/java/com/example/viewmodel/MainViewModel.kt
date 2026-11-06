@@ -1070,7 +1070,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 productId = canonicalId, 
                 purchaseToken = purchaseData.purchaseToken, 
                 orderId = purchaseData.orderId,
-                packageName = purchaseData.packageName
+                packageName = purchaseData.packageName,
+                purchaseData = purchaseData.rawPurchaseData,
+                signature = purchaseData.signature
             )) {
                 is Result.Success -> {
                     // Consume purchase token if square unlock item so user can buy again next time

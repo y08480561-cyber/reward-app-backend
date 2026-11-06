@@ -1709,7 +1709,9 @@ class BackendRepository(
         productId: String,
         purchaseToken: String,
         orderId: String? = null,
-        packageName: String? = null
+        packageName: String? = null,
+        purchaseData: String? = null,
+        signature: String? = null
     ): Result<JSONObject> = withContext(Dispatchers.IO) {
         val url = "${prefs.serverUrl.trimEnd('/')}/api/store/verify-purchase"
         val payload = JSONObject().apply {
@@ -1718,6 +1720,8 @@ class BackendRepository(
             put("purchaseToken", purchaseToken)
             if (!orderId.isNullOrBlank()) put("orderId", orderId)
             if (!packageName.isNullOrBlank()) put("packageName", packageName)
+            if (!purchaseData.isNullOrBlank()) put("purchaseData", purchaseData)
+            if (!signature.isNullOrBlank()) put("signature", signature)
         }
         try {
             val request = Request.Builder()

@@ -1798,12 +1798,48 @@ app.get('/api/store/user-entitlements', ensureDatabaseReady, async (req, res) =>
   }
 });
 
-// 3. Official Store Purchase Verification (Idempotent, Replay-Protected)
+const MYKET_PUBLIC_KEY = process.env.MYKET_PUBLIC_KEY || "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCIUMmkIxGVpyKupQajOZqGfhYSkoGA0I1rhDiTLkKCiObtCnqXHJYdTJTRYKlSmA/KIIa4rC08CoZILDRjKKVt+Z3ZOt2pONjTr6jt+FtObbg7bNpTSWbcUE6Np5rz/nV/wHfQvn3wv/AJ9UFW95qAaKpwf0CZLLxG8a33BaB4dwIDAQAB";
+
+function verifyMyketRsaSignature(signedData, signatureBase64) {
+  if (!signedData || !signatureBase64) return false;
+  try {
+    const formattedPublicKey = `-----BEGIN PUBLIC KEY-----\n${MYKET_PUBLIC_KEY.trim().match(/.{1,64}/g).join('\n')}\n-----END PUBLIC KEY-----`;
+    const verifier = crypto.createVerify('RSA-SHA1');
+    verifier.update(signedData);
+    return verifier.verify(formattedPublicKey, signatureBase64, 'base64');
+  } catch (err) {
+    console.error('[Server RSA Signature Verify Error]', err.message);
+    return false;
+  }
+}
+
+// 3. Official Store Purchase Verification (Idempotent, Replay-Protected, Cryptographically Signed)
 app.post('/api/store/verify-purchase', requireUserAuth, ensureDatabaseReady, async (req, res) => {
   const client = await pool.connect();
   try {
     const userId = req.user ? req.user.id : (req.headers['x-user-id'] || req.body.userId);
-    const { productId, purchaseToken, orderId, packageName } = req.body;
+    let { productId, purchaseToken, orderId, packageName, purchaseData, signature } = req.body;
+
+    // Server-side RSA SHA1withRSA verification against Myket Public Key
+    if (purchaseData && signature) {
+      const isValidSig = verifyMyketRsaSignature(purchaseData, signature);
+      if (!isValidSig) {
+        return res.status(401).json({ error: "امضای دیجیتال تراکنش مایکت نامعتبر است (خطای اعتبارسنجی امنیتی سرور)." });
+      }
+      try {
+        const parsed = JSON.parse(purchaseData);
+        if (parsed.productId) productId = parsed.productId;
+        if (parsed.purchaseToken) purchaseToken = parsed.purchaseToken;
+        if (parsed.orderId) orderId = parsed.orderId;
+        if (parsed.packageName) packageName = parsed.packageName;
+
+        if (parsed.purchaseState !== undefined && Number(parsed.purchaseState) !== 0) {
+          return res.status(400).json({ error: "تراکنش خرید در مایکت در حالت تکمیل‌شده (Purchased) نیست." });
+        }
+      } catch (pErr) {
+        return res.status(400).json({ error: "اطلاعات ساختار یافته خرید مایکت قابل تحلیل نیست." });
+      }
+    }
 
     if (!userId || !productId) {
       return res.status(400).json({ error: "شناسه کاربر و محصول الزامی است." });
