@@ -259,17 +259,7 @@ class MainActivity : ComponentActivity() {
     @Suppress("DEPRECATION")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == com.example.billing.MyketBillingManager.REQUEST_CODE_MYKET_PURCHASE) {
-            val viewModel: MainViewModel = androidx.lifecycle.ViewModelProvider(this)[MainViewModel::class.java]
-            val purchaseData = viewModel.myketBillingManager.handleActivityResult(requestCode, resultCode, data)
-            if (purchaseData != null) {
-                viewModel.processMyketPurchaseResult(purchaseData)
-            } else if (resultCode == RESULT_CANCELED) {
-                android.widget.Toast.makeText(this, "عملیات پرداخت لغو گردید.", android.widget.Toast.LENGTH_SHORT).show()
-            } else {
-                android.widget.Toast.makeText(this, "خطا در دریافت اطلاعات پرداخت از مایکت.", android.widget.Toast.LENGTH_SHORT).show()
-            }
-        }
+        // Myket SDK 2.2+ handles results internally via listeners, so manual delegation is no longer required.
     }
 
     override fun onStart() {

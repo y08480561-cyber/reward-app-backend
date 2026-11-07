@@ -1,19 +1,21 @@
 package com.example.billing
 
 import android.app.Activity
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.ServiceConnection
-import android.os.Bundle
-import android.os.IBinder
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
-import ir.mservices.market.billing.IInAppBillingService
+import ir.myket.billingclient.IabHelper
+import ir.myket.billingclient.util.IabResult
+import ir.myket.billingclient.util.Inventory
+import ir.myket.billingclient.util.Purchase
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
+import kotlin.coroutines.resume
 
 /**
  * Result of a Myket In-App Billing action
@@ -37,13 +39,18 @@ data class PurchaseData(
 )
 
 /**
- * Myket Billing Implementation compliant with SDK v2.2 Standards.
- * Uses AIDL for reliable connection while providing high-level SDK capabilities.
+ * Official Myket Billing SDK v2.2 Implementation.
+ * Uses ir.myket.billingclient.util.IabHelper for secure and reliable purchases.
  */
 class MyketBillingManager(context: Context) {
 
     private val appContext: Context = context.applicationContext
     private val purchaseMutex = Mutex()
+    private var iabHelper: IabHelper? = null
+    
+    @Volatile
+    var isBillingReady = false
+        private set
 
     companion object {
         private const val TAG = "MyketBillingManager"
@@ -58,142 +65,83 @@ class MyketBillingManager(context: Context) {
         val ALL_SKUS = listOf(SKU_SQUARES_50, SKU_SQUARES_100, SKU_UPGRADE_SILVER, SKU_UPGRADE_GOLD)
     }
 
-    private val MYKET_PACKAGE = "ir.mservices.market"
-    private val BILLING_SERVICE_ACTION = "ir.mservices.market.InAppBillingService.BIND"
-    private val BILLING_API_VERSION = 3
-
-    @Volatile
-    private var billingService: IInAppBillingService? = null
-    @Volatile
-    private var isBound = false
-    @Volatile
-    private var isBinding = false
-    @Volatile
-    var isBillingReady = false
-        private set
-
-    private val serviceConnection = object : ServiceConnection {
-        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-            billingService = IInAppBillingService.Stub.asInterface(service)
-            isBound = (billingService != null)
-            isBinding = false
-            if (isBound) {
-                Log.d(TAG, "ON_SERVICE_CONNECTED: Myket Billing Service connected.")
-                checkBillingSupport()
+    /**
+     * Initializes the Myket Billing SDK.
+     */
+    fun startConnection() {
+        if (iabHelper != null && isBillingReady) return
+        
+        Log.d(TAG, "BIND_SERVICE_STARTED: Initializing Myket SDK v2.2...")
+        
+        iabHelper = IabHelper(appContext, MYKET_PUBLIC_KEY).apply {
+            enableDebugLogging(true)
+            startSetup { result ->
+                Log.d(TAG, "BIND_SERVICE_RESULT: Setup result: ${result.message} (Success: ${result.isSuccess})")
+                if (result.isSuccess) {
+                    isBillingReady = true
+                    Log.d(TAG, "ON_SERVICE_CONNECTED: Myket Billing Service connected and ready.")
+                } else {
+                    isBillingReady = false
+                    Log.e(TAG, "BIND_SERVICE_FAILED: ${result.message}")
+                }
             }
-        }
-
-        override fun onServiceDisconnected(name: ComponentName?) {
-            billingService = null
-            isBound = false
-            isBinding = false
-            isBillingReady = false
-            Log.d(TAG, "ON_SERVICE_DISCONNECTED: Service disconnected.")
         }
     }
 
     /**
-     * SDK Capability: startSetup
+     * Safely closes the IabHelper connection.
      */
-    fun startConnection() {
-        if (billingService != null && isBillingReady) return
-        if (!isMyketInstalled()) {
-            isBillingReady = false
-            return
-        }
-        if (isBinding) return
-        isBinding = true
-        Log.d(TAG, "BIND_SERVICE_STARTED: Connecting to Myket...")
-        try {
-            val intent = Intent(BILLING_SERVICE_ACTION).apply {
-                setPackage(MYKET_PACKAGE)
-            }
-            val success = appContext.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
-            Log.d(TAG, "BIND_SERVICE_RESULT: $success")
-            if (!success) {
-                isBinding = false
-                isBillingReady = false
-            }
-        } catch (e: Exception) {
-            isBinding = false
-            isBillingReady = false
-        }
-    }
-
-    private fun checkBillingSupport() {
-        val service = billingService ?: return
-        try {
-            val result = service.isBillingSupported(BILLING_API_VERSION, appContext.packageName, "inapp")
-            if (result == 0) {
-                isBillingReady = true
-                Log.d(TAG, "BILLING_SUPPORTED: Ready for purchases.")
-            } else {
-                isBillingReady = false
-                Log.e(TAG, "BILLING_NOT_SUPPORTED: Code $result")
-            }
-        } catch (e: Exception) {
-            isBillingReady = false
-        }
-    }
-
     fun endConnection() {
-        if (isBound) {
-            try {
-                appContext.unbindService(serviceConnection)
-            } catch (e: Exception) {}
-            isBound = false
-            isBinding = false
-            isBillingReady = false
-            billingService = null
+        Log.d(TAG, "ON_SERVICE_DISCONNECTED: Disposing Myket IabHelper.")
+        try {
+            iabHelper?.dispose()
+        } catch (e: Exception) {
+            Log.w(TAG, "Error during dispose: ${e.message}")
         }
+        iabHelper = null
+        isBillingReady = false
     }
 
+    /**
+     * Checks if Myket app is installed.
+     */
     fun isMyketInstalled(): Boolean {
         return try {
             val pm = appContext.packageManager
-            pm.getPackageInfo(MYKET_PACKAGE, 0)
+            pm.getPackageInfo("ir.mservices.market", 0)
             true
         } catch (e: Exception) {
-            false
+            try {
+                appContext.packageManager.getPackageInfo("com.myket.android", 0)
+                true
+            } catch (e2: Exception) {
+                false
+            }
         }
     }
 
     /**
-     * SDK Capability: getSkuDetails / queryInventory
+     * Queries prices and titles of the products from Myket.
      */
-    suspend fun queryInventory(): Map<String, SkuDetails>? = withContext(Dispatchers.IO) {
-        val service = billingService ?: return@withContext null
+    suspend fun queryInventory(): Inventory? = withContext(Dispatchers.IO) {
+        val helper = iabHelper ?: return@withContext null
         if (!isBillingReady) return@withContext null
         
-        try {
-            val queryBundle = Bundle().apply {
-                putStringArrayList("ITEM_ID_LIST", ArrayList(ALL_SKUS))
-            }
-            val skuDetailsBundle = service.getSkuDetails(BILLING_API_VERSION, appContext.packageName, "inapp", queryBundle)
-            val responseCode = skuDetailsBundle.getInt("RESPONSE_CODE")
-            if (responseCode == 0) {
-                val detailsList = skuDetailsBundle.getStringArrayList("DETAILS_LIST")
-                val results = mutableMapOf<String, SkuDetails>()
-                detailsList?.forEach { jsonStr ->
-                    val json = JSONObject(jsonStr)
-                    val sku = json.getString("productId")
-                    results[sku] = SkuDetails(
-                        sku = sku,
-                        price = json.getString("price"),
-                        title = json.getString("title"),
-                        description = json.getString("description")
-                    )
+        suspendCancellableCoroutine { continuation ->
+            helper.queryInventoryAsync(true, ALL_SKUS) { result, inv ->
+                if (result.isSuccess) {
+                    Log.d(TAG, "BILLING_SUPPORTED: Inventory queried successfully.")
+                    continuation.resume(inv)
+                } else {
+                    Log.e(TAG, "Query inventory failed: ${result.message}")
+                    continuation.resume(null)
                 }
-                return@withContext results
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Query inventory failed", e)
         }
-        null
     }
 
     /**
-     * SDK Capability: launchPurchaseFlow
+     * Launches the purchase flow for a specific SKU.
      */
     suspend fun launchPurchaseFlow(
         activity: Activity,
@@ -201,10 +149,14 @@ class MyketBillingManager(context: Context) {
         isReadyInMyket: Boolean = true,
         requestCode: Int = REQUEST_CODE_MYKET_PURCHASE,
         developerPayload: String = ""
-    ): BillingResult<Unit> = withContext(Dispatchers.IO) {
+    ): BillingResult<PurchaseData?> = withContext(Dispatchers.IO) {
         purchaseMutex.withLock {
+            if (!isReadyInMyket) {
+                return@withLock BillingResult.UnderPreparation("این بسته در حال آماده‌سازی در مایکت است.")
+            }
+            
             if (!isMyketInstalled()) {
-                return@withLock BillingResult.MyketNotInstalled("لطفاً ابتدا مایکت را نصب کنید.")
+                return@withLock BillingResult.MyketNotInstalled("لطفاً ابتدا برنامه مایکت را نصب کنید.")
             }
 
             startConnection()
@@ -214,103 +166,128 @@ class MyketBillingManager(context: Context) {
                 waitCount++
             }
 
-            val service = billingService ?: return@withLock BillingResult.Error("عدم اتصال به مایکت")
+            val helper = iabHelper ?: run {
+                return@withLock BillingResult.Error("در حال برقراری ارتباط با مایکت... لطفاً لحظاتی دیگر تلاش کنید.")
+            }
 
-            try {
-                val buyIntentBundle = service.getBuyIntent(BILLING_API_VERSION, appContext.packageName, sku, "inapp", developerPayload)
-                val responseCode = buyIntentBundle.getInt("RESPONSE_CODE")
-                Log.d(TAG, "GET_BUY_INTENT_RESULT: $responseCode")
+            if (!isBillingReady) {
+                return@withLock BillingResult.Error("امکان برقراری ارتباط با مایکت فراهم نشد. لطفاً وارد حساب مایکت خود شوید.")
+            }
 
-                if (responseCode == 0) {
-                    val pendingIntent = buyIntentBundle.getParcelable<android.app.PendingIntent>("BUY_INTENT")
-                    if (pendingIntent != null) {
-                        Log.d(TAG, "PAYMENT_INTENT_LAUNCHED: SKU $sku")
-                        withContext(Dispatchers.Main) {
-                            activity.startIntentSenderForResult(pendingIntent.intentSender, requestCode, Intent(), 0, 0, 0)
-                        }
-                        return@withLock BillingResult.Success(Unit)
+            suspendCancellableCoroutine<BillingResult<PurchaseData?>> { continuation ->
+                Handler(Looper.getMainLooper()).post {
+                    Log.d(TAG, "PAYMENT_INTENT_LAUNCHED: Starting purchase flow for $sku")
+                    try {
+                        helper.launchPurchaseFlow(activity, sku, { result, purchase ->
+                            Log.d(TAG, "GET_BUY_INTENT_RESULT: Finished with message: ${result.message}")
+                            if (result.isSuccess && purchase != null) {
+                                val pData = PurchaseData(
+                                    orderId = purchase.orderId ?: "",
+                                    packageName = purchase.packageName,
+                                    productId = purchase.sku,
+                                    purchaseTime = purchase.purchaseTime,
+                                    purchaseToken = purchase.token,
+                                    developerPayload = purchase.developerPayload ?: "",
+                                    rawPurchaseData = purchase.originalJson,
+                                    signature = purchase.signature
+                                )
+                                if (continuation.isActive) continuation.resume(BillingResult.Success(pData))
+                            } else if (result.response == 1) { // User canceled
+                                if (continuation.isActive) continuation.resume(BillingResult.Error("عملیات توسط کاربر لغو شد.", result.response))
+                            } else {
+                                if (continuation.isActive) continuation.resume(BillingResult.Error(result.message, result.response))
+                            }
+                        }, developerPayload)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error launching purchase flow", e)
+                        if (continuation.isActive) continuation.resume(BillingResult.Error("خطا در اجرای فرایند خرید: ${e.message}"))
                     }
-                } else if (responseCode == 7) {
-                    return@withLock BillingResult.Error("این محصول قبلاً خریداری شده است.", responseCode)
                 }
-                return@withLock BillingResult.Error("خطا در درگاه مایکت (کد $responseCode)", responseCode)
-            } catch (e: Exception) {
-                return@withLock BillingResult.Error("خطا در ارتباط: ${e.message}")
             }
         }
     }
 
-    fun handleActivityResult(requestCode: Int, resultCode: Int, data: Intent?): PurchaseData? {
-        if (requestCode != REQUEST_CODE_MYKET_PURCHASE || data == null) return null
-        
-        val purchaseData = data.getStringExtra("INAPP_PURCHASE_DATA")
-        val signature = data.getStringExtra("INAPP_DATA_SIGNATURE")
-        
-        if (resultCode == Activity.RESULT_OK && purchaseData != null) {
-            try {
-                val json = JSONObject(purchaseData)
-                return PurchaseData(
-                    orderId = json.optString("orderId"),
-                    packageName = json.optString("packageName"),
-                    productId = json.optString("productId"),
-                    purchaseTime = json.optLong("purchaseTime"),
-                    purchaseToken = json.optString("purchaseToken", json.optString("token")),
-                    developerPayload = json.optString("developerPayload"),
-                    rawPurchaseData = purchaseData,
-                    signature = signature ?: ""
-                )
-            } catch (e: Exception) {}
-        }
-        return null
-    }
-
     /**
-     * SDK Capability: queryPurchases
+     * SDK 2.2+ uses ProxyBillingActivity and does not require manual onActivityResult delegation.
+     * This method is kept for backward compatibility with the ViewModel's processing logic, 
+     * but the manual Binder delegation is removed.
      */
-    suspend fun queryPurchases(): List<PurchaseData> = withContext(Dispatchers.IO) {
-        val service = billingService ?: return@withContext emptyList()
-        val results = mutableListOf<PurchaseData>()
-        try {
-            val ownedItems = service.getPurchases(BILLING_API_VERSION, appContext.packageName, "inapp", null)
-            if (ownedItems.getInt("RESPONSE_CODE") == 0) {
-                val dataList = ownedItems.getStringArrayList("INAPP_PURCHASE_DATA_LIST")
-                val sigList = ownedItems.getStringArrayList("INAPP_DATA_SIGNATURE_LIST")
-                dataList?.indices?.forEach { i ->
-                    val raw = dataList[i]
-                    val sig = sigList?.getOrNull(i) ?: ""
-                    val json = JSONObject(raw)
-                    results.add(PurchaseData(
+    fun handleActivityResult(requestCode: Int, resultCode: Int, data: Intent?): PurchaseData? {
+        var pData: PurchaseData? = null
+        
+        // Extract data for our BackendRepository manually from the Intent
+        if (requestCode == REQUEST_CODE_MYKET_PURCHASE && data != null) {
+            val responseCode = data.getIntExtra("RESPONSE_CODE", 0)
+            val purchaseData = data.getStringExtra("INAPP_PURCHASE_DATA")
+            val dataSignature = data.getStringExtra("INAPP_DATA_SIGNATURE")
+            
+            if (resultCode == Activity.RESULT_OK && responseCode == 0 && purchaseData != null) {
+                try {
+                    val json = org.json.JSONObject(purchaseData)
+                    pData = PurchaseData(
                         orderId = json.optString("orderId"),
                         packageName = json.optString("packageName"),
                         productId = json.optString("productId"),
                         purchaseTime = json.optLong("purchaseTime"),
                         purchaseToken = json.optString("purchaseToken", json.optString("token")),
-                        rawPurchaseData = raw,
-                        signature = sig
-                    ))
+                        developerPayload = json.optString("developerPayload"),
+                        rawPurchaseData = purchaseData,
+                        signature = dataSignature ?: ""
+                    )
+                    Log.d(TAG, "Purchase result parsed successfully: ${pData.productId}")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error parsing purchase data", e)
                 }
             }
-        } catch (e: Exception) {}
-        results
+        }
+        return pData
     }
 
     /**
-     * SDK Capability: consumeAsync
+     * Queries unconsumed purchases for restoration.
+     */
+    suspend fun queryPurchases(): List<PurchaseData> = withContext(Dispatchers.IO) {
+        val helper = iabHelper ?: return@withContext emptyList()
+        if (!isBillingReady) return@withContext emptyList()
+
+        suspendCancellableCoroutine { continuation ->
+            helper.queryInventoryAsync(true, ALL_SKUS) { result, inv ->
+                if (result.isSuccess && inv != null) {
+                    val list = inv.allPurchases.map { p ->
+                        PurchaseData(
+                            orderId = p.orderId ?: "",
+                            packageName = p.packageName,
+                            productId = p.sku,
+                            purchaseTime = p.purchaseTime,
+                            purchaseToken = p.token,
+                            developerPayload = p.developerPayload ?: "",
+                            rawPurchaseData = p.originalJson,
+                            signature = p.signature
+                        )
+                    }
+                    continuation.resume(list)
+                } else {
+                    continuation.resume(emptyList())
+                }
+            }
+        }
+    }
+
+    /**
+     * Consumes a consumable product.
      */
     suspend fun consumePurchase(purchaseToken: String): Boolean = withContext(Dispatchers.IO) {
-        val service = billingService ?: return@withContext false
-        try {
-            val response = service.consumePurchase(BILLING_API_VERSION, appContext.packageName, purchaseToken)
-            response == 0
-        } catch (e: Exception) {
-            false
+        val helper = iabHelper ?: return@withContext false
+        if (!isBillingReady) return@withContext false
+
+        // Create a Purchase object to consume
+        val p = Purchase("inapp", "{\"purchaseToken\":\"$purchaseToken\",\"token\":\"$purchaseToken\"}", "")
+        
+        suspendCancellableCoroutine { continuation ->
+            helper.consumeAsync(p) { purchase, result ->
+                Log.d(TAG, "Consume result: ${result.message} for token: ${purchase.token}")
+                continuation.resume(result.isSuccess)
+            }
         }
     }
 }
-
-data class SkuDetails(
-    val sku: String,
-    val price: String,
-    val title: String,
-    val description: String
-)

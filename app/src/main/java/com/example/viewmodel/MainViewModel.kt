@@ -962,7 +962,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val inventory = myketBillingManager.queryInventory()
                 val finalProducts = if (inventory != null) {
                     backendProducts.map { product ->
-                        val skuDetails = inventory[product.myketSku]
+                        val skuDetails = inventory.getSkuDetails(product.myketSku)
                         if (skuDetails != null) {
                             // Extract price as Long if possible (e.g. "50,000" -> 50000)
                             val cleanPrice = skuDetails.price.filter { it.isDigit() }.toLongOrNull() ?: product.priceToman
@@ -1080,7 +1080,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
             when (result) {
                 is com.example.billing.BillingResult.Success -> {
-                    // Myket payment activity opened successfully! Wait for Activity result in MainActivity
+                    val purchaseData = result.data
+                    if (purchaseData != null) {
+                        processMyketPurchaseResult(purchaseData)
+                    }
                 }
                 is com.example.billing.BillingResult.UnderPreparation -> {
                     _uiState.update { it.copy(storeErrorMessage = result.message, errorMessage = result.message) }
@@ -1089,7 +1092,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     _uiState.update { it.copy(storeErrorMessage = result.message, errorMessage = result.message) }
                 }
                 is com.example.billing.BillingResult.Error -> {
-                    _uiState.update { it.copy(storeErrorMessage = result.message, errorMessage = result.message) }
+                    if (result.responseCode != 1) { // 1 is user cancel
+                        _uiState.update { it.copy(storeErrorMessage = result.message, errorMessage = result.message) }
+                    } else {
+                        _uiState.update { it.copy(infoMessage = result.message) }
+                    }
                 }
             }
         }
