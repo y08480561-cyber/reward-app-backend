@@ -45,12 +45,16 @@ data class PurchaseData(
 class MyketBillingManager(context: Context) {
 
     private val appContext: Context = context.applicationContext
+    private val connectionMutex = Mutex()
     private val purchaseMutex = Mutex()
     private var iabHelper: IabHelper? = null
     
     @Volatile
     var isBillingReady = false
         private set
+
+    @Volatile
+    private var isConnecting = false
 
     companion object {
         private const val TAG = "MyketBillingManager"
@@ -66,24 +70,40 @@ class MyketBillingManager(context: Context) {
     }
 
     /**
-     * Initializes the Myket Billing SDK.
+     * Initializes the Myket Billing SDK safely.
      */
     fun startConnection() {
-        if (iabHelper != null && isBillingReady) return
+        if (isBillingReady || isConnecting) return
         
-        Log.d(TAG, "BIND_SERVICE_STARTED: Initializing Myket SDK v2.2...")
-        
-        iabHelper = IabHelper(appContext, MYKET_PUBLIC_KEY).apply {
-            enableDebugLogging(true)
-            startSetup { result ->
-                Log.d(TAG, "BIND_SERVICE_RESULT: Setup result: ${result.message} (Success: ${result.isSuccess})")
-                if (result.isSuccess) {
-                    isBillingReady = true
-                    Log.d(TAG, "ON_SERVICE_CONNECTED: Myket Billing Service connected and ready.")
-                } else {
-                    isBillingReady = false
-                    Log.e(TAG, "BIND_SERVICE_FAILED: ${result.message}")
+        // Use a coroutine on Main thread to handle the async setup start
+        // This is safe to call from any thread
+        Handler(Looper.getMainLooper()).post {
+            if (isBillingReady || isConnecting) return@post
+            isConnecting = true
+            
+            Log.d(TAG, "BIND_SERVICE_STARTED: Initializing Myket SDK v2.2...")
+            
+            try {
+                if (iabHelper == null) {
+                    iabHelper = IabHelper(appContext, MYKET_PUBLIC_KEY)
+                    iabHelper?.enableDebugLogging(true)
                 }
+                
+                iabHelper?.startSetup { result ->
+                    isConnecting = false
+                    Log.d(TAG, "BIND_SERVICE_RESULT: Setup result: ${result.message} (Success: ${result.isSuccess})")
+                    if (result.isSuccess) {
+                        isBillingReady = true
+                        Log.d(TAG, "ON_SERVICE_CONNECTED: Myket Billing Service connected and ready.")
+                    } else {
+                        isBillingReady = false
+                        Log.e(TAG, "BIND_SERVICE_FAILED: ${result.message}")
+                    }
+                }
+            } catch (e: Exception) {
+                isConnecting = false
+                isBillingReady = false
+                Log.e(TAG, "Error starting connection", e)
             }
         }
     }
@@ -100,6 +120,7 @@ class MyketBillingManager(context: Context) {
         }
         iabHelper = null
         isBillingReady = false
+        isConnecting = false
     }
 
     /**
@@ -121,21 +142,42 @@ class MyketBillingManager(context: Context) {
     }
 
     /**
+     * Ensures connection is established before performing billing operations.
+     */
+    private suspend fun ensureConnected(): Boolean {
+        if (isBillingReady) return true
+        startConnection()
+        
+        var waitCount = 0
+        while ((isConnecting || !isBillingReady) && waitCount < 50) {
+            kotlinx.coroutines.delay(100)
+            waitCount++
+            if (isBillingReady) return true
+        }
+        return isBillingReady
+    }
+
+    /**
      * Queries prices and titles of the products from Myket.
      */
     suspend fun queryInventory(): Inventory? = withContext(Dispatchers.IO) {
+        if (!ensureConnected()) return@withContext null
         val helper = iabHelper ?: return@withContext null
-        if (!isBillingReady) return@withContext null
         
         suspendCancellableCoroutine { continuation ->
-            helper.queryInventoryAsync(true, ALL_SKUS) { result, inv ->
-                if (result.isSuccess) {
-                    Log.d(TAG, "BILLING_SUPPORTED: Inventory queried successfully.")
-                    continuation.resume(inv)
-                } else {
-                    Log.e(TAG, "Query inventory failed: ${result.message}")
-                    continuation.resume(null)
+            try {
+                helper.queryInventoryAsync(true, ALL_SKUS) { result, inv ->
+                    if (result.isSuccess) {
+                        Log.d(TAG, "BILLING_SUPPORTED: Inventory queried successfully.")
+                        if (continuation.isActive) continuation.resume(inv)
+                    } else {
+                        Log.e(TAG, "Query inventory failed: ${result.message}")
+                        if (continuation.isActive) continuation.resume(null)
+                    }
                 }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception during queryInventoryAsync", e)
+                if (continuation.isActive) continuation.resume(null)
             }
         }
     }
@@ -159,19 +201,12 @@ class MyketBillingManager(context: Context) {
                 return@withLock BillingResult.MyketNotInstalled("لطفاً ابتدا برنامه مایکت را نصب کنید.")
             }
 
-            startConnection()
-            var waitCount = 0
-            while (!isBillingReady && waitCount < 30) {
-                kotlinx.coroutines.delay(100)
-                waitCount++
+            if (!ensureConnected()) {
+                return@withLock BillingResult.Error("امکان برقراری ارتباط با مایکت فراهم نشد. لطفاً وارد حساب مایکت خود شوید.")
             }
 
             val helper = iabHelper ?: run {
                 return@withLock BillingResult.Error("در حال برقراری ارتباط با مایکت... لطفاً لحظاتی دیگر تلاش کنید.")
-            }
-
-            if (!isBillingReady) {
-                return@withLock BillingResult.Error("امکان برقراری ارتباط با مایکت فراهم نشد. لطفاً وارد حساب مایکت خود شوید.")
             }
 
             suspendCancellableCoroutine<BillingResult<PurchaseData?>> { continuation ->
@@ -208,14 +243,10 @@ class MyketBillingManager(context: Context) {
     }
 
     /**
-     * SDK 2.2+ uses ProxyBillingActivity and does not require manual onActivityResult delegation.
-     * This method is kept for backward compatibility with the ViewModel's processing logic, 
-     * but the manual Binder delegation is removed.
+     * Extracts purchase data from the intent (legacy support).
      */
     fun handleActivityResult(requestCode: Int, resultCode: Int, data: Intent?): PurchaseData? {
         var pData: PurchaseData? = null
-        
-        // Extract data for our BackendRepository manually from the Intent
         if (requestCode == REQUEST_CODE_MYKET_PURCHASE && data != null) {
             val responseCode = data.getIntExtra("RESPONSE_CODE", 0)
             val purchaseData = data.getStringExtra("INAPP_PURCHASE_DATA")
@@ -247,28 +278,33 @@ class MyketBillingManager(context: Context) {
      * Queries unconsumed purchases for restoration.
      */
     suspend fun queryPurchases(): List<PurchaseData> = withContext(Dispatchers.IO) {
+        if (!ensureConnected()) return@withContext emptyList()
         val helper = iabHelper ?: return@withContext emptyList()
-        if (!isBillingReady) return@withContext emptyList()
 
         suspendCancellableCoroutine { continuation ->
-            helper.queryInventoryAsync(true, ALL_SKUS) { result, inv ->
-                if (result.isSuccess && inv != null) {
-                    val list = inv.allPurchases.map { p ->
-                        PurchaseData(
-                            orderId = p.orderId ?: "",
-                            packageName = p.packageName,
-                            productId = p.sku,
-                            purchaseTime = p.purchaseTime,
-                            purchaseToken = p.token,
-                            developerPayload = p.developerPayload ?: "",
-                            rawPurchaseData = p.originalJson,
-                            signature = p.signature
-                        )
+            try {
+                helper.queryInventoryAsync(true, ALL_SKUS) { result, inv ->
+                    if (result.isSuccess && inv != null) {
+                        val list = inv.allPurchases.map { p ->
+                            PurchaseData(
+                                orderId = p.orderId ?: "",
+                                packageName = p.packageName,
+                                productId = p.sku,
+                                purchaseTime = p.purchaseTime,
+                                purchaseToken = p.token,
+                                developerPayload = p.developerPayload ?: "",
+                                rawPurchaseData = p.originalJson,
+                                signature = p.signature
+                            )
+                        }
+                        if (continuation.isActive) continuation.resume(list)
+                    } else {
+                        if (continuation.isActive) continuation.resume(emptyList())
                     }
-                    continuation.resume(list)
-                } else {
-                    continuation.resume(emptyList())
                 }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception during queryPurchases", e)
+                if (continuation.isActive) continuation.resume(emptyList())
             }
         }
     }
@@ -277,17 +313,20 @@ class MyketBillingManager(context: Context) {
      * Consumes a consumable product.
      */
     suspend fun consumePurchase(purchaseToken: String): Boolean = withContext(Dispatchers.IO) {
+        if (!ensureConnected()) return@withContext false
         val helper = iabHelper ?: return@withContext false
-        if (!isBillingReady) return@withContext false
 
-        // Create a Purchase object to consume
-        val p = Purchase("inapp", "{\"purchaseToken\":\"$purchaseToken\",\"token\":\"$purchaseToken\"}", "")
-        
-        suspendCancellableCoroutine { continuation ->
-            helper.consumeAsync(p) { purchase, result ->
-                Log.d(TAG, "Consume result: ${result.message} for token: ${purchase.token}")
-                continuation.resume(result.isSuccess)
+        try {
+            val p = Purchase("inapp", "{\"purchaseToken\":\"$purchaseToken\",\"token\":\"$purchaseToken\"}", "")
+            suspendCancellableCoroutine { continuation ->
+                helper.consumeAsync(p) { purchase, result ->
+                    Log.d(TAG, "Consume result: ${result.message} for token: ${purchase.token}")
+                    if (continuation.isActive) continuation.resume(result.isSuccess)
+                }
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "Exception during consumePurchase", e)
+            false
         }
     }
 }

@@ -965,11 +965,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         val skuDetails = inventory.getSkuDetails(product.myketSku)
                         if (skuDetails != null) {
                             // Extract price as Long if possible (e.g. "50,000" -> 50000)
-                            val cleanPrice = skuDetails.price.filter { it.isDigit() }.toLongOrNull() ?: product.priceToman
+                            val priceStr = skuDetails.price ?: ""
+                            val cleanPrice = priceStr.filter { it.isDigit() }.toLongOrNull() ?: product.priceToman
                             product.copy(
                                 priceToman = cleanPrice,
-                                title = skuDetails.title.substringBefore("(").trim(),
-                                description = skuDetails.description.ifBlank { product.description }
+                                title = (skuDetails.title ?: product.title).substringBefore("(").trim(),
+                                description = (skuDetails.description ?: "").ifBlank { product.description }
                             )
                         } else {
                             product
