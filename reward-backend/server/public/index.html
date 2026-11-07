@@ -450,6 +450,12 @@
             <span>داشبورد اصلی</span>
           </div>
         </a>
+        <a class="sidebar-link" onclick="navigateTo('competitions')">
+          <div class="sidebar-link-content">
+            <i class="bi bi-trophy-fill"></i>
+            <span>مدیریت مسابقات</span>
+          </div>
+        </a>
 
         <div class="nav-category-header">مدیریت محتوا</div>
         <a class="sidebar-link" onclick="navigateTo('users')">
@@ -642,6 +648,9 @@
                     <i class="bi bi-trophy-fill text-warning fs-5"></i>
                     <h6 class="gold-text mb-0">وضعیت دوره فعال مسابقه</h6>
                   </div>
+                  <button class="btn btn-sm btn-danger fw-bold shadow-sm" onclick="openStartCompModal()">
+                    <i class="bi bi-plus-circle-fill me-1"></i> شروع دوره بعدی
+                  </button>
                 </div>
                 <div class="p-3 rounded mb-2" style="background-color: #0E1E36; border: 1px solid var(--border-color);">
                   <div class="d-flex justify-content-between align-items-center mb-1">
@@ -1126,6 +1135,112 @@
             </div>
           </div>
         </section>
+        
+        <!-- ============================================================== -->
+        <!-- SECTION: مدیریت مسابقات (Competitions Management) -->
+        <!-- ============================================================== -->
+        <section id="section-competitions" class="admin-section">
+          <div class="card p-4 shadow mb-4">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+              <div>
+                <h4 class="gold-text mb-1"><i class="bi bi-trophy-fill text-warning me-2"></i> مدیریت دوره‌های مسابقه</h4>
+                <p class="text-secondary small mb-0">کنترل دوره فعال، آرشیو امتیازات و شروع مسابقات جدید</p>
+              </div>
+              <div class="d-flex gap-2">
+                <button class="btn btn-outline-warning btn-sm" onclick="loadDashboard()"><i class="bi bi-arrow-clockwise me-1"></i> بروزرسانی</button>
+                <button class="btn btn-danger btn-sm fw-bold px-3 shadow-sm" onclick="openStartCompModal()">
+                  <i class="bi bi-plus-circle-fill me-1"></i> شروع دوره بعدی و صفر کردن امتیازها
+                </button>
+              </div>
+            </div>
+            
+            <div class="row g-3">
+              <!-- Active Competition Detail Card -->
+              <div class="col-lg-7">
+                <div class="p-3 rounded h-100" style="background-color: #0E1E36; border: 1.5px solid var(--gold-primary);">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="text-warning fw-bold mb-0">جزئیات مسابقه در حال برگزاری</h6>
+                    <span class="badge bg-success">وضعیت: فعال</span>
+                  </div>
+                  <hr class="border-secondary opacity-25 my-2">
+                  <div class="row g-2 text-white small">
+                    <div class="col-6">عنوان: <strong id="activeCompTitleFull">-</strong></div>
+                    <div class="col-6">شماره دوره: <strong id="activeCompNumberFull">-</strong></div>
+                    <div class="col-6">تاریخ شروع: <span id="activeCompStartedAtFull">-</span></div>
+                    <div class="col-6">تاریخ پایان: <span id="activeCompEndedAtFull">-</span></div>
+                  </div>
+                </div>
+              </div>
+              <!-- Mini Stats -->
+              <div class="col-lg-5">
+                <div class="p-3 rounded h-100" style="background-color: #0E1E36; border: 1px solid var(--border-color);">
+                  <h6 class="text-info fw-bold mb-2">آمار زنده دوره</h6>
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-secondary small">کل شرکت‌کنندگان:</span>
+                    <span class="badge bg-dark border border-secondary" id="activeCompParticipants">۰ نفر</span>
+                  </div>
+                  <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-secondary small">مجموع امتیازات کسب‌شده:</span>
+                    <span class="badge bg-dark border border-secondary" id="activeCompTotalScore">۰ امتیاز</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tabs for History & Logs -->
+          <div class="card p-0 shadow" style="overflow: hidden; border-color: var(--border-color);">
+            <ul class="nav nav-tabs border-0 bg-dark bg-opacity-25" role="tablist">
+              <li class="nav-item" role="presentation">
+                <button class="nav-link active text-white py-3 px-4 fw-bold" id="tab-comp-history" data-bs-toggle="tab" data-bs-target="#panel-comp-history" type="button" role="tab">
+                  <i class="bi bi-archive-fill me-1"></i> تاریخچه مسابقات قبلی
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link text-white py-3 px-4 fw-bold" id="tab-comp-logs" data-bs-toggle="tab" data-bs-target="#panel-comp-logs" type="button" role="tab">
+                  <i class="bi bi-journal-text me-1"></i> گزارش تغییرات (Audit Logs)
+                </button>
+              </li>
+            </ul>
+            <div class="tab-content p-4">
+              <div class="tab-pane fade show active" id="panel-comp-history" role="tabpanel">
+                <div class="table-responsive">
+                  <table class="table table-dark table-hover align-middle mb-0">
+                    <thead>
+                      <tr class="small text-secondary">
+                        <th>دوره</th>
+                        <th>عنوان مسابقه</th>
+                        <th>تعداد نفرات</th>
+                        <th>مجموع امتیاز</th>
+                        <th>تاریخ اتمام</th>
+                        <th>عملیات</th>
+                      </tr>
+                    </thead>
+                    <tbody id="archivedCompsTbody">
+                      <tr><td colspan="6" class="text-center py-4">در حال بارگذاری...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="tab-pane fade" id="panel-comp-logs" role="tabpanel">
+                <div class="table-responsive">
+                  <table class="table table-dark table-hover align-middle mb-0">
+                    <thead>
+                      <tr class="small text-secondary">
+                        <th>زمان ثبت</th>
+                        <th>عملیات</th>
+                        <th>جزئیات تغییرات</th>
+                      </tr>
+                    </thead>
+                    <tbody id="logsTbody">
+                      <tr><td colspan="3" class="text-center py-4">در حال بارگذاری...</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
 
         <section id="section-support" class="admin-section">
           <!-- Stat Cards Row -->
@@ -1414,6 +1529,11 @@
             <strong>توجه بسیار مهم:</strong> با شروع مسابقه جدید، رتبه و امتیازهای تمام کاربران در مسابقه فعلی به‌صورت <strong>دائمی در جدول آرشیو PostgreSQL</strong> ذخیره می‌شوند و امتیاز کاربران در دوره جدید از <strong>صفر</strong> آغاز می‌گردد.
             <hr class="my-2">
             <strong>نکته امنیتی:</strong> حساب‌های کاربری، شماره‌های موبایل و خریدهای پلن عضویت کاربران <strong>حفظ خواهند شد</strong>.
+          </div>
+          
+          <div id="startCompStatsAlert" class="alert alert-info border-0 small mb-3">
+            <i class="bi bi-info-circle-fill me-1"></i>
+            تعداد کاربران متأثر: <strong id="affectedUsersCount">۰</strong> نفر | دوره در حال بسته شدن: <strong id="closingCompTitle">-</strong>
           </div>
 
           <div class="row g-3">
@@ -1733,6 +1853,7 @@
     // Navigation section titles mapping
     const SECTION_TITLES = {
       'dashboard': { title: 'داشبورد اصلی', icon: 'bi-speedometer2' },
+      'competitions': { title: 'مدیریت مسابقات', icon: 'bi-trophy-fill' },
       'users': { title: 'مدیریت کاربران', icon: 'bi-people-fill' },
       'rewards_management': { title: 'جوایز و بنر هدیه', icon: 'bi-gift-fill' },
       'store': { title: 'فروشگاه و تراکنش‌ها', icon: 'bi-shop' },
@@ -1775,6 +1896,8 @@
       if (sectionId === 'store') {
         loadStoreProducts();
         loadStorePurchases();
+      } else if (sectionId === 'competitions') {
+        loadDashboard();
       } else if (sectionId === 'rewards') {
         loadRewardsData();
         loadRewardAppearance();
@@ -2022,6 +2145,11 @@
     function openStartCompModal() {
       document.getElementById('confirmationPhraseInput').value = '';
       document.getElementById('confirmStartCompBtn').setAttribute('disabled', 'true');
+      
+      const userCount = cachedUsers ? cachedUsers.length : 0;
+      setElText('affectedUsersCount', userCount);
+      setElText('closingCompTitle', currentActiveComp ? currentActiveComp.title : 'نامشخص');
+      
       const nextNum = currentActiveComp ? (currentActiveComp.competitionNumber + 1) : 2;
       document.getElementById('newCompTitleInput').value = `مسابقه دوره ${nextNum} (جوایز ارزنده)`;
       
@@ -2278,18 +2406,28 @@
           setElText('activeCompTitle', data.activeCompetition.title);
           setElText('dashCompNumber', compNumText);
           setElText('dashCompTitle', data.activeCompetition.title);
+          
+          // Full section details
+          setElText('activeCompNumberFull', data.activeCompetition.competitionNumber);
+          setElText('activeCompTitleFull', data.activeCompetition.title);
+          setElText('activeCompParticipants', (data.activeCompetition.totalParticipants || 0) + ' نفر');
+          setElText('activeCompTotalScore', (data.activeCompetition.totalScore || 0) + ' امتیاز');
 
           const startDate = new Date(data.activeCompetition.startedAt);
-          setElText('activeCompStartedAt', startDate.toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }));
+          const startText = startDate.toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+          setElText('activeCompStartedAt', startText);
+          setElText('activeCompStartedAtFull', startText);
           
           if (data.activeCompetition.endedAt) {
             const endDate = new Date(data.activeCompetition.endedAt);
             const endText = endDate.toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
             setElText('activeCompEndedAt', endText);
             setElText('dashCompEndedAt', endText);
+            setElText('activeCompEndedAtFull', endText);
           } else {
             setElText('activeCompEndedAt', 'نامحدود / تعیین نشده');
             setElText('dashCompEndedAt', 'نامحدود');
+            setElText('activeCompEndedAtFull', 'تعیین نشده (نامحدود)');
           }
         }
 
