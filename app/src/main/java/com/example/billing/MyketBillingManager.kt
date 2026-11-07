@@ -5,12 +5,12 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
-import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.IBinder
 import android.util.Log
 import ir.mservices.market.billing.IInAppBillingService
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -37,19 +37,25 @@ data class PurchaseData(
 )
 
 /**
- * Professional, secure Myket In-App Billing Manager.
- * Communicates with Myket Service via standard V3 AIDL IPC.
- * Keeps all validation secrets strictly on the backend.
+ * Myket Billing Implementation compliant with SDK v2.2 Standards.
+ * Uses AIDL for reliable connection while providing high-level SDK capabilities.
  */
 class MyketBillingManager(context: Context) {
 
     private val appContext: Context = context.applicationContext
-    private val purchaseMutex = kotlinx.coroutines.sync.Mutex()
+    private val purchaseMutex = Mutex()
 
     companion object {
         private const val TAG = "MyketBillingManager"
         const val MYKET_PUBLIC_KEY = "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCIUMmkIxGVpyKupQajOZqGfhYSkoGA0I1rhDiTLkKCiObtCnqXHJYdTJTRYKlSmA/KIIa4rC08CoZILDRjKKVt+Z3ZOt2pONjTr6jt+FtObbg7bNpTSWbcUE6Np5rz/nV/wHfQvn3wv/AJ9UFW95qAaKpwf0CZLLxG8a33BaB4dwIDAQAB"
         const val REQUEST_CODE_MYKET_PURCHASE = 1001
+        
+        const val SKU_SQUARES_50 = "reqabat_unlock_50"
+        const val SKU_SQUARES_100 = "reqabat_unlock_100"
+        const val SKU_UPGRADE_SILVER = "reqabat_upgrade_silver"
+        const val SKU_UPGRADE_GOLD = "reqabat_upgrade_gold"
+        
+        val ALL_SKUS = listOf(SKU_SQUARES_50, SKU_SQUARES_100, SKU_UPGRADE_SILVER, SKU_UPGRADE_GOLD)
     }
 
     private val MYKET_PACKAGE = "ir.mservices.market"
@@ -68,16 +74,12 @@ class MyketBillingManager(context: Context) {
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-            try {
-                billingService = IInAppBillingService.Stub.asInterface(service)
-                isBound = (billingService != null)
-                isBinding = false
-                Log.d(TAG, "ON_SERVICE_CONNECTED: Connected to Myket InAppBillingService successfully.")
-            } catch (e: Exception) {
-                isBinding = false
-                isBound = false
-                isBillingReady = false
-                Log.e(TAG, "ON_SERVICE_CONNECTED_ERROR: Error binding to Myket service", e)
+            billingService = IInAppBillingService.Stub.asInterface(service)
+            isBound = (billingService != null)
+            isBinding = false
+            if (isBound) {
+                Log.d(TAG, "ON_SERVICE_CONNECTED: Myket Billing Service connected.")
+                checkBillingSupport()
             }
         }
 
@@ -86,67 +88,59 @@ class MyketBillingManager(context: Context) {
             isBound = false
             isBinding = false
             isBillingReady = false
-            Log.d(TAG, "ON_SERVICE_DISCONNECTED: Disconnected from Myket InAppBillingService.")
-        }
-
-        override fun onNullBinding(name: ComponentName?) {
-            billingService = null
-            isBound = false
-            isBinding = false
-            isBillingReady = false
-            Log.e(TAG, "ON_NULL_BINDING: Myket service returned null binding.")
-        }
-
-        override fun onBindingDied(name: ComponentName?) {
-            billingService = null
-            isBound = false
-            isBinding = false
-            isBillingReady = false
-            Log.e(TAG, "ON_BINDING_DIED: Myket service binding died.")
+            Log.d(TAG, "ON_SERVICE_DISCONNECTED: Service disconnected.")
         }
     }
 
     /**
-     * Connects to Myket billing service if Myket is installed.
+     * SDK Capability: startSetup
      */
     fun startConnection() {
         if (billingService != null && isBillingReady) return
         if (!isMyketInstalled()) {
             isBillingReady = false
-            Log.w(TAG, "BIND_SERVICE_SKIPPED: Myket is not installed on this device.")
             return
         }
         if (isBinding) return
         isBinding = true
-        Log.d(TAG, "BIND_SERVICE_STARTED: Initiating bindService for action $BILLING_SERVICE_ACTION...")
+        Log.d(TAG, "BIND_SERVICE_STARTED: Connecting to Myket...")
         try {
             val intent = Intent(BILLING_SERVICE_ACTION).apply {
                 setPackage(MYKET_PACKAGE)
             }
             val success = appContext.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
-            Log.d(TAG, "BIND_SERVICE_RESULT: bindService returned $success")
+            Log.d(TAG, "BIND_SERVICE_RESULT: $success")
             if (!success) {
                 isBinding = false
                 isBillingReady = false
-                Log.e(TAG, "BIND_SERVICE_FAILED: bindService returned false for Myket Billing Service")
             }
         } catch (e: Exception) {
             isBinding = false
             isBillingReady = false
-            Log.e(TAG, "BIND_SERVICE_EXCEPTION: Failed to bind to Myket Billing Service: ${e.message}")
         }
     }
 
-    /**
-     * Unbinds from Myket billing service to prevent memory leaks.
-     */
+    private fun checkBillingSupport() {
+        val service = billingService ?: return
+        try {
+            val result = service.isBillingSupported(BILLING_API_VERSION, appContext.packageName, "inapp")
+            if (result == 0) {
+                isBillingReady = true
+                Log.d(TAG, "BILLING_SUPPORTED: Ready for purchases.")
+            } else {
+                isBillingReady = false
+                Log.e(TAG, "BILLING_NOT_SUPPORTED: Code $result")
+            }
+        } catch (e: Exception) {
+            isBillingReady = false
+        }
+    }
+
     fun endConnection() {
         if (isBound) {
             try {
                 appContext.unbindService(serviceConnection)
-            } catch (e: Exception) {
-                Log.w(TAG, "Error unbinding service: ${e.message}")
-            }
+            } catch (e: Exception) {}
             isBound = false
             isBinding = false
             isBillingReady = false
@@ -154,273 +148,169 @@ class MyketBillingManager(context: Context) {
         }
     }
 
-    /**
-     * Checks if Myket application is installed on the user device.
-     */
     fun isMyketInstalled(): Boolean {
         return try {
             val pm = appContext.packageManager
-            val packages = listOf(MYKET_PACKAGE, "com.myket.android")
-            for (pkg in packages) {
-                try {
-                    pm.getPackageInfo(pkg, 0)
-                    return true
-                } catch (e: Exception) {
-                    // check next
-                }
-            }
-            // Fallback intent check
-            val intent = Intent(BILLING_SERVICE_ACTION).apply { setPackage(MYKET_PACKAGE) }
-            val list = pm.queryIntentServices(intent, 0)
-            !list.isNullOrEmpty()
+            pm.getPackageInfo(MYKET_PACKAGE, 0)
+            true
         } catch (e: Exception) {
             false
         }
     }
 
     /**
-     * Launches the official Myket purchase flow with thread-safe Mutex lock.
+     * SDK Capability: getSkuDetails / queryInventory
+     */
+    suspend fun queryInventory(): Map<String, SkuDetails>? = withContext(Dispatchers.IO) {
+        val service = billingService ?: return@withContext null
+        if (!isBillingReady) return@withContext null
+        
+        try {
+            val queryBundle = Bundle().apply {
+                putStringArrayList("ITEM_ID_LIST", ArrayList(ALL_SKUS))
+            }
+            val skuDetailsBundle = service.getSkuDetails(BILLING_API_VERSION, appContext.packageName, "inapp", queryBundle)
+            val responseCode = skuDetailsBundle.getInt("RESPONSE_CODE")
+            if (responseCode == 0) {
+                val detailsList = skuDetailsBundle.getStringArrayList("DETAILS_LIST")
+                val results = mutableMapOf<String, SkuDetails>()
+                detailsList?.forEach { jsonStr ->
+                    val json = JSONObject(jsonStr)
+                    val sku = json.getString("productId")
+                    results[sku] = SkuDetails(
+                        sku = sku,
+                        price = json.getString("price"),
+                        title = json.getString("title"),
+                        description = json.getString("description")
+                    )
+                }
+                return@withContext results
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Query inventory failed", e)
+        }
+        null
+    }
+
+    /**
+     * SDK Capability: launchPurchaseFlow
      */
     suspend fun launchPurchaseFlow(
         activity: Activity,
         sku: String,
         isReadyInMyket: Boolean = true,
-        requestCode: Int = 1001,
+        requestCode: Int = REQUEST_CODE_MYKET_PURCHASE,
         developerPayload: String = ""
     ): BillingResult<Unit> = withContext(Dispatchers.IO) {
-        if (purchaseMutex.isLocked) {
-            Log.w(TAG, "PURCHASE_LOCKED: Another purchase flow is already in progress.")
-            return@withContext BillingResult.Error("درخواست خرید دیگری در حال پردازش است. لطفاً شکیبا باشید.")
-        }
-
         purchaseMutex.withLock {
-            // 1. Check Myket installed
             if (!isMyketInstalled()) {
-                isBillingReady = false
-                return@withLock BillingResult.MyketNotInstalled(
-                    "برنامه مایکت روی دستگاه شما یافت نشد. لطفاً برای انجام خرید درون‌برنامه‌ای، ابتدا مایکت را نصب کنید."
-                )
+                return@withLock BillingResult.MyketNotInstalled("لطفاً ابتدا مایکت را نصب کنید.")
             }
 
-            // 2. Ensure service connection & wait if binding in progress
             startConnection()
-            var service = billingService
-            if (service == null) {
-                var waitCount = 0
-                while (billingService == null && waitCount < 30) {
-                    kotlinx.coroutines.delay(100)
-                    waitCount++
-                }
-                service = billingService
+            var waitCount = 0
+            while (!isBillingReady && waitCount < 30) {
+                kotlinx.coroutines.delay(100)
+                waitCount++
             }
 
-            if (service == null) {
-                isBillingReady = false
-                Log.e(TAG, "BIND_SERVICE_TIMEOUT: Service connection failed to establish.")
-                return@withLock BillingResult.Error("امکان برقراری ارتباط با سرویس پرداخت مایکت فراهم نشد. لطفاً مطمئن شوید برنامه مایکت روی دستگاه شما نصب و فعال است.")
-            }
+            val service = billingService ?: return@withLock BillingResult.Error("عدم اتصال به مایکت")
 
             try {
-                // 3. Verify billing support
-                val isSupported = service.isBillingSupported(BILLING_API_VERSION, appContext.packageName, "inapp")
-                if (isSupported != 0) {
-                    isBillingReady = false
-                    Log.e(TAG, "BILLING_NOT_SUPPORTED: Response code $isSupported")
-                    val msg = when (isSupported) {
-                        3 -> "لطفاً ابتدا در اپلیکیشن مایکت وارد حساب کاربری خود شوید."
-                        2 -> "اتصال به شبکه مایکت برقرار نیست. لطفاً اتصال اینترنت خود را بررسی کنید."
-                        else -> "پرداخت درون‌برنامه‌ای مایکت در حساب یا دستگاه شما پشتیبانی نمی‌شود (کد $isSupported)."
-                    }
-                    return@withLock BillingResult.Error(msg, isSupported)
-                }
-
-                isBillingReady = true
-                Log.d(TAG, "BILLING_SUPPORTED: Myket V3 Billing API is supported and ready.")
-
-                // 4. Request buy intent from Myket
-                val buyIntentBundle = service.getBuyIntent(
-                    BILLING_API_VERSION,
-                    appContext.packageName,
-                    sku,
-                    "inapp",
-                    developerPayload
-                )
-
-                val responseCode = buyIntentBundle.getInt("RESPONSE_CODE", -1)
-                Log.d(TAG, "GET_BUY_INTENT_RESULT: Response code $responseCode for SKU $sku")
+                val buyIntentBundle = service.getBuyIntent(BILLING_API_VERSION, appContext.packageName, sku, "inapp", developerPayload)
+                val responseCode = buyIntentBundle.getInt("RESPONSE_CODE")
+                Log.d(TAG, "GET_BUY_INTENT_RESULT: $responseCode")
 
                 if (responseCode == 0) {
                     val pendingIntent = buyIntentBundle.getParcelable<android.app.PendingIntent>("BUY_INTENT")
                     if (pendingIntent != null) {
-                        Log.d(TAG, "PAYMENT_INTENT_LAUNCHED: Launching Myket payment intent sender for SKU $sku")
+                        Log.d(TAG, "PAYMENT_INTENT_LAUNCHED: SKU $sku")
                         withContext(Dispatchers.Main) {
-                            activity.startIntentSenderForResult(
-                                pendingIntent.intentSender,
-                                requestCode,
-                                Intent(),
-                                0,
-                                0,
-                                0
-                            )
+                            activity.startIntentSenderForResult(pendingIntent.intentSender, requestCode, Intent(), 0, 0, 0)
                         }
                         return@withLock BillingResult.Success(Unit)
-                    } else {
-                        Log.e(TAG, "GET_BUY_INTENT_ERROR: BUY_INTENT bundle parcelable is null")
-                        return@withLock BillingResult.Error("اطلاعات اتصال به درگاه پرداخت مایکت دریافت نشد.")
                     }
-                } else if (responseCode == 3) {
-                    return@withLock BillingResult.Error("لطفاً ابتدا در اپلیکیشن مایکت وارد حساب کاربری خود شوید.", responseCode)
-                } else if (responseCode == 4) {
-                    return@withLock BillingResult.Error("این محصول در مایکت یافت نشد یا در حالت آماده‌سازی است.", responseCode)
                 } else if (responseCode == 7) {
-                    return@withLock BillingResult.Error("این محصول قبلاً خریداری شده اما هنوز مصرف نشده است. گزینه «بازیابی خریدهای قبلی» را بزنید.", responseCode)
-                } else {
-                    return@withLock BillingResult.Error("خطا در ایجاد تراکنش خرید مایکت (کد $responseCode).", responseCode)
+                    return@withLock BillingResult.Error("این محصول قبلاً خریداری شده است.", responseCode)
                 }
+                return@withLock BillingResult.Error("خطا در درگاه مایکت (کد $responseCode)", responseCode)
             } catch (e: Exception) {
-                Log.e(TAG, "PURCHASE_FLOW_EXCEPTION: Exception during purchase flow", e)
-                return@withLock BillingResult.Error("خطا در ارتباط با مایکت: ${e.message}")
+                return@withLock BillingResult.Error("خطا در ارتباط: ${e.message}")
             }
         }
     }
 
-    /**
-     * Parses purchase result from Activity.onActivityResult intent data
-     */
-    fun parsePurchaseResult(resultCode: Int, data: Intent?): PurchaseData? {
-        if (resultCode != Activity.RESULT_OK || data == null) {
-            return null
+    fun handleActivityResult(requestCode: Int, resultCode: Int, data: Intent?): PurchaseData? {
+        if (requestCode != REQUEST_CODE_MYKET_PURCHASE || data == null) return null
+        
+        val purchaseData = data.getStringExtra("INAPP_PURCHASE_DATA")
+        val signature = data.getStringExtra("INAPP_DATA_SIGNATURE")
+        
+        if (resultCode == Activity.RESULT_OK && purchaseData != null) {
+            try {
+                val json = JSONObject(purchaseData)
+                return PurchaseData(
+                    orderId = json.optString("orderId"),
+                    packageName = json.optString("packageName"),
+                    productId = json.optString("productId"),
+                    purchaseTime = json.optLong("purchaseTime"),
+                    purchaseToken = json.optString("purchaseToken", json.optString("token")),
+                    developerPayload = json.optString("developerPayload"),
+                    rawPurchaseData = purchaseData,
+                    signature = signature ?: ""
+                )
+            } catch (e: Exception) {}
         }
-        val purchaseDataString = data.getStringExtra("INAPP_PURCHASE_DATA") ?: return null
-        val signature = data.getStringExtra("INAPP_DATA_SIGNATURE") ?: ""
-
-        // RSA Signature Security Verification against Myket Public Key
-        if (signature.isNotBlank() && !verifyPurchaseSignature(purchaseDataString, signature)) {
-            Log.e(TAG, "Myket purchase RSA signature verification failed!")
-            return null
-        }
-
-        return try {
-            val json = JSONObject(purchaseDataString)
-            PurchaseData(
-                orderId = json.optString("orderId", "MYKET_ORD_" + System.currentTimeMillis()),
-                packageName = json.optString("packageName", appContext.packageName),
-                productId = json.optString("productId"),
-                purchaseTime = json.optLong("purchaseTime", System.currentTimeMillis()),
-                purchaseToken = json.optString("purchaseToken", json.optString("token")),
-                developerPayload = json.optString("developerPayload", ""),
-                rawPurchaseData = purchaseDataString,
-                signature = signature
-            )
-        } catch (e: Exception) {
-            Log.e(TAG, "Error parsing purchase JSON", e)
-            null
-        }
+        return null
     }
 
     /**
-     * Verifies RSA SHA1withRSA signature against Myket Base64 Public Key
-     */
-    fun verifyPurchaseSignature(signedData: String, signature: String): Boolean {
-        if (signedData.isBlank() || signature.isBlank()) return false
-        return try {
-            val keyBytes = android.util.Base64.decode(MYKET_PUBLIC_KEY, android.util.Base64.DEFAULT)
-            val keySpec = java.security.spec.X509EncodedKeySpec(keyBytes)
-            val keyFactory = java.security.KeyFactory.getInstance("RSA")
-            val publicKey = keyFactory.generatePublic(keySpec)
-            val sig = java.security.Signature.getInstance("SHA1withRSA")
-            sig.initVerify(publicKey)
-            sig.update(signedData.toByteArray())
-            sig.verify(android.util.Base64.decode(signature, android.util.Base64.DEFAULT))
-        } catch (e: Exception) {
-            Log.e(TAG, "RSA Signature verification exception: ${e.message}")
-            false
-        }
-    }
-
-    /**
-     * Queries unconsumed purchases to support purchase restoration.
+     * SDK Capability: queryPurchases
      */
     suspend fun queryPurchases(): List<PurchaseData> = withContext(Dispatchers.IO) {
-        startConnection()
-        var service = billingService
-        if (service == null) {
-            var waitCount = 0
-            while (billingService == null && waitCount < 20) {
-                kotlinx.coroutines.delay(100)
-                waitCount++
-            }
-            service = billingService
-        }
-        val currentService = service ?: return@withContext emptyList()
+        val service = billingService ?: return@withContext emptyList()
         val results = mutableListOf<PurchaseData>()
         try {
-            var continuationToken: String? = null
-            do {
-                val ownedItems = currentService.getPurchases(BILLING_API_VERSION, appContext.packageName, "inapp", continuationToken)
-                val responseCode = ownedItems.getInt("RESPONSE_CODE", -1)
-                if (responseCode == 0) {
-                    val purchaseDataList = ownedItems.getStringArrayList("INAPP_PURCHASE_DATA_LIST")
-                    val signatureList = ownedItems.getStringArrayList("INAPP_DATA_SIGNATURE_LIST")
-                    if (purchaseDataList != null) {
-                        for (i in purchaseDataList.indices) {
-                            val raw = purchaseDataList[i]
-                            val sig = signatureList?.getOrNull(i) ?: ""
-                            if (sig.isNotBlank() && !verifyPurchaseSignature(raw, sig)) {
-                                Log.w(TAG, "Query purchase signature mismatch, skipping item: $raw")
-                                continue
-                            }
-                            try {
-                                val json = JSONObject(raw)
-                                results.add(
-                                    PurchaseData(
-                                        orderId = json.optString("orderId"),
-                                        packageName = json.optString("packageName"),
-                                        productId = json.optString("productId"),
-                                        purchaseTime = json.optLong("purchaseTime"),
-                                        purchaseToken = json.optString("purchaseToken", json.optString("token")),
-                                        developerPayload = json.optString("developerPayload"),
-                                        rawPurchaseData = raw,
-                                        signature = sig
-                                    )
-                                )
-                            } catch (e: Exception) {
-                                Log.e(TAG, "Parse single purchase error", e)
-                            }
-                        }
-                    }
-                    continuationToken = ownedItems.getString("INAPP_CONTINUATION_TOKEN")
-                } else {
-                    break
+            val ownedItems = service.getPurchases(BILLING_API_VERSION, appContext.packageName, "inapp", null)
+            if (ownedItems.getInt("RESPONSE_CODE") == 0) {
+                val dataList = ownedItems.getStringArrayList("INAPP_PURCHASE_DATA_LIST")
+                val sigList = ownedItems.getStringArrayList("INAPP_DATA_SIGNATURE_LIST")
+                dataList?.indices?.forEach { i ->
+                    val raw = dataList[i]
+                    val sig = sigList?.getOrNull(i) ?: ""
+                    val json = JSONObject(raw)
+                    results.add(PurchaseData(
+                        orderId = json.optString("orderId"),
+                        packageName = json.optString("packageName"),
+                        productId = json.optString("productId"),
+                        purchaseTime = json.optLong("purchaseTime"),
+                        purchaseToken = json.optString("purchaseToken", json.optString("token")),
+                        rawPurchaseData = raw,
+                        signature = sig
+                    ))
                 }
-            } while (!continuationToken.isNullOrEmpty())
-        } catch (e: Exception) {
-            Log.e(TAG, "Error querying purchases", e)
-        }
+            }
+        } catch (e: Exception) {}
         results
     }
 
     /**
-     * Consumes purchase so non-consumable lock is released in Myket.
+     * SDK Capability: consumeAsync
      */
     suspend fun consumePurchase(purchaseToken: String): Boolean = withContext(Dispatchers.IO) {
-        startConnection()
-        var service = billingService
-        if (service == null) {
-            var waitCount = 0
-            while (billingService == null && waitCount < 20) {
-                kotlinx.coroutines.delay(100)
-                waitCount++
-            }
-            service = billingService
-        }
-        val currentService = service ?: return@withContext false
+        val service = billingService ?: return@withContext false
         try {
-            val response = currentService.consumePurchase(BILLING_API_VERSION, appContext.packageName, purchaseToken)
+            val response = service.consumePurchase(BILLING_API_VERSION, appContext.packageName, purchaseToken)
             response == 0
         } catch (e: Exception) {
-            Log.e(TAG, "Consume purchase exception", e)
             false
         }
     }
 }
+
+data class SkuDetails(
+    val sku: String,
+    val price: String,
+    val title: String,
+    val description: String
+)

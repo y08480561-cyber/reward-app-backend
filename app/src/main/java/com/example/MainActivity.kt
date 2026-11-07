@@ -261,7 +261,7 @@ class MainActivity : ComponentActivity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == com.example.billing.MyketBillingManager.REQUEST_CODE_MYKET_PURCHASE) {
             val viewModel: MainViewModel = androidx.lifecycle.ViewModelProvider(this)[MainViewModel::class.java]
-            val purchaseData = viewModel.myketBillingManager.parsePurchaseResult(resultCode, data)
+            val purchaseData = viewModel.myketBillingManager.handleActivityResult(requestCode, resultCode, data)
             if (purchaseData != null) {
                 viewModel.processMyketPurchaseResult(purchaseData)
             } else if (resultCode == RESULT_CANCELED) {

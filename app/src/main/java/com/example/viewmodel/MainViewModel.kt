@@ -949,16 +949,39 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _uiState.update { it.copy(isStoreLoading = true, storeErrorMessage = null) }
             
-            // 1. Fetch Store Products
+            // 1. Fetch Store Products from Backend
             val productsResult = backendRepository.fetchStoreProducts()
             
             // 2. Fetch User Entitlements
             val entitlementsResult = backendRepository.fetchUserEntitlements(user.id)
             
             if (productsResult is Result.Success) {
+                val backendProducts = productsResult.data
+                
+                // 3. Enrich with real prices from Myket SDK if available
+                val inventory = myketBillingManager.queryInventory()
+                val finalProducts = if (inventory != null) {
+                    backendProducts.map { product ->
+                        val skuDetails = inventory[product.myketSku]
+                        if (skuDetails != null) {
+                            // Extract price as Long if possible (e.g. "50,000" -> 50000)
+                            val cleanPrice = skuDetails.price.filter { it.isDigit() }.toLongOrNull() ?: product.priceToman
+                            product.copy(
+                                priceToman = cleanPrice,
+                                title = skuDetails.title.substringBefore("(").trim(),
+                                description = skuDetails.description.ifBlank { product.description }
+                            )
+                        } else {
+                            product
+                        }
+                    }
+                } else {
+                    backendProducts
+                }
+
                 _uiState.update {
                     it.copy(
-                        storeProducts = productsResult.data,
+                        storeProducts = finalProducts,
                         userEntitlements = if (entitlementsResult is Result.Success) entitlementsResult.data else it.userEntitlements,
                         isStoreLoading = false
                     )

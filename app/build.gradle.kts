@@ -20,6 +20,10 @@ android {
     versionName = "1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    
+    manifestPlaceholders["marketApplicationId"] = "ir.mservices.market"
+    manifestPlaceholders["marketBindAddress"] = "ir.mservices.market.InAppBillingService.BIND"
+    manifestPlaceholders["marketPermission"] = "ir.mservices.market.BILLING"
   }
 
   // Do not remove or modify these signingConfigs. They are necessary for building, installing,
@@ -125,6 +129,7 @@ dependencies {
   implementation(libs.logging.interceptor)
   implementation(libs.moshi.kotlin)
   implementation(libs.okhttp)
+  implementation("ir.myket:billing:2.2")
   implementation("ir.tapsell.plus:tapsell-plus-sdk-android:2.3.3")
   implementation("com.google.android.gms:play-services-ads-identifier:18.2.0")
   implementation(libs.retrofit)
