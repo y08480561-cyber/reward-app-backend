@@ -10,7 +10,7 @@ import kotlinx.coroutines.launch
 
 // ONESIGNAL_APP_ID should be set in AI Studio Secrets panel.
 // It will be available via BuildConfig.ONESIGNAL_APP_ID if using the Secrets Gradle Plugin.
-const val ONESIGNAL_APP_ID = BuildConfig.ONESIGNAL_APP_ID
+val ONESIGNAL_APP_ID: String = BuildConfig.ONESIGNAL_APP_ID
 
 class ReqabatApplication : Application() {
     override fun onCreate() {

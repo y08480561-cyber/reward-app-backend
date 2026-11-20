@@ -2537,6 +2537,47 @@ app.get('/api/admin/users', requireAdminAuth, ensureDatabaseReady, async (req, r
 });
 
 // ====================================================================
+// 6.2 Users Excel (.xlsx) Export API (Protected - Full Registered Users)
+// ====================================================================
+app.get('/api/admin/users/export-excel', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
+  try {
+    const { buildUsersExcelBuffer, getIranJalaliDateString } = require('./xlsxExporter');
+
+    const result = await pool.query(`
+      SELECT
+        u.first_name,
+        u.last_name,
+        u.phone_number
+      FROM public.users u
+      ORDER BY u.created_at ASC, u.id ASC
+    `);
+
+    const rows = result.rows.map(row => ({
+      fullName: `${row.first_name || ''} ${row.last_name || ''}`.trim() || 'بدون نام',
+      phoneNumber: row.phone_number != null ? String(row.phone_number).trim() : ''
+    }));
+
+    const xlsxBuffer = buildUsersExcelBuffer(rows);
+    const jalaliDate = getIranJalaliDateString(new Date());
+    const fileName = `users-${jalaliDate}.xlsx`;
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"; filename*=UTF-8''${encodeURIComponent(fileName)}`);
+    res.setHeader('Content-Length', xlsxBuffer.length);
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+
+    return res.status(200).send(xlsxBuffer);
+  } catch (err) {
+    console.error('[API Admin Users Excel Export Error]', err);
+    return res.status(500).json({
+      success: false,
+      error: 'خطا در تولید و دریافت فایل اکسل کاربران از پایگاه داده.'
+    });
+  }
+});
+
+// ====================================================================
 // 7. Admin Force Reset Cycle (Protected)
 // ====================================================================
 app.post('/api/admin/cycle/reset', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
