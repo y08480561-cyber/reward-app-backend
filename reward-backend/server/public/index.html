@@ -276,6 +276,63 @@
       color: #FFFFFF;
     }
 
+    .badge-new-user {
+      background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+      color: #FFFFFF;
+      font-size: 11px;
+      font-weight: 800;
+      padding: 3px 9px;
+      border-radius: 999px;
+      border: 1px solid rgba(110, 231, 183, 0.55);
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+    .user-row-new {
+      background-color: rgba(16, 185, 129, 0.09) !important;
+    }
+    .user-row-new > td:first-child {
+      box-shadow: inset -3px 0 0 #10B981;
+    }
+    .reg-datetime-box {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+      font-size: 12.5px;
+      line-height: 1.35;
+    }
+    .reg-date-line {
+      color: #F8FAFC;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .reg-time-line {
+      color: #38BDF8;
+      font-size: 11.5px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .new-users-summary-badge {
+      background: rgba(16, 185, 129, 0.14);
+      color: #34D399;
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
     .form-control-dark, .form-select-dark {
       background-color: #0E1E36;
       border: 1px solid var(--border-color);
@@ -726,13 +783,27 @@
           <div class="card p-4 shadow">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4 pb-3 border-bottom border-secondary">
               <div>
-                <h4 class="gold-text mb-1"><i class="bi bi-people-fill text-warning me-2"></i> شرکت‌کنندگان دوره مسابقه فعلی</h4>
-                <p class="text-secondary small mb-0">فهرست زنده کاربران، شماره موبایل، رتبه فعلی و امتیازها</p>
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                  <h4 class="gold-text mb-0"><i class="bi bi-people-fill text-warning me-2"></i> شرکت‌کنندگان دوره مسابقه فعلی</h4>
+                  <span class="new-users-summary-badge" id="newUsersCountBadge">
+                    <i class="bi bi-person-plus-fill"></i>
+                    <span>کاربران جدید (۲۴ ساعت اخیر): ۰ نفر</span>
+                  </span>
+                </div>
+                <p class="text-secondary small mb-0">فهرست زنده کاربران، برچسب ثبت‌نام جدید، تاریخ و ساعت دقیق عضویت (شمسی)، شماره موبایل و امتیازها</p>
               </div>
               <div class="d-flex flex-wrap align-items-center gap-2">
-                <div style="width: 250px;">
-                  <input type="text" id="userSearchInput" class="form-control form-control-sm form-control-dark" placeholder="جستجو بر اساس نام و نام خانوادگی..." oninput="filterUsers()">
+                <div style="width: 220px;">
+                  <input type="text" id="userSearchInput" class="form-control form-control-sm form-control-dark" placeholder="جستجو بر اساس نام یا شماره..." oninput="filterUsers()">
                 </div>
+                <select id="userFilterMode" class="form-select form-select-sm form-select-dark" style="width: auto; min-width: 150px;" onchange="filterUsers()">
+                  <option value="all">همه کاربران</option>
+                  <option value="new">فقط کاربران جدید</option>
+                </select>
+                <select id="userSortMode" class="form-select form-select-sm form-select-dark" style="width: auto; min-width: 175px;" onchange="filterUsers()">
+                  <option value="score">مرتب‌سازی: بیشترین امتیاز</option>
+                  <option value="newest">مرتب‌سازی: جدیدترین ثبت‌نام</option>
+                </select>
                 <button type="button" id="exportUsersExcelBtn" class="btn btn-sm btn-excel-export" onclick="exportUsersExcel()">
                   <span class="spinner-border spinner-border-sm d-none" id="exportUsersExcelSpinner" role="status" aria-hidden="true"></span>
                   <i class="bi bi-file-earmark-excel-fill" id="exportUsersExcelIcon"></i>
@@ -751,12 +822,13 @@
                     <th style="width: 60px;">رتبه</th>
                     <th>نام و نام خانوادگی</th>
                     <th>شماره همراه</th>
+                    <th style="min-width: 165px;">تاریخ و ساعت ثبت‌نام</th>
                     <th>مجموع امتیاز</th>
                     <th style="width: 140px;">عملیات</th>
                   </tr>
                 </thead>
                 <tbody id="usersTbody">
-                  <tr><td colspan="5" class="text-center py-4 text-secondary">در حال بارگذاری اطلاعات کاربران...</td></tr>
+                  <tr><td colspan="6" class="text-center py-4 text-secondary">در حال بارگذاری اطلاعات کاربران...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -2483,8 +2555,25 @@
         renderLogs(data.competitionLogs || []);
 
         // Users & Sessions
-        cachedUsers = data.users || [];
-        renderUsers(cachedUsers);
+        const serverNow = Number(data.serverNow) || Date.now();
+        const NEW_USER_WINDOW_MS = 24 * 60 * 60 * 1000;
+        cachedUsers = (data.users || []).map((u, idx) => {
+          const regMs = u.registeredAt != null
+            ? Number(u.registeredAt)
+            : (u.registeredAtIso ? new Date(u.registeredAtIso).getTime() : NaN);
+          const validRegMs = Number.isFinite(regMs) ? regMs : null;
+          const isNew = typeof u.isNew === 'boolean'
+            ? u.isNew
+            : (validRegMs !== null && (serverNow - validRegMs) >= 0 && (serverNow - validRegMs) <= NEW_USER_WINDOW_MS);
+          return {
+            ...u,
+            registeredAt: validRegMs,
+            isNew,
+            _rank: idx + 1
+          };
+        });
+        updateNewUsersSummary(cachedUsers);
+        filterUsers();
         renderSessions(data.recentSessions || []);
 
         // Load Support Tickets
@@ -2744,28 +2833,131 @@
       }
     }
 
+    function toPersianDigits(val) {
+      const map = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
+      return String(val == null ? '' : val).replace(/\d/g, d => map[Number(d)]);
+    }
+
+    function gregorianToJalaliParts(gy, gm, gd) {
+      const gdm = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+      const gy2 = gm > 2 ? gy + 1 : gy;
+      let days =
+        355666 +
+        365 * gy +
+        Math.floor((gy2 + 3) / 4) -
+        Math.floor((gy2 + 99) / 100) +
+        Math.floor((gy2 + 399) / 400) +
+        gd +
+        gdm[gm - 1];
+
+      let jy = -1595 + 33 * Math.floor(days / 12053);
+      days %= 12053;
+      jy += 4 * Math.floor(days / 1461);
+      days %= 1461;
+      if (days > 365) {
+        jy += Math.floor((days - 1) / 365);
+        days = (days - 1) % 365;
+      }
+
+      let jm;
+      let jd;
+      if (days < 186) {
+        jm = 1 + Math.floor(days / 31);
+        jd = 1 + (days % 31);
+      } else {
+        jm = 7 + Math.floor((days - 186) / 30);
+        jd = 1 + ((days - 186) % 30);
+      }
+
+      return {
+        year: String(jy),
+        month: String(jm).padStart(2, '0'),
+        day: String(jd).padStart(2, '0')
+      };
+    }
+
+    function formatIranJalaliDateTime(timestamp) {
+      if (timestamp === null || timestamp === undefined || timestamp === '') return null;
+      const date = new Date(typeof timestamp === 'number' ? timestamp : String(timestamp));
+      if (Number.isNaN(date.getTime())) return null;
+
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Tehran',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hourCycle: 'h23'
+      }).formatToParts(date);
+
+      const map = {};
+      for (const p of parts) {
+        if (p.type !== 'literal') map[p.type] = p.value;
+      }
+
+      const jalali = gregorianToJalaliParts(
+        Number(map.year),
+        Number(map.month),
+        Number(map.day)
+      );
+
+      const dateFa = toPersianDigits(`${jalali.year}/${jalali.month}/${jalali.day}`);
+      const timeFa = toPersianDigits(`${map.hour}:${map.minute}:${map.second}`);
+      return { dateFa, timeFa };
+    }
+
+    function updateNewUsersSummary(users) {
+      const badge = document.getElementById('newUsersCountBadge');
+      if (!badge) return;
+      const newCount = (users || []).filter(u => u && u.isNew).length;
+      badge.innerHTML = `<i class="bi bi-person-plus-fill"></i><span>کاربران جدید (۲۴ ساعت اخیر): ${toPersianDigits(newCount)} نفر</span>`;
+    }
+
     function renderUsers(users) {
       const tbody = document.getElementById('usersTbody');
       if (!tbody) return;
 
       if (!users || users.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-secondary"><i class="bi bi-info-circle"></i> هیچ کاربری در مسابقه فعلی ثبت نشده است.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-secondary"><i class="bi bi-info-circle"></i> هیچ کاربری با شرایط انتخاب‌شده یافت نشد.</td></tr>';
         return;
       }
 
-      tbody.innerHTML = users.map((u, index) => `
-        <tr>
-          <td><span class="${index < 3 ? 'badge bg-warning text-dark fw-bold' : 'text-secondary'}">${index + 1}</span></td>
-          <td class="fw-bold">${u.firstName || ''} ${u.lastName || ''}</td>
-          <td dir="ltr" class="text-end">${u.phoneNumber || '-'}</td>
-          <td><span class="badge badge-gold">${u.score || 0} امتیاز</span></td>
+      tbody.innerHTML = users.map((u, index) => {
+        const displayRank = u._rank || (index + 1);
+        const fullName = `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'کاربر بدون نام';
+        const newBadgeHtml = u.isNew
+          ? '<span class="badge-new-user ms-2" title="ثبت‌نام‌شده در ۲۴ ساعت اخیر"><i class="bi bi-stars"></i> جدید</span>'
+          : '';
+        const formattedReg = formatIranJalaliDateTime(u.registeredAt != null ? u.registeredAt : u.registeredAtIso);
+        const regHtml = formattedReg
+          ? `<div class="reg-datetime-box">
+               <span class="reg-date-line"><i class="bi bi-calendar3 text-warning"></i><span dir="ltr">${formattedReg.dateFa}</span></span>
+               <span class="reg-time-line"><i class="bi bi-clock"></i><span dir="ltr">${formattedReg.timeFa}</span></span>
+             </div>`
+          : '<span class="text-secondary small">ثبت‌نام نامشخص</span>';
+
+        return `
+        <tr class="${u.isNew ? 'user-row-new' : ''}">
+          <td><span class="${displayRank <= 3 ? 'badge bg-warning text-dark fw-bold' : 'text-secondary'}">${toPersianDigits(displayRank)}</span></td>
+          <td class="fw-bold">
+            <div class="d-flex flex-wrap align-items-center gap-1">
+              <span>${escapeHtml(fullName)}</span>
+              ${newBadgeHtml}
+            </div>
+          </td>
+          <td dir="ltr" class="text-end">${escapeHtml(u.phoneNumber || '-')}</td>
+          <td>${regHtml}</td>
+          <td><span class="badge badge-gold">${toPersianDigits(u.score || 0)} امتیاز</span></td>
           <td>
-            <button class="btn btn-sm btn-outline-info" title="بازنشانی دوره ۲۴ ساعته کاربر" onclick="resetUserCycle('${u.id}')">
+            <button class="btn btn-sm btn-outline-info" title="بازنشانی دوره ۲۴ ساعته کاربر" onclick="resetUserCycle('${escapeHtml(u.id)}')">
               <i class="bi bi-arrow-repeat"></i> ریست دوره
             </button>
           </td>
         </tr>
-      `).join('');
+      `;
+      }).join('');
     }
 
     function renderSessions(sessions) {
@@ -2791,15 +2983,30 @@
 
     function filterUsers() {
       const q = (document.getElementById('userSearchInput')?.value || '').trim().toLowerCase();
-      if (!q) {
-        renderUsers(cachedUsers);
-        return;
+      const filterMode = document.getElementById('userFilterMode')?.value || 'all';
+      const sortMode = document.getElementById('userSortMode')?.value || 'score';
+
+      let list = [...cachedUsers];
+
+      if (filterMode === 'new') {
+        list = list.filter(u => Boolean(u.isNew));
       }
-      const filtered = cachedUsers.filter(u => 
-        (u.firstName && u.firstName.toLowerCase().includes(q)) ||
-        (u.lastName && u.lastName.toLowerCase().includes(q))
-      );
-      renderUsers(filtered);
+
+      if (q) {
+        list = list.filter(u =>
+          (u.firstName && u.firstName.toLowerCase().includes(q)) ||
+          (u.lastName && u.lastName.toLowerCase().includes(q)) ||
+          (u.phoneNumber && String(u.phoneNumber).toLowerCase().includes(q))
+        );
+      }
+
+      if (sortMode === 'newest') {
+        list.sort((a, b) => (Number(b.registeredAt) || 0) - (Number(a.registeredAt) || 0));
+      } else {
+        list.sort((a, b) => (a._rank || 0) - (b._rank || 0));
+      }
+
+      renderUsers(list);
     }
 
     async function exportUsersExcel() {

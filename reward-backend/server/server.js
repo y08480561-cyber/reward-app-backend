@@ -2375,14 +2375,23 @@ app.get('/api/admin/overview', requireAdminAuth, ensureDatabaseReady, async (req
     const countRes = await pool.query(`SELECT COUNT(*) AS total_sessions FROM public.ad_sessions`);
     const totalAdSessions = Number(countRes.rows[0]?.total_sessions || 0);
 
-    const users = usersRes.rows.map(u => ({
-      id: u.id,
-      firstName: u.first_name,
-      lastName: u.last_name,
-      phoneNumber: u.phone_number,
-      registeredAt: new Date(u.created_at).getTime(),
-      score: Number(u.score)
-    }));
+    const serverNow = Date.now();
+    const NEW_USER_WINDOW_MS = 24 * 60 * 60 * 1000;
+    const users = usersRes.rows.map(u => {
+      const parsedTime = u.created_at ? new Date(u.created_at).getTime() : NaN;
+      const registeredAt = Number.isFinite(parsedTime) ? parsedTime : null;
+      const isNew = registeredAt !== null && (serverNow - registeredAt) >= 0 && (serverNow - registeredAt) <= NEW_USER_WINDOW_MS;
+      return {
+        id: u.id,
+        firstName: u.first_name,
+        lastName: u.last_name,
+        phoneNumber: u.phone_number,
+        registeredAt,
+        registeredAtIso: registeredAt !== null ? new Date(registeredAt).toISOString() : null,
+        isNew,
+        score: Number(u.score)
+      };
+    });
 
     const totalScoresSum = users.reduce((sum, u) => sum + (u.score || 0), 0);
 
@@ -2422,6 +2431,7 @@ app.get('/api/admin/overview', requireAdminAuth, ensureDatabaseReady, async (req
     const allAnnRes = await pool.query(`SELECT * FROM public.home_announcements ORDER BY updated_at DESC LIMIT 20`);
 
     return res.json({
+      serverNow,
       totalUsers: users.length,
       totalAdSessions,
       totalScoresSum,
