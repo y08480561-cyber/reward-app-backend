@@ -333,6 +333,115 @@
       gap: 6px;
     }
 
+    .users-selection-toolbar {
+      background: #152A44;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 10px 14px;
+      margin-bottom: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .selected-count-badge {
+      background: rgba(148, 163, 184, 0.15);
+      color: #CBD5E1;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      border-radius: 999px;
+      font-size: 12.5px;
+      font-weight: 700;
+      padding: 4px 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+    .selected-count-badge.has-selection {
+      background: rgba(255, 183, 3, 0.18);
+      color: #FFB703;
+      border-color: rgba(255, 183, 3, 0.55);
+    }
+    .btn-excel-selected {
+      background: linear-gradient(135deg, #FFB703 0%, #FB8500 100%);
+      color: #0B192C;
+      font-weight: 800;
+      border: 1px solid rgba(255, 183, 3, 0.65);
+      border-radius: 10px;
+      padding: 6px 14px;
+      box-shadow: 0 4px 12px rgba(255, 183, 3, 0.22);
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    .btn-excel-selected:hover:not(:disabled) {
+      background: linear-gradient(135deg, #FB8500 0%, #FFB703 100%);
+      color: #0B192C;
+      box-shadow: 0 6px 16px rgba(255, 183, 3, 0.38);
+      transform: translateY(-1px);
+    }
+    .btn-excel-selected:disabled {
+      opacity: 0.72;
+      cursor: not-allowed;
+      color: #0B192C;
+    }
+    .user-select-checkbox {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+      background-color: #0E1E36;
+      border: 1.5px solid #64748B;
+    }
+    .user-select-checkbox:checked {
+      background-color: #FFB703;
+      border-color: #FFB703;
+    }
+    .user-select-checkbox:indeterminate {
+      background-color: #10B981;
+      border-color: #10B981;
+    }
+    .user-row-selected {
+      background-color: rgba(255, 183, 3, 0.11) !important;
+    }
+    .users-pagination-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border-color);
+    }
+    .users-page-btn {
+      background-color: #152A44;
+      border: 1px solid var(--border-color);
+      color: #E2E8F0;
+      border-radius: 8px;
+      padding: 4px 10px;
+      font-size: 12.5px;
+      font-weight: 600;
+      min-width: 34px;
+      transition: all 0.15s ease;
+    }
+    .users-page-btn:hover:not(:disabled) {
+      border-color: var(--gold-primary);
+      color: var(--gold-primary);
+    }
+    .users-page-btn.active {
+      background: linear-gradient(135deg, #FFB703, #FB8500);
+      border-color: #FFB703;
+      color: #0B192C;
+      font-weight: 800;
+    }
+    .users-page-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
     .form-control-dark, .form-select-dark {
       background-color: #0E1E36;
       border: 1px solid var(--border-color);
@@ -809,10 +918,42 @@
               </div>
             </div>
 
+            <div class="users-selection-toolbar">
+              <div class="d-flex flex-wrap align-items-center gap-3">
+                <div class="form-check d-flex align-items-center gap-2 m-0 ps-0">
+                  <input class="form-check-input user-select-checkbox m-0" type="checkbox" id="selectAllUsersCheckbox" onchange="toggleSelectAllFilteredUsers(this.checked)">
+                  <label class="form-check-label fw-bold text-light" for="selectAllUsersCheckbox" style="cursor: pointer;">
+                    انتخاب همه
+                  </label>
+                  <small class="text-secondary" id="selectAllScopeHint">(۰ کاربر در فهرست)</small>
+                </div>
+                <span class="selected-count-badge" id="selectedUsersCountBadge">
+                  <i class="bi bi-check2-square"></i>
+                  <span>انتخاب‌شده: ۰ نفر</span>
+                </span>
+              </div>
+
+              <div class="d-flex flex-wrap align-items-center gap-2">
+                <button type="button" id="exportSelectedUsersExcelBtn" class="btn btn-sm btn-excel-selected" onclick="exportSelectedUsersExcel()">
+                  <span class="spinner-border spinner-border-sm d-none" id="exportSelectedUsersExcelSpinner" role="status" aria-hidden="true"></span>
+                  <i class="bi bi-file-earmark-spreadsheet-fill" id="exportSelectedUsersExcelIcon"></i>
+                  <span id="exportSelectedUsersExcelLabel">دانلود اکسل انتخاب‌شده‌ها</span>
+                </button>
+                <button type="button" id="clearUserSelectionBtn" class="btn btn-sm btn-outline-light d-none" onclick="clearUserSelection()">
+                  <i class="bi bi-x-circle me-1"></i> پاک‌کردن انتخاب‌ها
+                </button>
+              </div>
+            </div>
+
+            <div id="usersSelectionNotice" class="alert d-none py-2 px-3 small mb-3" role="alert"></div>
+
             <div class="table-responsive">
               <table class="table table-dark table-hover table-striped rounded align-middle">
                 <thead>
                   <tr class="text-secondary small">
+                    <th style="width: 46px;" class="text-center">
+                      <input class="form-check-input user-select-checkbox m-0" type="checkbox" id="usersPageSelectAll" title="انتخاب کاربران این صفحه" aria-label="انتخاب کاربران این صفحه" onchange="toggleCurrentPageUsersSelection(this.checked)">
+                    </th>
                     <th style="width: 60px;">رتبه</th>
                     <th>نام و نام خانوادگی</th>
                     <th>شماره همراه</th>
@@ -822,9 +963,22 @@
                   </tr>
                 </thead>
                 <tbody id="usersTbody">
-                  <tr><td colspan="6" class="text-center py-4 text-secondary">در حال بارگذاری اطلاعات کاربران...</td></tr>
+                  <tr><td colspan="7" class="text-center py-4 text-secondary">در حال بارگذاری اطلاعات کاربران...</td></tr>
                 </tbody>
               </table>
+            </div>
+
+            <div id="usersPaginationBar" class="users-pagination-bar">
+              <div class="d-flex flex-wrap align-items-center gap-2 small text-secondary">
+                <span id="usersPaginationInfo">نمایش ۰ کاربر</span>
+                <select id="usersPageSizeSelect" class="form-select form-select-sm form-select-dark" style="width: auto;" onchange="changeUsersPageSize(this.value)" aria-label="تعداد کاربر در هر صفحه">
+                  <option value="15">۱۵ در صفحه</option>
+                  <option value="25" selected>۲۵ در صفحه</option>
+                  <option value="50">۵۰ در صفحه</option>
+                  <option value="100">۱۰۰ در صفحه</option>
+                </select>
+              </div>
+              <div id="usersPaginationButtons" class="d-flex flex-wrap align-items-center gap-1"></div>
             </div>
           </div>
         </section>
@@ -1827,6 +1981,10 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script>
     let cachedUsers = [];
+    let filteredUsersList = [];
+    const selectedUserIds = new Set();
+    let usersCurrentPage = 1;
+    let usersPageSize = 25;
     let cachedAnnouncements = [];
     let cachedTickets = [];
     let currentOpenTicket = null;
@@ -2347,7 +2505,7 @@
               </button>
             </div>
           `);
-          setElHtml('usersTbody', '<tr><td colspan="6" class="text-center text-danger py-4">دسترسی نیازمند کلید معتبر مدیریت است.<br><button class="btn btn-outline-warning btn-sm mt-2" onclick="openAdminAuthModal()"><i class="bi bi-key me-1"></i> وارد کردن کلید مدیریت</button></td></tr>');
+          setElHtml('usersTbody', '<tr><td colspan="7" class="text-center text-danger py-4">دسترسی نیازمند کلید معتبر مدیریت است.<br><button class="btn btn-outline-warning btn-sm mt-2" onclick="openAdminAuthModal()"><i class="bi bi-key me-1"></i> وارد کردن کلید مدیریت</button></td></tr>');
           setElHtml('sessionsTbody', '<tr><td colspan="6" class="text-center text-danger py-4">دسترسی مسدود است.</td></tr>');
           
           if (!key && !window.adminAuthModalOpenedOnce) {
@@ -2438,7 +2596,8 @@
           };
         });
         updateNewUsersSummary(cachedUsers);
-        filterUsers();
+        pruneSelectedUsers(cachedUsers);
+        filterUsers(false);
         renderSessions(data.recentSessions || []);
 
         // Load Support Tickets
@@ -2780,18 +2939,258 @@
       badge.innerHTML = `<i class="bi bi-person-plus-fill"></i><span>کاربران جدید (۲۴ ساعت اخیر): ${toPersianDigits(newCount)} نفر</span>`;
     }
 
+    function isUserSelectable(user) {
+      return Boolean(user && user.id != null && String(user.id).trim() !== '');
+    }
+
+    function getSelectableUsers(list) {
+      return (list || []).filter(isUserSelectable);
+    }
+
+    function pruneSelectedUsers(allUsers) {
+      if (!Array.isArray(allUsers)) return;
+      const validIds = new Set(getSelectableUsers(allUsers).map(u => String(u.id).trim()));
+      for (const id of Array.from(selectedUserIds)) {
+        if (!validIds.has(id)) {
+          selectedUserIds.delete(id);
+        }
+      }
+    }
+
+    function showUsersSelectionNotice(html, variant = 'info') {
+      const notice = document.getElementById('usersSelectionNotice');
+      if (!notice) return;
+      const clsMap = {
+        success: 'alert alert-success py-2 px-3 small mb-3 d-flex flex-wrap align-items-center justify-content-between gap-2',
+        warning: 'alert alert-warning py-2 px-3 small mb-3 d-flex flex-wrap align-items-center justify-content-between gap-2',
+        danger: 'alert alert-danger py-2 px-3 small mb-3 d-flex flex-wrap align-items-center justify-content-between gap-2',
+        info: 'alert alert-info py-2 px-3 small mb-3 d-flex flex-wrap align-items-center justify-content-between gap-2'
+      };
+      notice.className = clsMap[variant] || clsMap.info;
+      notice.innerHTML = html;
+      notice.classList.remove('d-none');
+    }
+
+    function hideUsersSelectionNotice() {
+      const notice = document.getElementById('usersSelectionNotice');
+      if (!notice) return;
+      notice.classList.add('d-none');
+      notice.innerHTML = '';
+    }
+
+    function getUsersTotalPages() {
+      return Math.max(1, Math.ceil((filteredUsersList.length || 0) / Math.max(1, usersPageSize)));
+    }
+
+    function getCurrentUsersPageSlice() {
+      const totalPages = getUsersTotalPages();
+      if (usersCurrentPage > totalPages) usersCurrentPage = totalPages;
+      if (usersCurrentPage < 1) usersCurrentPage = 1;
+      const start = (usersCurrentPage - 1) * usersPageSize;
+      return filteredUsersList.slice(start, start + usersPageSize);
+    }
+
+    function updateSelectionUI() {
+      const count = selectedUserIds.size;
+      const badge = document.getElementById('selectedUsersCountBadge');
+      if (badge) {
+        badge.className = count > 0 ? 'selected-count-badge has-selection' : 'selected-count-badge';
+        badge.innerHTML = `<i class="bi bi-check2-square"></i><span>انتخاب‌شده: ${toPersianDigits(count)} نفر</span>`;
+      }
+
+      const clearBtn = document.getElementById('clearUserSelectionBtn');
+      if (clearBtn) {
+        if (count > 0) {
+          clearBtn.classList.remove('d-none');
+          clearBtn.disabled = false;
+        } else {
+          clearBtn.classList.add('d-none');
+        }
+      }
+
+      const selectableFiltered = getSelectableUsers(filteredUsersList);
+      const selectedFilteredCount = selectableFiltered.filter(u => selectedUserIds.has(String(u.id).trim())).length;
+
+      const scopeHint = document.getElementById('selectAllScopeHint');
+      if (scopeHint) {
+        scopeHint.innerText = `(${toPersianDigits(selectableFiltered.length)} کاربر در فهرست)`;
+      }
+
+      const selectAllCheckbox = document.getElementById('selectAllUsersCheckbox');
+      if (selectAllCheckbox) {
+        if (selectableFiltered.length === 0) {
+          selectAllCheckbox.checked = false;
+          selectAllCheckbox.indeterminate = false;
+          selectAllCheckbox.disabled = true;
+        } else {
+          selectAllCheckbox.disabled = false;
+          selectAllCheckbox.checked = selectedFilteredCount === selectableFiltered.length;
+          selectAllCheckbox.indeterminate = selectedFilteredCount > 0 && selectedFilteredCount < selectableFiltered.length;
+        }
+      }
+
+      const pageSelectable = getSelectableUsers(getCurrentUsersPageSlice());
+      const pageSelectedCount = pageSelectable.filter(u => selectedUserIds.has(String(u.id).trim())).length;
+      const pageCheckbox = document.getElementById('usersPageSelectAll');
+      if (pageCheckbox) {
+        if (pageSelectable.length === 0) {
+          pageCheckbox.checked = false;
+          pageCheckbox.indeterminate = false;
+          pageCheckbox.disabled = true;
+        } else {
+          pageCheckbox.disabled = false;
+          pageCheckbox.checked = pageSelectedCount === pageSelectable.length;
+          pageCheckbox.indeterminate = pageSelectedCount > 0 && pageSelectedCount < pageSelectable.length;
+        }
+      }
+    }
+
+    function toggleUserSelection(checkboxEl) {
+      if (!checkboxEl) return;
+      const userId = String(checkboxEl.getAttribute('data-user-id') || '').trim();
+      if (!userId) return;
+
+      if (checkboxEl.checked) {
+        selectedUserIds.add(userId);
+      } else {
+        selectedUserIds.delete(userId);
+      }
+
+      const row = checkboxEl.closest('tr');
+      if (row) {
+        row.classList.toggle('user-row-selected', checkboxEl.checked);
+      }
+      if (selectedUserIds.size > 0) {
+        hideUsersSelectionNotice();
+      }
+      updateSelectionUI();
+    }
+
+    function toggleSelectAllFilteredUsers(checked) {
+      const selectableFiltered = getSelectableUsers(filteredUsersList);
+      for (const u of selectableFiltered) {
+        const uid = String(u.id).trim();
+        if (checked) {
+          selectedUserIds.add(uid);
+        } else {
+          selectedUserIds.delete(uid);
+        }
+      }
+      if (selectedUserIds.size > 0 || !checked) {
+        hideUsersSelectionNotice();
+      }
+      renderUsersPage();
+    }
+
+    function toggleCurrentPageUsersSelection(checked) {
+      const pageSelectable = getSelectableUsers(getCurrentUsersPageSlice());
+      for (const u of pageSelectable) {
+        const uid = String(u.id).trim();
+        if (checked) {
+          selectedUserIds.add(uid);
+        } else {
+          selectedUserIds.delete(uid);
+        }
+      }
+      if (selectedUserIds.size > 0 || !checked) {
+        hideUsersSelectionNotice();
+      }
+      renderUsersPage();
+    }
+
+    function clearUserSelection() {
+      selectedUserIds.clear();
+      hideUsersSelectionNotice();
+      renderUsersPage();
+    }
+
+    function goToUsersPage(page) {
+      const totalPages = getUsersTotalPages();
+      const target = Math.min(totalPages, Math.max(1, Number(page) || 1));
+      usersCurrentPage = target;
+      renderUsersPage();
+    }
+
+    function changeUsersPageSize(newSize) {
+      const parsed = parseInt(newSize, 10);
+      if (!Number.isFinite(parsed) || parsed < 1) return;
+      usersPageSize = parsed;
+      usersCurrentPage = 1;
+      renderUsersPage();
+    }
+
+    function renderUsersPagination() {
+      const infoEl = document.getElementById('usersPaginationInfo');
+      const btnsEl = document.getElementById('usersPaginationButtons');
+      const totalItems = filteredUsersList.length;
+      const totalPages = getUsersTotalPages();
+
+      if (infoEl) {
+        if (totalItems === 0) {
+          infoEl.innerText = 'نمایش ۰ کاربر';
+        } else {
+          const startIdx = (usersCurrentPage - 1) * usersPageSize + 1;
+          const endIdx = Math.min(totalItems, usersCurrentPage * usersPageSize);
+          infoEl.innerText = `نمایش ${toPersianDigits(startIdx)} تا ${toPersianDigits(endIdx)} از ${toPersianDigits(totalItems)} کاربر (صفحه ${toPersianDigits(usersCurrentPage)} از ${toPersianDigits(totalPages)})`;
+        }
+      }
+
+      if (!btnsEl) return;
+      if (totalItems === 0 || totalPages <= 1) {
+        btnsEl.innerHTML = '';
+        return;
+      }
+
+      const buttons = [];
+      buttons.push(`<button type="button" class="users-page-btn" ${usersCurrentPage <= 1 ? 'disabled' : ''} onclick="goToUsersPage(${usersCurrentPage - 1})">قبلی</button>`);
+
+      const maxVisible = 5;
+      let startPage = Math.max(1, usersCurrentPage - Math.floor(maxVisible / 2));
+      let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+      if (endPage - startPage + 1 < maxVisible) {
+        startPage = Math.max(1, endPage - maxVisible + 1);
+      }
+
+      if (startPage > 1) {
+        buttons.push(`<button type="button" class="users-page-btn" onclick="goToUsersPage(1)">${toPersianDigits(1)}</button>`);
+        if (startPage > 2) buttons.push('<span class="text-secondary px-1">...</span>');
+      }
+
+      for (let p = startPage; p <= endPage; p++) {
+        buttons.push(`<button type="button" class="users-page-btn ${p === usersCurrentPage ? 'active' : ''}" onclick="goToUsersPage(${p})">${toPersianDigits(p)}</button>`);
+      }
+
+      if (endPage < totalPages) {
+        if (endPage < totalPages - 1) buttons.push('<span class="text-secondary px-1">...</span>');
+        buttons.push(`<button type="button" class="users-page-btn" onclick="goToUsersPage(${totalPages})">${toPersianDigits(totalPages)}</button>`);
+      }
+
+      buttons.push(`<button type="button" class="users-page-btn" ${usersCurrentPage >= totalPages ? 'disabled' : ''} onclick="goToUsersPage(${usersCurrentPage + 1})">بعدی</button>`);
+      btnsEl.innerHTML = buttons.join('');
+    }
+
+    function renderUsersPage() {
+      const pageUsers = getCurrentUsersPageSlice();
+      renderUsers(pageUsers);
+      renderUsersPagination();
+      updateSelectionUI();
+    }
+
     function renderUsers(users) {
       const tbody = document.getElementById('usersTbody');
       if (!tbody) return;
 
       if (!users || users.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-secondary"><i class="bi bi-info-circle"></i> هیچ کاربری با شرایط انتخاب‌شده یافت نشد.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-secondary"><i class="bi bi-info-circle"></i> هیچ کاربری با شرایط انتخاب‌شده یافت نشد.</td></tr>';
         return;
       }
 
       tbody.innerHTML = users.map((u, index) => {
         const displayRank = u._rank || (index + 1);
         const fullName = `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'کاربر بدون نام';
+        const selectable = isUserSelectable(u);
+        const uidStr = selectable ? String(u.id).trim() : '';
+        const isChecked = selectable && selectedUserIds.has(uidStr);
         const newBadgeHtml = u.isNew
           ? '<span class="badge-new-user ms-2" title="ثبت‌نام‌شده در ۲۴ ساعت اخیر"><i class="bi bi-stars"></i> جدید</span>'
           : '';
@@ -2803,8 +3202,23 @@
              </div>`
           : '<span class="text-secondary small">ثبت‌نام نامشخص</span>';
 
+        const rowClasses = [
+          u.isNew ? 'user-row-new' : '',
+          isChecked ? 'user-row-selected' : ''
+        ].filter(Boolean).join(' ');
+
         return `
-        <tr class="${u.isNew ? 'user-row-new' : ''}">
+        <tr class="${rowClasses}">
+          <td class="text-center">
+            <input
+              type="checkbox"
+              class="form-check-input user-select-checkbox user-row-checkbox m-0"
+              data-user-id="${escapeHtml(uidStr)}"
+              ${selectable ? '' : 'disabled'}
+              ${isChecked ? 'checked' : ''}
+              aria-label="انتخاب ${escapeHtml(fullName)}"
+              onchange="toggleUserSelection(this)">
+          </td>
           <td><span class="${displayRank <= 3 ? 'badge bg-warning text-dark fw-bold' : 'text-secondary'}">${toPersianDigits(displayRank)}</span></td>
           <td class="fw-bold">
             <div class="d-flex flex-wrap align-items-center gap-1">
@@ -2846,7 +3260,7 @@
       `).join('');
     }
 
-    function filterUsers() {
+    function filterUsers(resetPage = true) {
       const q = (document.getElementById('userSearchInput')?.value || '').trim().toLowerCase();
       const filterMode = document.getElementById('userFilterMode')?.value || 'all';
       const sortMode = document.getElementById('userSortMode')?.value || 'score';
@@ -2871,7 +3285,132 @@
         list.sort((a, b) => (a._rank || 0) - (b._rank || 0));
       }
 
-      renderUsers(list);
+      filteredUsersList = list;
+      if (resetPage) {
+        usersCurrentPage = 1;
+      }
+      renderUsersPage();
+    }
+
+    function triggerBlobDownload(blob, filename) {
+      const objectUrl = URL.createObjectURL(blob);
+      try {
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.download = filename;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } finally {
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 1500);
+      }
+    }
+
+    function parseFilenameFromDisposition(disposition, fallbackName) {
+      if (!disposition) return fallbackName;
+      const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+      const asciiMatch = disposition.match(/filename="?([^";]+)"?/i);
+      if (utf8Match && utf8Match[1]) {
+        return decodeURIComponent(utf8Match[1]);
+      }
+      if (asciiMatch && asciiMatch[1]) {
+        return asciiMatch[1];
+      }
+      return fallbackName;
+    }
+
+    async function exportSelectedUsersExcel() {
+      const ids = Array.from(selectedUserIds);
+      if (ids.length === 0) {
+        const msg = 'هیچ کاربری انتخاب نشده است. لطفاً ابتدا حداقل یک کاربر را انتخاب کنید.';
+        showUsersSelectionNotice(
+          `<span><i class="bi bi-exclamation-triangle-fill me-1"></i> ${msg}</span>`,
+          'warning'
+        );
+        showNotification(msg, 'warning');
+        return;
+      }
+
+      const key = getAdminKey();
+      if (!key) {
+        showAlert('برای دریافت خروجی اکسل، ابتدا کلید امنیتی مدیریت را وارد نمایید.');
+        openAdminAuthModal();
+        return;
+      }
+
+      const btn = document.getElementById('exportSelectedUsersExcelBtn');
+      const spinner = document.getElementById('exportSelectedUsersExcelSpinner');
+      const icon = document.getElementById('exportSelectedUsersExcelIcon');
+      const label = document.getElementById('exportSelectedUsersExcelLabel');
+
+      if (btn) btn.disabled = true;
+      if (spinner) spinner.classList.remove('d-none');
+      if (icon) icon.classList.add('d-none');
+      if (label) label.innerText = 'در حال تولید فایل...';
+
+      try {
+        const res = await fetch('/api/admin/users/export-selected-excel', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-key': key
+          },
+          body: JSON.stringify({ userIds: ids })
+        });
+
+        if (res.status === 401) {
+          let errMsg = 'دسترسی غیرمجاز. کلید امنیتی مدیریت نامعتبر است.';
+          try {
+            const errJson = await res.json();
+            if (errJson && errJson.error) errMsg = errJson.error;
+          } catch (_) {}
+          showAlert(errMsg);
+          openAdminAuthModal();
+          return;
+        }
+
+        if (!res.ok) {
+          let errMsg = 'خطا در دریافت خروجی اکسل انتخاب‌شده‌ها (کد ' + res.status + ')';
+          try {
+            const errJson = await res.json();
+            if (errJson && errJson.error) errMsg = errJson.error;
+          } catch (_) {}
+          throw new Error(errMsg);
+        }
+
+        const blob = await res.blob();
+        if (!blob || blob.size === 0) {
+          throw new Error('فایل اکسل دریافت‌شده خالی است.');
+        }
+
+        const filename = parseFilenameFromDisposition(
+          res.headers.get('Content-Disposition') || '',
+          'selected-users-export.xlsx'
+        );
+        triggerBlobDownload(blob, filename);
+
+        showUsersSelectionNotice(
+          `<span><i class="bi bi-check-circle-fill me-1"></i> فایل اکسل برای <strong>${toPersianDigits(ids.length)} کاربر</strong> با موفقیت دانلود شد.</span>
+           <button type="button" class="btn btn-sm btn-outline-light" onclick="clearUserSelection()">
+             <i class="bi bi-x-circle me-1"></i> پاک‌کردن انتخاب‌ها
+           </button>`,
+          'success'
+        );
+        showNotification(`فایل اکسل ${toPersianDigits(ids.length)} کاربر انتخاب‌شده با موفقیت دانلود شد.`, 'success');
+      } catch (err) {
+        console.error('Selected Excel export error:', err);
+        showUsersSelectionNotice(
+          `<span><i class="bi bi-x-octagon-fill me-1"></i> ${escapeHtml(err.message || 'خطا در دانلود خروجی اکسل.')}</span>`,
+          'danger'
+        );
+        showNotification(err.message || 'خطا در دانلود خروجی اکسل.', 'error');
+      } finally {
+        if (btn) btn.disabled = false;
+        if (spinner) spinner.classList.add('d-none');
+        if (icon) icon.classList.remove('d-none');
+        if (label) label.innerText = 'دانلود اکسل انتخاب‌شده‌ها';
+      }
     }
 
     async function exportUsersExcel() {
@@ -2892,7 +3431,6 @@
       if (icon) icon.classList.add('d-none');
       if (label) label.innerText = 'در حال آماده‌سازی...';
 
-      let objectUrl = null;
       try {
         const res = await fetch('/api/admin/users/export-excel', {
           method: 'GET',
@@ -2926,35 +3464,17 @@
           throw new Error('فایل اکسل دریافت‌شده خالی است.');
         }
 
-        let filename = '';
-        const disposition = res.headers.get('Content-Disposition') || '';
-        const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
-        const asciiMatch = disposition.match(/filename="?([^";]+)"?/i);
-        if (utf8Match && utf8Match[1]) {
-          filename = decodeURIComponent(utf8Match[1]);
-        } else if (asciiMatch && asciiMatch[1]) {
-          filename = asciiMatch[1];
-        } else {
-          filename = 'users-export.xlsx';
-        }
-
-        objectUrl = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = objectUrl;
-        link.download = filename;
-        link.style.display = 'none';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        const filename = parseFilenameFromDisposition(
+          res.headers.get('Content-Disposition') || '',
+          'users-export.xlsx'
+        );
+        triggerBlobDownload(blob, filename);
 
         showNotification('فایل اکسل کاربران با موفقیت دانلود شد.', 'success');
       } catch (err) {
         console.error('Excel export error:', err);
         showNotification(err.message || 'خطا در دانلود خروجی اکسل.', 'error');
       } finally {
-        if (objectUrl) {
-          setTimeout(() => URL.revokeObjectURL(objectUrl), 1500);
-        }
         if (btn) btn.disabled = false;
         if (spinner) spinner.classList.add('d-none');
         if (icon) icon.classList.remove('d-none');
@@ -4162,8 +4682,9 @@
       // Basic fallback if global alert not ready
       const alertBox = document.getElementById('alertBox');
       if (alertBox) {
+        const bsType = type === 'success' ? 'success' : (type === 'warning' ? 'warning' : 'danger');
         alertBox.innerText = msg;
-        alertBox.className = `alert alert-${type === 'success' ? 'success' : 'danger'} shadow-sm mb-4`;
+        alertBox.className = `alert alert-${bsType} shadow-sm mb-4`;
         alertBox.classList.remove('d-none');
         setTimeout(() => alertBox.classList.add('d-none'), 5000);
       } else {

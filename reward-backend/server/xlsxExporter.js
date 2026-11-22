@@ -340,8 +340,224 @@ function buildUsersExcelBuffer(rows) {
   ]);
 }
 
+/**
+ * Formats a timestamp/Date into Jalali date (YYYY/MM/DD) and Iran time (HH:MM:SS)
+ * in Asia/Tehran timezone.
+ */
+function getIranJalaliDateAndTime(timestamp) {
+  if (timestamp === null || timestamp === undefined || timestamp === '') {
+    return { jalaliDate: '', iranTime: '' };
+  }
+  const date = timestamp instanceof Date
+    ? timestamp
+    : new Date(typeof timestamp === 'number' ? timestamp : String(timestamp));
+  if (Number.isNaN(date.getTime())) {
+    return { jalaliDate: '', iranTime: '' };
+  }
+
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Tehran',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23'
+  }).formatToParts(date);
+
+  const map = {};
+  for (const p of parts) {
+    if (p.type !== 'literal') map[p.type] = p.value;
+  }
+
+  const jalali = gregorianToJalali(
+    Number(map.year),
+    Number(map.month),
+    Number(map.day)
+  );
+  const hour = map.hour === '24' ? '00' : String(map.hour || '00').padStart(2, '0');
+  const minute = String(map.minute || '00').padStart(2, '0');
+  const second = String(map.second || '00').padStart(2, '0');
+
+  return {
+    jalaliDate: `${jalali.year}/${jalali.month}/${jalali.day}`,
+    iranTime: `${hour}:${minute}:${second}`
+  };
+}
+
+/**
+ * Builds a real RTL .xlsx workbook for selected users with strictly four columns:
+ *  - Column A: نام و نام خانوادگی
+ *  - Column B: شماره تماس (stored explicitly as Text with '@' format)
+ *  - Column C: تاریخ ثبت‌نام (Jalali date YYYY/MM/DD as Text)
+ *  - Column D: ساعت ثبت‌نام (Iran time HH:MM:SS as Text)
+ *
+ * @param {Array<{ fullName: string, phoneNumber: string, registeredAt: Date|number|string|null }>} rows
+ * @returns {Buffer}
+ */
+function buildSelectedUsersExcelBuffer(rows) {
+  const safeRows = Array.isArray(rows) ? rows : [];
+
+  let maxNameLen = 22;
+  let maxPhoneLen = 16;
+  for (const row of safeRows) {
+    const nameLen = String(row.fullName || '').length;
+    const phoneLen = String(row.phoneNumber || '').length;
+    if (nameLen > maxNameLen) maxNameLen = nameLen;
+    if (phoneLen > maxPhoneLen) maxPhoneLen = phoneLen;
+  }
+
+  const colAWidth = Math.min(60, Math.max(28, maxNameLen + 6));
+  const colBWidth = Math.min(30, Math.max(20, maxPhoneLen + 5));
+  const colCWidth = 20;
+  const colDWidth = 18;
+
+  const rowXmlParts = [];
+  // Row 1: Header
+  rowXmlParts.push(
+    `<row r="1" ht="28" customHeight="1">` +
+      buildInlineStringCell('A1', 1, 'نام و نام خانوادگی') +
+      buildInlineStringCell('B1', 1, 'شماره تماس') +
+      buildInlineStringCell('C1', 1, 'تاریخ ثبت‌نام') +
+      buildInlineStringCell('D1', 1, 'ساعت ثبت‌نام') +
+    `</row>`
+  );
+
+  // Data rows (2 .. N+1)
+  for (let i = 0; i < safeRows.length; i++) {
+    const excelRowNum = i + 2;
+    const item = safeRows[i] || {};
+    const fullName = String(item.fullName || '').trim() || 'بدون نام';
+    const phoneNumber = String(item.phoneNumber == null ? '' : item.phoneNumber).trim();
+    const { jalaliDate, iranTime } = getIranJalaliDateAndTime(item.registeredAt);
+
+    rowXmlParts.push(
+      `<row r="${excelRowNum}" ht="22" customHeight="1">` +
+        buildInlineStringCell(`A${excelRowNum}`, 2, fullName) +
+        buildInlineStringCell(`B${excelRowNum}`, 3, phoneNumber) +
+        buildInlineStringCell(`C${excelRowNum}`, 3, jalaliDate || '-') +
+        buildInlineStringCell(`D${excelRowNum}`, 3, iranTime || '-') +
+      `</row>`
+    );
+  }
+
+  const lastRowNum = Math.max(1, safeRows.length + 1);
+
+  const contentTypesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+</Types>`;
+
+  const rootRelsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`;
+
+  const workbookRelsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>`;
+
+  const workbookXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>
+    <sheet name="کاربران انتخاب‌شده" sheetId="1" r:id="rId1"/>
+  </sheets>
+</workbook>`;
+
+  const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <fonts count="2">
+    <font>
+      <sz val="11"/>
+      <color rgb="FF0F172A"/>
+      <name val="Tahoma"/>
+    </font>
+    <font>
+      <b/>
+      <sz val="11"/>
+      <color rgb="FFFFFFFF"/>
+      <name val="Tahoma"/>
+    </font>
+  </fonts>
+  <fills count="3">
+    <fill><patternFill patternType="none"/></fill>
+    <fill><patternFill patternType="gray125"/></fill>
+    <fill>
+      <patternFill patternType="solid">
+        <fgColor rgb="FF0E1E36"/>
+        <bgColor indexed="64"/>
+      </patternFill>
+    </fill>
+  </fills>
+  <borders count="2">
+    <border><left/><right/><top/><bottom/><diagonal/></border>
+    <border>
+      <left style="thin"><color rgb="FFCBD5E1"/></left>
+      <right style="thin"><color rgb="FFCBD5E1"/></right>
+      <top style="thin"><color rgb="FFCBD5E1"/></top>
+      <bottom style="thin"><color rgb="FFCBD5E1"/></bottom>
+      <diagonal/>
+    </border>
+  </borders>
+  <cellStyleXfs count="1">
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>
+  </cellStyleXfs>
+  <cellXfs count="4">
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+    <xf numFmtId="49" fontId="1" fillId="2" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">
+      <alignment horizontal="right" vertical="center" readingOrder="2"/>
+    </xf>
+    <xf numFmtId="49" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1">
+      <alignment horizontal="right" vertical="center" readingOrder="2"/>
+    </xf>
+    <xf numFmtId="49" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1">
+      <alignment horizontal="right" vertical="center" readingOrder="2"/>
+    </xf>
+  </cellXfs>
+  <cellStyles count="1">
+    <cellStyle name="Normal" xfId="0" builtinId="0"/>
+  </cellStyles>
+</styleSheet>`;
+
+  const sheet1Xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <dimension ref="A1:D${lastRowNum}"/>
+  <sheetViews>
+    <sheetView rightToLeft="1" tabSelected="1" workbookViewId="0"/>
+  </sheetViews>
+  <sheetFormatPr defaultRowHeight="22"/>
+  <cols>
+    <col min="1" max="1" width="${colAWidth}" customWidth="1"/>
+    <col min="2" max="2" width="${colBWidth}" customWidth="1"/>
+    <col min="3" max="3" width="${colCWidth}" customWidth="1"/>
+    <col min="4" max="4" width="${colDWidth}" customWidth="1"/>
+  </cols>
+  <sheetData>
+    ${rowXmlParts.join('\n    ')}
+  </sheetData>
+</worksheet>`;
+
+  return createZipBuffer([
+    { name: '[Content_Types].xml', content: contentTypesXml },
+    { name: '_rels/.rels', content: rootRelsXml },
+    { name: 'xl/_rels/workbook.xml.rels', content: workbookRelsXml },
+    { name: 'xl/workbook.xml', content: workbookXml },
+    { name: 'xl/styles.xml', content: stylesXml },
+    { name: 'xl/worksheets/sheet1.xml', content: sheet1Xml }
+  ]);
+}
+
 module.exports = {
   buildUsersExcelBuffer,
+  buildSelectedUsersExcelBuffer,
   getIranJalaliDateString,
+  getIranJalaliDateAndTime,
   gregorianToJalali
 };

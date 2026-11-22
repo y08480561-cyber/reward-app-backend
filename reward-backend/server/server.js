@@ -2588,6 +2588,75 @@ app.get('/api/admin/users/export-excel', requireAdminAuth, ensureDatabaseReady, 
 });
 
 // ====================================================================
+// 6.3 Selected Users Excel (.xlsx) Export API (Protected - DB Verified)
+// ====================================================================
+app.post('/api/admin/users/export-selected-excel', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
+  try {
+    const rawUserIds = req.body && Array.isArray(req.body.userIds) ? req.body.userIds : [];
+    const cleanUserIds = Array.from(
+      new Set(
+        rawUserIds
+          .map(id => (id == null ? '' : String(id).trim()))
+          .filter(id => id.length > 0)
+      )
+    );
+
+    if (cleanUserIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'لطفاً ابتدا حداقل یک کاربر را انتخاب کنید.'
+      });
+    }
+
+    const { buildSelectedUsersExcelBuffer, getIranJalaliDateString } = require('./xlsxExporter');
+
+    const result = await pool.query(
+      `SELECT
+         u.id,
+         u.first_name,
+         u.last_name,
+         u.phone_number,
+         u.created_at
+       FROM public.users u
+       WHERE u.id::text = ANY($1::text[])
+       ORDER BY u.created_at ASC, u.id ASC`,
+      [cleanUserIds]
+    );
+
+    if (!result.rows || result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'هیچ کاربر معتبری مطابق انتخاب شما در پایگاه داده یافت نشد.'
+      });
+    }
+
+    const rows = result.rows.map(row => ({
+      fullName: `${row.first_name || ''} ${row.last_name || ''}`.trim() || 'بدون نام',
+      phoneNumber: row.phone_number != null ? String(row.phone_number).trim() : '',
+      registeredAt: row.created_at || null
+    }));
+
+    const xlsxBuffer = buildSelectedUsersExcelBuffer(rows);
+    const jalaliDate = getIranJalaliDateString(new Date());
+    const fileName = `selected-users-${jalaliDate}.xlsx`;
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"; filename*=UTF-8''${encodeURIComponent(fileName)}`);
+    res.setHeader('Content-Length', xlsxBuffer.length);
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+
+    return res.status(200).send(xlsxBuffer);
+  } catch (err) {
+    console.error('[API Admin Selected Users Excel Export Error]', err);
+    return res.status(500).json({
+      success: false,
+      error: 'خطا در تولید و دریافت فایل اکسل کاربران انتخاب‌شده از پایگاه داده.'
+    });
+  }
+});
+
+// ====================================================================
 // 7. Admin Force Reset Cycle (Protected)
 // ====================================================================
 app.post('/api/admin/cycle/reset', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
