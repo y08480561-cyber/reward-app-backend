@@ -48,9 +48,11 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.model.PromoBannerUrlValidator
 import com.example.model.SquareStatus
 import com.example.ui.components.AppBottomNavigation
 import com.example.ui.components.ExperienceFeedbackDialog
+import com.example.ui.components.InAppBannerBrowserDialog
 import com.example.ui.components.LuxuryScreenCanvas
 import com.example.ui.components.PurchaseSuccessModal
 import com.example.ui.components.RewardCelebrationModal
@@ -91,6 +93,24 @@ class MainActivity : ComponentActivity() {
                 val authState by viewModel.authUiState.collectAsState()
 
                 var showLaunchOverlay by remember { mutableStateOf(true) }
+                var inAppBrowserUrl by remember { mutableStateOf<String?>(null) }
+                val openExternalSafeUrl: (String) -> Unit = { rawUrl ->
+                    val safeUrl = PromoBannerUrlValidator.normalizeSafeHttpUrl(rawUrl)
+                    if (safeUrl != null) {
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(safeUrl)).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            startActivity(intent)
+                        } catch (_: Exception) {
+                            android.widget.Toast.makeText(
+                                this@MainActivity,
+                                "مرورگری برای باز کردن این لینک در دستگاه یافت نشد.",
+                                android.widget.Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                }
                 LaunchedEffect(Unit) {
                     delay(550)
                     showLaunchOverlay = false
@@ -139,8 +159,21 @@ class MainActivity : ComponentActivity() {
                                                 cycle = uiState.dailyCycle,
                                                 competition = uiState.activeCompetition,
                                                 announcement = uiState.activeAnnouncement,
+                                                promoAdBanners = uiState.promoAdBanners,
                                                 userRank = currentUserRank,
                                                 completedSquaresToday = completedToday,
+                                                onPromoBannerVisible = { bannerId ->
+                                                    viewModel.onPromoBannerVisible(bannerId)
+                                                },
+                                                onPromoBannerClick = { banner ->
+                                                    viewModel.onPromoBannerClick(banner) { safeUrl, linkMode ->
+                                                        if (linkMode == "internal") {
+                                                            inAppBrowserUrl = safeUrl
+                                                        } else {
+                                                            openExternalSafeUrl(safeUrl)
+                                                        }
+                                                    }
+                                                },
                                                 onNavigate = { target -> viewModel.navigateTo(target) }
                                             )
                                         }
@@ -304,6 +337,18 @@ class MainActivity : ComponentActivity() {
                                 PurchaseSuccessModal(
                                     data = modalData,
                                     onDismiss = { viewModel.dismissPurchaseSuccessModal() }
+                                )
+                            }
+
+                            // In-App Secure Browser Modal for Promo Banners
+                            inAppBrowserUrl?.let { targetUrl ->
+                                InAppBannerBrowserDialog(
+                                    url = targetUrl,
+                                    onOpenExternal = { extUrl ->
+                                        openExternalSafeUrl(extUrl)
+                                        inAppBrowserUrl = null
+                                    },
+                                    onDismiss = { inAppBrowserUrl = null }
                                 )
                             }
 

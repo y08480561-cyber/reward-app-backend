@@ -664,6 +664,13 @@
             <span>فروشگاه و تراکنش‌ها</span>
           </div>
         </a>
+        <a class="sidebar-link" onclick="navigateTo('ad_banners')">
+          <div class="sidebar-link-content">
+            <i class="bi bi-badge-ad-fill"></i>
+            <span>مدیریت بنرهای تبلیغاتی</span>
+          </div>
+          <span class="badge bg-warning text-dark rounded-pill" id="sidebarAdBannersBadge" style="display: none;">۰</span>
+        </a>
         <div class="nav-category-header">سیستم</div>
         <a class="sidebar-link" onclick="navigateTo('settings')">
           <div class="sidebar-link-content">
@@ -1522,6 +1529,108 @@
           </div>
         </section>
 
+        <!-- ============================================================== -->
+        <!-- SECTION 10: مدیریت بنرهای تبلیغاتی (Ad Banners Management)     -->
+        <!-- ============================================================== -->
+        <section id="section-ad_banners" class="admin-section">
+          <div class="row g-3 mb-4">
+            <div class="col-sm-6 col-xl-3">
+              <div class="stat-card">
+                <div class="stat-card-icon bg-warning bg-opacity-10 text-warning">
+                  <i class="bi bi-images"></i>
+                </div>
+                <div class="text-secondary small fw-bold mb-1">کل بنرهای تبلیغاتی</div>
+                <h3 id="adBannersTotalCount" class="gold-text mb-0">۰</h3>
+              </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+              <div class="stat-card">
+                <div class="stat-card-icon bg-success bg-opacity-10 text-success">
+                  <i class="bi bi-broadcast"></i>
+                </div>
+                <div class="text-secondary small fw-bold mb-1">تبلیغات فعال و در حال نمایش</div>
+                <h3 id="adBannersActiveCount" class="text-success mb-0">۰</h3>
+              </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+              <div class="stat-card">
+                <div class="stat-card-icon bg-info bg-opacity-10 text-info">
+                  <i class="bi bi-eye-fill"></i>
+                </div>
+                <div class="text-secondary small fw-bold mb-1">مجموع نمایش (Impressions)</div>
+                <h3 id="adBannersTotalImpressions" class="text-info mb-0">۰</h3>
+              </div>
+            </div>
+            <div class="col-sm-6 col-xl-3">
+              <div class="stat-card">
+                <div class="stat-card-icon bg-primary bg-opacity-10 text-primary">
+                  <i class="bi bi-hand-index-thumb-fill"></i>
+                </div>
+                <div class="text-secondary small fw-bold mb-1">مجموع کلیک / نرخ CTR</div>
+                <h3 id="adBannersTotalClicksCtr" class="text-white mb-0">۰ (۰٪)</h3>
+              </div>
+            </div>
+          </div>
+
+          <div class="card p-4 shadow">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4 pb-3 border-bottom border-secondary">
+              <div>
+                <h4 class="gold-text mb-1"><i class="bi bi-badge-ad-fill text-warning me-2"></i> مدیریت بنرهای تبلیغاتی تصویری و لینک‌دار</h4>
+                <p class="text-secondary small mb-0">
+                  بنرهای فعال و معتبر به‌صورت اسلایدر و با ترتیب مشخص در صفحه اصلی اپلیکیشن نمایش داده می‌شوند. لینک مقصد هرگز در ظاهر عادی اپلیکیشن چاپ نمی‌شود.
+                </p>
+              </div>
+              <div class="d-flex gap-2 flex-wrap">
+                <button class="btn btn-gold fw-bold px-3" onclick="openAdBannerModal()">
+                  <i class="bi bi-plus-circle-fill me-1"></i> ایجاد تبلیغ جدید
+                </button>
+                <button class="btn btn-outline-warning btn-sm" onclick="loadAdBanners()">
+                  <i class="bi bi-arrow-clockwise"></i> به‌روزرسانی
+                </button>
+              </div>
+            </div>
+
+            <div class="row g-2 mb-3 align-items-center">
+              <div class="col-md-5">
+                <input type="text" id="adBannerSearchInput" class="form-control form-control-sm form-control-dark" placeholder="جستجو بر اساس نام داخلی تبلیغ یا آدرس مقصد..." oninput="renderAdBannersTable()">
+              </div>
+              <div class="col-md-4">
+                <select id="adBannerStatusFilter" class="form-select form-select-sm form-select-dark" onchange="renderAdBannersTable()">
+                  <option value="all">همه وضعیت‌ها</option>
+                  <option value="active">فعال (در حال نمایش)</option>
+                  <option value="inactive">غیرفعال</option>
+                  <option value="scheduled">زمان‌بندی‌شده (شروع در آینده)</option>
+                  <option value="expired">منقضی‌شده</option>
+                </select>
+              </div>
+              <div class="col-md-3 text-md-end small text-secondary" id="adBannersFilterCount">
+                در حال بارگذاری...
+              </div>
+            </div>
+
+            <div id="adBannerAlertBox" class="alert d-none py-2 px-3 small mb-3"></div>
+
+            <div class="table-responsive">
+              <table class="table table-dark table-hover table-striped rounded align-middle">
+                <thead>
+                  <tr class="text-secondary small">
+                    <th style="width: 95px;">ترتیب</th>
+                    <th style="width: 130px;">تصویر بنر</th>
+                    <th>نام داخلی و لینک مقصد</th>
+                    <th>وضعیت</th>
+                    <th>بازه زمانی نمایش</th>
+                    <th>آمار نمایش / کلیک</th>
+                    <th style="width: 190px;">عملیات</th>
+                  </tr>
+                </thead>
+                <tbody id="adBannersTbody">
+                  <tr><td colspan="7" class="text-center py-4 text-secondary">در حال بارگذاری بنرهای تبلیغاتی...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
       </main>
     </div>
   </div>
@@ -1977,6 +2086,154 @@
     </div>
   </div>
 
+  <!-- Modal: Create / Edit Promotional Ad Banner -->
+  <div class="modal fade modal-dark" id="adBannerModal" tabindex="-1" aria-labelledby="adBannerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+      <div class="modal-content" style="background-color: #12253B; border: 1px solid var(--border-color); color: #fff;">
+        <div class="modal-header border-secondary">
+          <h5 class="modal-title gold-text fw-bold" id="adBannerModalLabel">
+            <i class="bi bi-badge-ad-fill text-warning me-2"></i> ایجاد / ویرایش بنر تبلیغاتی
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="بستن"></button>
+        </div>
+        <form id="adBannerForm" onsubmit="submitAdBannerForm(event)">
+          <div class="modal-body">
+            <input type="hidden" id="adBannerEditId" value="">
+            <div id="adBannerModalAlert" class="alert alert-danger d-none py-2 px-3 small mb-3"></div>
+
+            <div class="row g-4">
+              <!-- Form Inputs Column -->
+              <div class="col-lg-7">
+                <div class="row g-3">
+                  <!-- Field 1: Internal Title -->
+                  <div class="col-md-8">
+                    <label class="form-label text-secondary small fw-bold">۱. نام داخلی تبلیغ (فقط برای شناسایی مدیر):</label>
+                    <input type="text" id="adBannerTitleInput" class="form-control form-control-dark" maxlength="120" required placeholder="مثلاً: کمپین بهاره دیجی‌کالا ۱۴۰۵" oninput="updateAdBannerPreview()">
+                  </div>
+
+                  <!-- Field 7: Display Order -->
+                  <div class="col-md-4">
+                    <label class="form-label text-secondary small fw-bold">۷. ترتیب نمایش:</label>
+                    <input type="number" id="adBannerOrderInput" class="form-control form-control-dark" min="0" value="1">
+                  </div>
+
+                  <!-- Field 2: Image Upload -->
+                  <div class="col-12">
+                    <label class="form-label text-secondary small fw-bold">۲. انتخاب و بارگذاری تصویر بنر (JPG، PNG، WebP — حداکثر ۵ مگابایت):</label>
+                    <div class="p-3 rounded" style="background-color: #0B192C; border: 1px dashed rgba(255, 183, 3, 0.45);">
+                      <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                        <input type="file" id="adBannerImageFileInput" class="form-control form-control-sm form-control-dark" accept="image/jpeg,image/png,image/webp" onchange="handleAdBannerFileSelected(event)" style="max-width: 340px;">
+                        <span id="adBannerUploadStatus" class="small text-secondary">تصویری انتخاب نشده است</span>
+                      </div>
+                      <input type="hidden" id="adBannerImageUrlInput" value="">
+                      <div class="small text-secondary">
+                        پیشنهاد ابعاد استاندارد: نسبت افقی ۱۶:۹ یا ۲:۱ (مثلاً ۱۲۰۰×۶۰۰ پیکسل) برای نمایش بدون بریدگی در صفحه اصلی.
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Field 3: Target URL -->
+                  <div class="col-12">
+                    <label class="form-label text-secondary small fw-bold">۳. آدرس مقصد (URL) با http:// یا https://:</label>
+                    <input type="url" id="adBannerTargetUrlInput" class="form-control form-control-dark text-start" style="direction: ltr;" required placeholder="https://example.com/campaign" oninput="updateAdBannerPreview()">
+                    <div class="form-text text-secondary small">این لینک هنگام لمس بنر باز می‌شود و روی تصویر تبلیغ نمایش داده نخواهد شد.</div>
+                  </div>
+
+                  <!-- Field 4: Display Status -->
+                  <div class="col-md-6">
+                    <label class="form-label text-secondary small fw-bold">۴. وضعیت نمایش:</label>
+                    <select id="adBannerStatusSelect" class="form-select form-select-dark" onchange="updateAdBannerPreview()">
+                      <option value="true">فعال (نمایش در برنامه در بازه معتبر)</option>
+                      <option value="false">غیرفعال (عدم نمایش)</option>
+                    </select>
+                  </div>
+
+                  <!-- Field 8: Link Open Mode -->
+                  <div class="col-md-6">
+                    <label class="form-label text-secondary small fw-bold">۸. نوع باز شدن لینک:</label>
+                    <select id="adBannerLinkModeSelect" class="form-select form-select-dark" onchange="updateAdBannerPreview()">
+                      <option value="external">باز شدن در مرورگر خارجی (پیشنهادی)</option>
+                      <option value="internal">باز شدن در مرورگر داخلی برنامه (WebView امن)</option>
+                    </select>
+                  </div>
+
+                  <!-- Field 5: Start Date -->
+                  <div class="col-md-6">
+                    <label class="form-label text-secondary small fw-bold">۵. تاریخ و ساعت شروع نمایش (اختیاری):</label>
+                    <div class="input-group input-group-sm">
+                      <input type="datetime-local" id="adBannerStartAtInput" class="form-control form-control-dark" onchange="updateAdBannerPreview()">
+                      <button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('adBannerStartAtInput').value=''; updateAdBannerPreview();" title="پاک کردن تاریخ شروع">پاک</button>
+                    </div>
+                  </div>
+
+                  <!-- Field 6: End Date -->
+                  <div class="col-md-6">
+                    <label class="form-label text-secondary small fw-bold">۶. تاریخ و ساعت پایان نمایش (اختیاری):</label>
+                    <div class="input-group input-group-sm">
+                      <input type="datetime-local" id="adBannerEndAtInput" class="form-control form-control-dark" onchange="updateAdBannerPreview()">
+                      <button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('adBannerEndAtInput').value=''; updateAdBannerPreview();" title="پاک کردن تاریخ پایان">پاک</button>
+                    </div>
+                    <div class="d-flex gap-1 mt-1 flex-wrap">
+                      <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size: 11px;" onclick="setAdBannerQuickEndDays(3)">+۳ روز</button>
+                      <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size: 11px;" onclick="setAdBannerQuickEndDays(7)">+۷ روز</button>
+                      <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size: 11px;" onclick="setAdBannerQuickEndDays(30)">+۳۰ روز</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Field 9: Live Preview Column -->
+              <div class="col-lg-5">
+                <div class="p-3 rounded h-100 d-flex flex-column justify-content-between" style="background-color: #0B192C; border: 1px solid rgba(255, 183, 3, 0.35);">
+                  <div>
+                    <label class="form-label text-warning small fw-bold mb-2">
+                      <i class="bi bi-phone me-1"></i> ۹. پیش‌نمایش زنده تصویر بنر و لینک قبل از انتشار:
+                    </label>
+                    <div class="small text-secondary mb-2">نمای واقعی داخل اپلیکیشن (بدون نمایش آدرس لینک روی تصویر):</div>
+
+                    <div id="adBannerPreviewCard" style="background: #121212; border: 1px solid rgba(212, 175, 55, 0.38); border-radius: 16px; overflow: hidden; aspect-ratio: 16 / 8; display: flex; align-items: center; justify-content: center; position: relative;">
+                      <img id="adBannerPreviewImg" src="" alt="پیش‌نمایش تبلیغ" style="width: 100%; height: 100%; object-fit: cover; display: none;">
+                      <div id="adBannerPreviewPlaceholder" class="text-center text-secondary p-3">
+                        <i class="bi bi-image fs-1 d-block mb-2 text-warning opacity-50"></i>
+                        <div class="small">پس از انتخاب تصویر، پیش‌نمایش بنر اینجا نمایش داده می‌شود.</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="mt-3 p-2 rounded" style="background-color: #12253B; border: 1px solid var(--border-color);">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                      <span class="small text-secondary">وضعیت پیش‌بینی‌شده:</span>
+                      <span id="adBannerPreviewStatusBadge" class="badge bg-success">فعال</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <span class="small text-secondary">نحوه باز شدن لینک:</span>
+                      <span id="adBannerPreviewModeBadge" class="badge bg-info text-dark">مرورگر خارجی</span>
+                    </div>
+                    <div class="small text-secondary mb-1">بررسی لینک مقصد (فقط در پنل مدیر):</div>
+                    <div class="d-flex align-items-center gap-2">
+                      <code id="adBannerPreviewUrlText" class="text-warning small text-truncate flex-grow-1" style="direction: ltr;">-</code>
+                      <a id="adBannerPreviewTestLink" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-warning disabled" style="font-size: 11px;">
+                        <i class="bi bi-box-arrow-up-right"></i> تست لینک
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-footer border-secondary">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">انصراف</button>
+            <button type="submit" id="saveAdBannerBtn" class="btn btn-gold fw-bold px-4">
+              <span id="saveAdBannerSpinner" class="spinner-border spinner-border-sm d-none me-1" role="status"></span>
+              <i class="bi bi-check2-circle me-1"></i> ذخیره بنر تبلیغاتی
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <!-- Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script>
@@ -2006,7 +2263,8 @@
       'store': { title: 'فروشگاه و تراکنش‌ها', icon: 'bi-shop' },
       'support': { title: 'پشتیبانی و تیکت‌ها', icon: 'bi-headset' },
       'settings': { title: 'تنظیمات پنل', icon: 'bi-gear-fill' },
-      'login_notification': { title: 'مدیریت پیام ورود', icon: 'bi-megaphone-fill' }
+      'login_notification': { title: 'مدیریت پیام ورود', icon: 'bi-megaphone-fill' },
+      'ad_banners': { title: 'مدیریت بنرهای تبلیغاتی', icon: 'bi-badge-ad-fill' }
     };
 
     function navigateTo(sectionId) {
@@ -2054,6 +2312,8 @@
         loadAdminSupportTickets();
       } else if (sectionId === 'login_notification') {
         loadLoginNotification();
+      } else if (sectionId === 'ad_banners') {
+        loadAdBanners();
       }
 
       // Close mobile sidebar if open
@@ -4689,6 +4949,527 @@
         setTimeout(() => alertBox.classList.add('d-none'), 5000);
       } else {
         alert(msg);
+      }
+    }
+
+    // ====================================================================
+    // PROMOTIONAL AD BANNERS MANAGEMENT
+    // ====================================================================
+    let cachedAdBanners = [];
+    let bootstrapAdBannerModal = null;
+    let isUploadingAdBannerImage = false;
+
+    function showAdBannerSectionAlert(msg, type = 'success') {
+      const box = document.getElementById('adBannerAlertBox');
+      if (!box) return;
+      const cls = type === 'success' ? 'alert-success' : (type === 'warning' ? 'alert-warning' : 'alert-danger');
+      box.className = `alert ${cls} py-2 px-3 small mb-3`;
+      box.textContent = msg;
+      box.classList.remove('d-none');
+      setTimeout(() => box.classList.add('d-none'), 5000);
+    }
+
+    function isValidHttpUrlFrontend(rawUrl) {
+      if (!rawUrl || typeof rawUrl !== 'string') return false;
+      const trimmed = rawUrl.trim();
+      if (!trimmed || /\s/.test(trimmed)) return false;
+      try {
+        const parsed = new URL(trimmed);
+        return (parsed.protocol === 'http:' || parsed.protocol === 'https:') && Boolean(parsed.hostname && parsed.hostname.length >= 2);
+      } catch (_e) {
+        return false;
+      }
+    }
+
+    function toDatetimeLocalValue(isoOrDate) {
+      if (!isoOrDate) return '';
+      const d = new Date(isoOrDate);
+      if (Number.isNaN(d.getTime())) return '';
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    function formatPersianDateTime(isoOrDate) {
+      if (!isoOrDate) return 'نامحدود';
+      const d = new Date(isoOrDate);
+      if (Number.isNaN(d.getTime())) return '-';
+      try {
+        return d.toLocaleString('fa-IR', {
+          year: 'numeric', month: '2-digit', day: '2-digit',
+          hour: '2-digit', minute: '2-digit'
+        });
+      } catch (_e) {
+        return d.toISOString();
+      }
+    }
+
+    async function loadAdBanners() {
+      const key = getAdminKey();
+      const tbody = document.getElementById('adBannersTbody');
+      if (tbody && cachedAdBanners.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-secondary">در حال دریافت بنرهای تبلیغاتی...</td></tr>';
+      }
+
+      try {
+        const res = await fetch('/api/admin/ad-banners', {
+          headers: { 'x-admin-key': key }
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-danger">${escapeHtml(data.message || data.error || 'خطا در دریافت بنرها')}</td></tr>`;
+          return;
+        }
+
+        cachedAdBanners = Array.isArray(data.banners) ? data.banners : [];
+        const s = data.summary || {};
+
+        setElText('adBannersTotalCount', Number(s.total || 0).toLocaleString('fa-IR'));
+        setElText('adBannersActiveCount', Number(s.activeCount || 0).toLocaleString('fa-IR'));
+        setElText('adBannersTotalImpressions', Number(s.totalImpressions || 0).toLocaleString('fa-IR'));
+        setElText('adBannersTotalClicksCtr', `${Number(s.totalClicks || 0).toLocaleString('fa-IR')} (${s.avgCtr || 0}٪)`);
+
+        const badge = document.getElementById('sidebarAdBannersBadge');
+        if (badge) {
+          if ((s.activeCount || 0) > 0) {
+            badge.textContent = Number(s.activeCount).toLocaleString('fa-IR');
+            badge.style.display = 'inline-block';
+          } else {
+            badge.style.display = 'none';
+          }
+        }
+
+        renderAdBannersTable();
+      } catch (err) {
+        if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-danger">خطای ارتباط: ${escapeHtml(err.message)}</td></tr>`;
+      }
+    }
+
+    function renderAdBannersTable() {
+      const tbody = document.getElementById('adBannersTbody');
+      const countEl = document.getElementById('adBannersFilterCount');
+      if (!tbody) return;
+
+      const search = (document.getElementById('adBannerSearchInput')?.value || '').trim().toLowerCase();
+      const statusFilter = document.getElementById('adBannerStatusFilter')?.value || 'all';
+
+      const filtered = cachedAdBanners.filter((b) => {
+        if (statusFilter !== 'all' && b.computed_status !== statusFilter) return false;
+        if (search) {
+          const hay = `${b.title || ''} ${b.target_url || ''}`.toLowerCase();
+          if (!hay.includes(search)) return false;
+        }
+        return true;
+      });
+
+      if (countEl) {
+        countEl.textContent = `نمایش ${filtered.length.toLocaleString('fa-IR')} از ${cachedAdBanners.length.toLocaleString('fa-IR')} تبلیغ`;
+      }
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-secondary">هنوز بنر تبلیغاتی ثبت نشده یا موردی با فیلتر انتخابی یافت نشد.</td></tr>';
+        return;
+      }
+
+      const statusBadges = {
+        active: '<span class="badge bg-success">فعال</span>',
+        inactive: '<span class="badge bg-secondary">غیرفعال</span>',
+        scheduled: '<span class="badge bg-info text-dark">زمان‌بندی‌شده</span>',
+        expired: '<span class="badge bg-danger">منقضی‌شده</span>'
+      };
+
+      tbody.innerHTML = filtered.map((b, idx) => {
+        const modeBadge = b.link_open_mode === 'internal'
+          ? '<span class="badge bg-dark border border-info text-info" style="font-size: 11px;">مرورگر داخلی</span>'
+          : '<span class="badge bg-dark border border-warning text-warning" style="font-size: 11px;">مرورگر خارجی</span>';
+
+        const safeUrl = isValidHttpUrlFrontend(b.target_url) ? b.target_url : '';
+
+        return `
+          <tr>
+            <td>
+              <div class="d-flex align-items-center gap-1">
+                <span class="badge bg-dark border border-secondary px-2 py-1">${Number(b.display_order || 0).toLocaleString('fa-IR')}</span>
+                <div class="btn-group-vertical btn-group-sm">
+                  <button type="button" class="btn btn-outline-secondary py-0 px-1" title="انتقال به بالا" onclick="moveAdBannerOrder('${escapeHtml(b.id)}', -1)" ${idx === 0 ? 'disabled' : ''}>
+                    <i class="bi bi-caret-up-fill" style="font-size: 10px;"></i>
+                  </button>
+                  <button type="button" class="btn btn-outline-secondary py-0 px-1" title="انتقال به پایین" onclick="moveAdBannerOrder('${escapeHtml(b.id)}', 1)" ${idx === filtered.length - 1 ? 'disabled' : ''}>
+                    <i class="bi bi-caret-down-fill" style="font-size: 10px;"></i>
+                  </button>
+                </div>
+              </div>
+            </td>
+            <td>
+              <img src="${escapeHtml(b.image_url)}" alt="${escapeHtml(b.title)}" class="rounded border border-secondary" style="width: 116px; height: 60px; object-fit: cover; background: #0B192C;">
+            </td>
+            <td>
+              <div class="fw-bold text-white mb-1">${escapeHtml(b.title)}</div>
+              <div class="d-flex align-items-center gap-2 flex-wrap">
+                ${modeBadge}
+                ${safeUrl ? `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer" class="small text-info text-truncate d-inline-block" style="max-width: 220px; direction: ltr;">${escapeHtml(safeUrl)}</a>` : '<span class="small text-danger">لینک نامعتبر</span>'}
+              </div>
+            </td>
+            <td>
+              <div class="d-flex flex-column gap-1 align-items-start">
+                ${statusBadges[b.computed_status] || '<span class="badge bg-secondary">-</span>'}
+                <div class="form-check form-switch m-0">
+                  <input class="form-check-input" type="checkbox" ${b.is_active ? 'checked' : ''} onchange="toggleAdBannerStatus('${escapeHtml(b.id)}')" title="تغییر وضعیت فعال/غیرفعال">
+                </div>
+              </div>
+            </td>
+            <td class="small text-secondary">
+              <div>شروع: <span class="text-white">${formatPersianDateTime(b.start_at)}</span></div>
+              <div>پایان: <span class="text-white">${formatPersianDateTime(b.end_at)}</span></div>
+            </td>
+            <td class="small">
+              <div>نمایش: <strong class="text-info">${Number(b.impression_count || 0).toLocaleString('fa-IR')}</strong></div>
+              <div>کلیک: <strong class="text-warning">${Number(b.click_count || 0).toLocaleString('fa-IR')}</strong></div>
+              <div class="text-secondary">CTR: <strong class="text-success">${b.ctr_percent || 0}٪</strong></div>
+            </td>
+            <td>
+              <div class="d-flex gap-1 flex-wrap">
+                <button type="button" class="btn btn-sm btn-outline-warning" onclick="openAdBannerModal('${escapeHtml(b.id)}')" title="ویرایش">
+                  <i class="bi bi-pencil-fill"></i> ویرایش
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteAdBanner('${escapeHtml(b.id)}', '${escapeHtml(b.title)}')" title="حذف">
+                  <i class="bi bi-trash-fill"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function openAdBannerModal(bannerId = null) {
+      const modalAlert = document.getElementById('adBannerModalAlert');
+      if (modalAlert) modalAlert.classList.add('d-none');
+
+      const fileInput = document.getElementById('adBannerImageFileInput');
+      if (fileInput) fileInput.value = '';
+
+      if (bannerId) {
+        const b = cachedAdBanners.find((item) => item.id === bannerId);
+        if (!b) return;
+        document.getElementById('adBannerModalLabel').innerHTML = '<i class="bi bi-pencil-square text-warning me-2"></i> ویرایش بنر تبلیغاتی';
+        document.getElementById('adBannerEditId').value = b.id;
+        document.getElementById('adBannerTitleInput').value = b.title || '';
+        document.getElementById('adBannerOrderInput').value = b.display_order ?? 0;
+        document.getElementById('adBannerImageUrlInput').value = b.image_url || '';
+        document.getElementById('adBannerTargetUrlInput').value = b.target_url || '';
+        document.getElementById('adBannerStatusSelect').value = b.is_active ? 'true' : 'false';
+        document.getElementById('adBannerLinkModeSelect').value = b.link_open_mode === 'internal' ? 'internal' : 'external';
+        document.getElementById('adBannerStartAtInput').value = toDatetimeLocalValue(b.start_at);
+        document.getElementById('adBannerEndAtInput').value = toDatetimeLocalValue(b.end_at);
+        document.getElementById('adBannerUploadStatus').textContent = 'تصویر فعلی بارگذاری شده است (برای تغییر فایل جدید انتخاب کنید)';
+        document.getElementById('adBannerUploadStatus').className = 'small text-info';
+      } else {
+        document.getElementById('adBannerModalLabel').innerHTML = '<i class="bi bi-plus-circle-fill text-warning me-2"></i> ایجاد بنر تبلیغاتی جدید';
+        document.getElementById('adBannerEditId').value = '';
+        document.getElementById('adBannerTitleInput').value = '';
+        const nextOrder = cachedAdBanners.length > 0
+          ? Math.max(...cachedAdBanners.map((x) => Number(x.display_order || 0))) + 1
+          : 1;
+        document.getElementById('adBannerOrderInput').value = nextOrder;
+        document.getElementById('adBannerImageUrlInput').value = '';
+        document.getElementById('adBannerTargetUrlInput').value = '';
+        document.getElementById('adBannerStatusSelect').value = 'true';
+        document.getElementById('adBannerLinkModeSelect').value = 'external';
+        document.getElementById('adBannerStartAtInput').value = '';
+        document.getElementById('adBannerEndAtInput').value = '';
+        document.getElementById('adBannerUploadStatus').textContent = 'تصویری انتخاب نشده است';
+        document.getElementById('adBannerUploadStatus').className = 'small text-secondary';
+      }
+
+      updateAdBannerPreview();
+      if (!bootstrapAdBannerModal) {
+        bootstrapAdBannerModal = new bootstrap.Modal(document.getElementById('adBannerModal'));
+      }
+      bootstrapAdBannerModal.show();
+    }
+
+    function setAdBannerQuickEndDays(days) {
+      const targetDate = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+      document.getElementById('adBannerEndAtInput').value = toDatetimeLocalValue(targetDate);
+      updateAdBannerPreview();
+    }
+
+    async function handleAdBannerFileSelected(event) {
+      const file = event.target?.files?.[0];
+      if (!file) return;
+
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+      if (!allowedTypes.includes(file.type)) {
+        document.getElementById('adBannerUploadStatus').textContent = 'فقط فرمت‌های JPG، PNG و WebP مجاز هستند.';
+        document.getElementById('adBannerUploadStatus').className = 'small text-danger';
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        document.getElementById('adBannerUploadStatus').textContent = 'حجم تصویر نباید بیشتر از ۵ مگابایت باشد.';
+        document.getElementById('adBannerUploadStatus').className = 'small text-danger';
+        return;
+      }
+
+      const statusEl = document.getElementById('adBannerUploadStatus');
+      statusEl.textContent = 'در حال بارگذاری تصویر...';
+      statusEl.className = 'small text-warning';
+      isUploadingAdBannerImage = true;
+
+      try {
+        const formData = new FormData();
+        formData.append('image', file);
+
+        const res = await fetch('/api/admin/ad-banners/upload-image', {
+          method: 'POST',
+          headers: { 'x-admin-key': getAdminKey() },
+          body: formData
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success || !data.url) {
+          statusEl.textContent = data.message || 'خطا در آپلود تصویر';
+          statusEl.className = 'small text-danger';
+          return;
+        }
+
+        document.getElementById('adBannerImageUrlInput').value = data.url;
+        statusEl.textContent = 'تصویر با موفقیت بارگذاری شد.';
+        statusEl.className = 'small text-success';
+        updateAdBannerPreview();
+      } catch (err) {
+        statusEl.textContent = 'خطا در آپلود تصویر: ' + err.message;
+        statusEl.className = 'small text-danger';
+      } finally {
+        isUploadingAdBannerImage = false;
+      }
+    }
+
+    function updateAdBannerPreview() {
+      const imageUrl = (document.getElementById('adBannerImageUrlInput')?.value || '').trim();
+      const targetUrl = (document.getElementById('adBannerTargetUrlInput')?.value || '').trim();
+      const isActive = document.getElementById('adBannerStatusSelect')?.value === 'true';
+      const linkMode = document.getElementById('adBannerLinkModeSelect')?.value || 'external';
+      const startVal = document.getElementById('adBannerStartAtInput')?.value;
+      const endVal = document.getElementById('adBannerEndAtInput')?.value;
+
+      const imgEl = document.getElementById('adBannerPreviewImg');
+      const placeholderEl = document.getElementById('adBannerPreviewPlaceholder');
+      if (imgEl && placeholderEl) {
+        if (imageUrl) {
+          imgEl.src = imageUrl;
+          imgEl.style.display = 'block';
+          placeholderEl.style.display = 'none';
+        } else {
+          imgEl.src = '';
+          imgEl.style.display = 'none';
+          placeholderEl.style.display = 'block';
+        }
+      }
+
+      const statusBadge = document.getElementById('adBannerPreviewStatusBadge');
+      if (statusBadge) {
+        const now = Date.now();
+        const startMs = startVal ? new Date(startVal).getTime() : null;
+        const endMs = endVal ? new Date(endVal).getTime() : null;
+        if (!isActive) {
+          statusBadge.className = 'badge bg-secondary';
+          statusBadge.textContent = 'غیرفعال';
+        } else if (startMs && startMs > now) {
+          statusBadge.className = 'badge bg-info text-dark';
+          statusBadge.textContent = 'زمان‌بندی‌شده';
+        } else if (endMs && endMs <= now) {
+          statusBadge.className = 'badge bg-danger';
+          statusBadge.textContent = 'منقضی‌شده';
+        } else {
+          statusBadge.className = 'badge bg-success';
+          statusBadge.textContent = 'فعال';
+        }
+      }
+
+      const modeBadge = document.getElementById('adBannerPreviewModeBadge');
+      if (modeBadge) {
+        if (linkMode === 'internal') {
+          modeBadge.className = 'badge bg-info text-dark';
+          modeBadge.textContent = 'مرورگر داخلی برنامه';
+        } else {
+          modeBadge.className = 'badge bg-warning text-dark';
+          modeBadge.textContent = 'مرورگر خارجی';
+        }
+      }
+
+      const urlText = document.getElementById('adBannerPreviewUrlText');
+      const testLink = document.getElementById('adBannerPreviewTestLink');
+      if (urlText && testLink) {
+        if (isValidHttpUrlFrontend(targetUrl)) {
+          urlText.textContent = targetUrl;
+          urlText.className = 'text-warning small text-truncate flex-grow-1';
+          testLink.href = targetUrl;
+          testLink.classList.remove('disabled');
+        } else {
+          urlText.textContent = targetUrl ? 'لینک نامعتبر (فقط http/https مجاز است)' : 'لینک وارد نشده است';
+          urlText.className = 'text-danger small text-truncate flex-grow-1';
+          testLink.href = '#';
+          testLink.classList.add('disabled');
+        }
+      }
+    }
+
+    async function submitAdBannerForm(event) {
+      event.preventDefault();
+      const modalAlert = document.getElementById('adBannerModalAlert');
+      const showModalErr = (msg) => {
+        if (modalAlert) {
+          modalAlert.textContent = msg;
+          modalAlert.classList.remove('d-none');
+        } else {
+          alert(msg);
+        }
+      };
+
+      if (modalAlert) modalAlert.classList.add('d-none');
+
+      if (isUploadingAdBannerImage) {
+        showModalErr('لطفاً تا پایان بارگذاری تصویر صبر کنید.');
+        return;
+      }
+
+      const editId = document.getElementById('adBannerEditId').value.trim();
+      const title = document.getElementById('adBannerTitleInput').value.trim();
+      const image_url = document.getElementById('adBannerImageUrlInput').value.trim();
+      const target_url = document.getElementById('adBannerTargetUrlInput').value.trim();
+      const is_active = document.getElementById('adBannerStatusSelect').value === 'true';
+      const link_open_mode = document.getElementById('adBannerLinkModeSelect').value;
+      const display_order = Number(document.getElementById('adBannerOrderInput').value || 0);
+      const startVal = document.getElementById('adBannerStartAtInput').value;
+      const endVal = document.getElementById('adBannerEndAtInput').value;
+
+      if (!title) {
+        showModalErr('نام داخلی تبلیغ الزامی است.');
+        return;
+      }
+      if (!image_url) {
+        showModalErr('لطفاً تصویر بنر را از دستگاه انتخاب و بارگذاری کنید.');
+        return;
+      }
+      if (!isValidHttpUrlFrontend(target_url)) {
+        showModalErr('لینک مقصد باید یک آدرس معتبر با http:// یا https:// باشد.');
+        return;
+      }
+
+      const start_at = startVal ? new Date(startVal).toISOString() : null;
+      const end_at = endVal ? new Date(endVal).toISOString() : null;
+      if (start_at && end_at && new Date(end_at).getTime() <= new Date(start_at).getTime()) {
+        showModalErr('تاریخ پایان نمایش باید بعد از تاریخ شروع باشد.');
+        return;
+      }
+
+      const spinner = document.getElementById('saveAdBannerSpinner');
+      const saveBtn = document.getElementById('saveAdBannerBtn');
+      if (spinner) spinner.classList.remove('d-none');
+      if (saveBtn) saveBtn.disabled = true;
+
+      try {
+        const endpoint = editId ? `/api/admin/ad-banners/${encodeURIComponent(editId)}` : '/api/admin/ad-banners';
+        const method = editId ? 'PUT' : 'POST';
+        const res = await fetch(endpoint, {
+          method,
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-key': getAdminKey()
+          },
+          body: JSON.stringify({
+            title,
+            image_url,
+            target_url,
+            is_active,
+            link_open_mode,
+            display_order,
+            start_at,
+            end_at
+          })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          showModalErr(data.message || data.error || 'خطا در ذخیره بنر تبلیغاتی');
+          return;
+        }
+
+        if (bootstrapAdBannerModal) bootstrapAdBannerModal.hide();
+        showAdBannerSectionAlert(data.message || 'بنر تبلیغاتی با موفقیت ذخیره شد.', 'success');
+        await loadAdBanners();
+      } catch (err) {
+        showModalErr('خطای ارتباط با سرور: ' + err.message);
+      } finally {
+        if (spinner) spinner.classList.add('d-none');
+        if (saveBtn) saveBtn.disabled = false;
+      }
+    }
+
+    async function toggleAdBannerStatus(bannerId) {
+      try {
+        const res = await fetch(`/api/admin/ad-banners/${encodeURIComponent(bannerId)}/toggle`, {
+          method: 'PATCH',
+          headers: { 'x-admin-key': getAdminKey() }
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          showAdBannerSectionAlert(data.message || 'تغییر وضعیت انجام نشد.', 'error');
+        } else {
+          showAdBannerSectionAlert(data.message || 'وضعیت تبلیغ تغییر کرد.', 'success');
+        }
+        await loadAdBanners();
+      } catch (err) {
+        showAdBannerSectionAlert('خطا در تغییر وضعیت: ' + err.message, 'error');
+      }
+    }
+
+    async function moveAdBannerOrder(bannerId, direction) {
+      const sorted = [...cachedAdBanners].sort((a, b) => (a.display_order - b.display_order));
+      const idx = sorted.findIndex((b) => b.id === bannerId);
+      const targetIdx = idx + direction;
+      if (idx < 0 || targetIdx < 0 || targetIdx >= sorted.length) return;
+
+      const swapped = [...sorted];
+      const temp = swapped[idx];
+      swapped[idx] = swapped[targetIdx];
+      swapped[targetIdx] = temp;
+
+      const items = swapped.map((b, i) => ({ id: b.id, display_order: i + 1 }));
+      try {
+        const res = await fetch('/api/admin/ad-banners/reorder', {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-admin-key': getAdminKey()
+          },
+          body: JSON.stringify({ items })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          showAdBannerSectionAlert(data.message || 'تغییر ترتیب انجام نشد.', 'error');
+          return;
+        }
+        await loadAdBanners();
+      } catch (err) {
+        showAdBannerSectionAlert('خطا در تغییر ترتیب نمایش: ' + err.message, 'error');
+      }
+    }
+
+    async function deleteAdBanner(bannerId, title) {
+      if (!confirm(`آیا از حذف بنر تبلیغاتی «${title}» اطمینان دارید؟`)) return;
+      try {
+        const res = await fetch(`/api/admin/ad-banners/${encodeURIComponent(bannerId)}`, {
+          method: 'DELETE',
+          headers: { 'x-admin-key': getAdminKey() }
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          showAdBannerSectionAlert(data.message || 'حذف تبلیغ ناموفق بود.', 'error');
+          return;
+        }
+        showAdBannerSectionAlert('بنر تبلیغاتی با موفقیت حذف شد.', 'success');
+        await loadAdBanners();
+      } catch (err) {
+        showAdBannerSectionAlert('خطا در حذف بنر: ' + err.message, 'error');
       }
     }
 

@@ -98,10 +98,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             notificationsEnabled = prefs.notificationsEnabled
         )
         val cachedAnn = backendRepository.parseCachedAnnouncement()
+        val cachedBanners = backendRepository.parseCachedAdBanners()
         _uiState.update {
             it.copy(
                 currentUser = user,
                 activeAnnouncement = cachedAnn,
+                promoAdBanners = cachedBanners,
                 currentScreen = AppScreen.HOME,
                 isTestAdsEnabled = prefs.useTestAds
             )
@@ -197,6 +199,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val loginNotifResult = backendRepository.fetchLoginNotificationConfig()
             val loginNotif = if (loginNotifResult is Result.Success) loginNotifResult.data else _uiState.value.loginNotification
 
+            // Fetch active clickable promotional ad banners
+            val promoBannersRes = backendRepository.fetchActiveAdBanners()
+            val promoBanners = if (promoBannersRes is Result.Success) promoBannersRes.data else _uiState.value.promoAdBanners
+
             _uiState.update {
                 it.copy(
                     dailyCycle = cycle,
@@ -205,6 +211,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     activeCompetition = activeComp ?: it.activeCompetition,
                     activeAnnouncement = activeAnn,
                     loginNotification = loginNotif,
+                    promoAdBanners = promoBanners,
                     currentUser = updatedUser,
                     isLoading = false
                 )
@@ -1307,5 +1314,45 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.update { it.copy(showFeedbackDialog = true) }
         }
     }
+
+    // ====================================================================
+    // Promotional Clickable Ad Banners
+    // ====================================================================
+    private val trackedBannerImpressions = mutableSetOf<String>()
+    private var lastPromoBannerClickTimeMs: Long = 0L
+    private var lastPromoBannerClickedId: String? = null
+
+    fun onPromoBannerVisible(bannerId: String) {
+        if (bannerId.isBlank()) return
+        if (!trackedBannerImpressions.add(bannerId)) return
+        val userId = _uiState.value.currentUser?.id ?: prefs.userId
+        viewModelScope.launch {
+            backendRepository.recordAdBannerImpression(bannerId, userId)
+        }
+    }
+
+    fun onPromoBannerClick(
+        banner: com.example.model.PromoAdBanner,
+        onOpenUrl: (safeUrl: String, linkOpenMode: String) -> Unit
+    ) {
+        val nowMs = System.currentTimeMillis()
+        if (lastPromoBannerClickedId == banner.id && (nowMs - lastPromoBannerClickTimeMs) < 800L) {
+            return
+        }
+        val safeUrl = com.example.model.PromoBannerUrlValidator.normalizeSafeHttpUrl(banner.targetUrl)
+            ?: return
+        if (!banner.isCurrentlyDisplayable(nowMs)) return
+
+        lastPromoBannerClickedId = banner.id
+        lastPromoBannerClickTimeMs = nowMs
+
+        val userId = _uiState.value.currentUser?.id ?: prefs.userId
+        val tapNonce = java.util.UUID.randomUUID().toString()
+        viewModelScope.launch {
+            backendRepository.recordAdBannerClick(banner.id, userId, tapNonce)
+        }
+        onOpenUrl(safeUrl, banner.linkOpenMode)
+    }
 }
+
 

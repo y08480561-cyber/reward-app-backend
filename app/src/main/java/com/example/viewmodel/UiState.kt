@@ -64,6 +64,8 @@ data class MainUiState(
     val activeCompetition: com.example.model.CompetitionInfo? = null,
     // Active Home Announcement
     val activeAnnouncement: com.example.model.HomeAnnouncement? = null,
+    // Active Clickable Promotional Ad Banners
+    val promoAdBanners: List<com.example.model.PromoAdBanner> = emptyList(),
     // Support System State
     val supportTickets: List<com.example.model.SupportTicket> = emptyList(),
     val activeSupportTicket: com.example.model.SupportTicket? = null,

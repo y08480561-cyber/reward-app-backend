@@ -337,3 +337,59 @@ data class LoginNotificationConfig(
     val updatedAt: Long = System.currentTimeMillis()
 )
 
+/**
+ * Clickable promotional image ad banner managed dynamically from Admin Panel.
+ */
+data class PromoAdBanner(
+    val id: String,
+    val title: String,
+    val imageUrl: String,
+    val targetUrl: String,
+    val linkOpenMode: String = "external", // "external" or "internal"
+    val isActive: Boolean = true,
+    val startAtMs: Long? = null,
+    val endAtMs: Long? = null,
+    val displayOrder: Int = 0,
+    val updatedAtMs: Long = System.currentTimeMillis()
+) {
+    fun isCurrentlyDisplayable(nowMs: Long = System.currentTimeMillis()): Boolean {
+        if (!isActive) return false
+        if (imageUrl.isBlank()) return false
+        if (!PromoBannerUrlValidator.isSafeHttpUrl(targetUrl)) return false
+        if (startAtMs != null && startAtMs > nowMs) return false
+        if (endAtMs != null && endAtMs <= nowMs) return false
+        return true
+    }
+}
+
+object PromoBannerUrlValidator {
+    fun isSafeHttpUrl(rawUrl: String?): Boolean {
+        return normalizeSafeHttpUrl(rawUrl) != null
+    }
+
+    fun normalizeSafeHttpUrl(rawUrl: String?): String? {
+        val trimmed = rawUrl?.trim().orEmpty()
+        if (trimmed.isEmpty() || trimmed.length > 2048) return null
+        if (trimmed.any { it.isWhitespace() || it.code < 0x20 || it.code == 0x7F }) return null
+        return try {
+            val uri = java.net.URI(trimmed)
+            val scheme = uri.scheme?.lowercase().orEmpty()
+            if (scheme != "http" && scheme != "https") return null
+            val host = uri.host?.trim().orEmpty()
+            if (host.length < 2) return null
+            if (!uri.userInfo.isNullOrEmpty()) return null
+            uri.toASCIIString()
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    fun filterAndSortActive(
+        banners: List<PromoAdBanner>,
+        nowMs: Long = System.currentTimeMillis()
+    ): List<PromoAdBanner> {
+        return banners
+            .filter { it.isCurrentlyDisplayable(nowMs) }
+            .sortedWith(compareBy<PromoAdBanner> { it.displayOrder }.thenByDescending { it.updatedAtMs })
+    }
+}

@@ -360,3 +360,23 @@ VALUES
   ('PKG_2', 'بسته نقره‌ای (۳۰ خانه)', 'بازگشایی فوری ۳۰ خانه از مسابقه با ضریب امتیاز ۲ برابری', 'SQUARE_UNLOCK', 30, 25000, 'reqabat_pkg_30', 'ویژه', 2),
   ('PKG_3', 'بسته طلایی (۱۰۰ خانه کامل)', 'بازگشایی کامل تمامی ۱۰۰ خانه مسابقه با ضریب ۳ برابری', 'SQUARE_UNLOCK', 100, 70000, 'reqabat_pkg_100', 'پیشنهاد طلایی', 3)
 ON CONFLICT (id) DO NOTHING;
+
+-- ۲۲. جدول بنرهای تبلیغاتی تصویری و لینک‌دار (Ad Banners)
+CREATE TABLE IF NOT EXISTS public.ad_banners (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    image_url TEXT NOT NULL,
+    target_url TEXT NOT NULL,
+    link_open_mode TEXT NOT NULL DEFAULT 'external' CHECK (link_open_mode IN ('external', 'internal')),
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    start_at TIMESTAMPTZ,
+    end_at TIMESTAMPTZ,
+    display_order INTEGER NOT NULL DEFAULT 0,
+    click_count INTEGER NOT NULL DEFAULT 0,
+    impression_count INTEGER NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+ALTER TABLE public.ad_banners ADD COLUMN IF NOT EXISTS link_open_mode TEXT NOT NULL DEFAULT 'external';
+CREATE INDEX IF NOT EXISTS idx_ad_banners_active_order ON public.ad_banners(is_active, display_order ASC, created_at DESC);
+

@@ -1759,4 +1759,122 @@ class BackendRepository(
             Result.Error("خطای شبکه در ثبت بازخورد: ${e.message}")
         }
     }
+
+    suspend fun fetchActiveAdBanners(): Result<List<com.example.model.PromoAdBanner>> = withContext(Dispatchers.IO) {
+        val baseUrl = prefs.serverUrl.trimEnd('/')
+        val url = "$baseUrl/api/ad-banners/active"
+        try {
+            val request = Request.Builder().url(url).get().build()
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (response.isSuccessful) {
+                    val json = JSONObject(body)
+                    val arr = json.optJSONArray("banners") ?: org.json.JSONArray()
+                    val parsed = parseAdBannersJsonArray(arr, baseUrl)
+                    prefs.cachedAdBannersJson = arr.toString()
+                    Result.Success(parsed)
+                } else {
+                    val cached = parseCachedAdBanners()
+                    Result.Success(cached)
+                }
+            }
+        } catch (_: Exception) {
+            val cached = parseCachedAdBanners()
+            Result.Success(cached)
+        }
+    }
+
+    fun parseCachedAdBanners(): List<com.example.model.PromoAdBanner> {
+        val raw = prefs.cachedAdBannersJson
+        if (raw.isBlank()) return emptyList()
+        return try {
+            val arr = org.json.JSONArray(raw)
+            parseAdBannersJsonArray(arr, prefs.serverUrl.trimEnd('/'))
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    fun parseAdBannersJsonArray(
+        arr: org.json.JSONArray,
+        baseUrl: String = ApiConfig.BASE_URL
+    ): List<com.example.model.PromoAdBanner> {
+        val list = mutableListOf<com.example.model.PromoAdBanner>()
+        for (i in 0 until arr.length()) {
+            val obj = arr.optJSONObject(i) ?: continue
+            val id = obj.optString("id").trim()
+            val rawImageUrl = obj.optString("imageUrl", obj.optString("image_url")).trim()
+            val resolvedImage = ApiConfig.resolveBackendAssetUrl(rawImageUrl, baseUrl)
+            val targetUrl = obj.optString("targetUrl", obj.optString("target_url")).trim()
+            if (id.isBlank() || resolvedImage.isBlank()) continue
+            if (!com.example.model.PromoBannerUrlValidator.isSafeHttpUrl(targetUrl)) continue
+
+            val startAtMs = when {
+                obj.has("startAt") && !obj.isNull("startAt") -> obj.optLong("startAt", -1L).takeIf { it > 0L }
+                obj.has("start_at") && !obj.isNull("start_at") -> obj.optLong("start_at", -1L).takeIf { it > 0L }
+                else -> null
+            }
+            val endAtMs = when {
+                obj.has("endAt") && !obj.isNull("endAt") -> obj.optLong("endAt", -1L).takeIf { it > 0L }
+                obj.has("end_at") && !obj.isNull("end_at") -> obj.optLong("end_at", -1L).takeIf { it > 0L }
+                else -> null
+            }
+
+            list.add(
+                com.example.model.PromoAdBanner(
+                    id = id,
+                    title = obj.optString("title", ""),
+                    imageUrl = resolvedImage,
+                    targetUrl = targetUrl,
+                    linkOpenMode = obj.optString("linkOpenMode", obj.optString("link_open_mode", "external"))
+                        .lowercase()
+                        .let { if (it == "internal") "internal" else "external" },
+                    isActive = obj.optBoolean("isActive", obj.optBoolean("is_active", true)),
+                    startAtMs = startAtMs,
+                    endAtMs = endAtMs,
+                    displayOrder = obj.optInt("displayOrder", obj.optInt("display_order", i)),
+                    updatedAtMs = obj.optLong("updatedAt", System.currentTimeMillis())
+                )
+            )
+        }
+        return com.example.model.PromoBannerUrlValidator.filterAndSortActive(list)
+    }
+
+    suspend fun recordAdBannerImpression(bannerId: String, userId: String) = withContext(Dispatchers.IO) {
+        if (bannerId.isBlank()) return@withContext
+        val url = "${prefs.serverUrl.trimEnd('/')}/api/ad-banners/${android.net.Uri.encode(bannerId)}/impression"
+        try {
+            val payload = JSONObject().apply {
+                if (userId.isNotBlank()) put("userId", userId)
+            }
+            val request = Request.Builder()
+                .url(url)
+                .header("Content-Type", "application/json")
+                .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+                .build()
+            client.newCall(request).execute().close()
+        } catch (_: Exception) {
+            // Non-blocking analytics
+        }
+    }
+
+    suspend fun recordAdBannerClick(bannerId: String, userId: String, tapNonce: String) = withContext(Dispatchers.IO) {
+        if (bannerId.isBlank()) return@withContext
+        val url = "${prefs.serverUrl.trimEnd('/')}/api/ad-banners/${android.net.Uri.encode(bannerId)}/click"
+        try {
+            val payload = JSONObject().apply {
+                if (userId.isNotBlank()) put("userId", userId)
+                if (tapNonce.isNotBlank()) put("tapNonce", tapNonce)
+            }
+            val request = Request.Builder()
+                .url(url)
+                .header("Content-Type", "application/json")
+                .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+                .build()
+            client.newCall(request).execute().close()
+        } catch (_: Exception) {
+            // Non-blocking analytics
+        }
+    }
 }
+

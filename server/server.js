@@ -4,6 +4,7 @@ const cors = require('cors');
 const path = require('path');
 const crypto = require('crypto');
 const fs = require('fs');
+const multer = require('multer');
 const { Pool } = require('pg');
 
 const app = express();
@@ -212,7 +213,8 @@ async function verifyDatabaseSchema() {
     'store_products', 'purchases', 'competitions', 'competition_archives',
     'competition_logs', 'home_announcements', 'support_tickets',
     'support_messages', 'rewards', 'reward_categories',
-    'reward_claims', 'reward_appearance', 'login_notification_settings'
+    'reward_claims', 'reward_appearance', 'login_notification_settings',
+    'ad_banners'
   ];
 
   try {
@@ -581,7 +583,26 @@ async function initDatabaseTables() {
       warning_description TEXT NOT NULL DEFAULT 'لطفاً پیش از ورود، وای‌فای و فیلترشکن را خاموش نموده و از طریق اینترنت همراه سیم‌کارت ایرانسل متصل گردید.',
       warning_icon TEXT NOT NULL DEFAULT 'signal_cellular_alt',
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );`
+    );`,
+
+    // 25. Promotional Ad Banners Table (Image & Link Banners)
+    `CREATE TABLE IF NOT EXISTS public.ad_banners (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      image_url TEXT NOT NULL,
+      target_url TEXT NOT NULL,
+      link_open_mode TEXT NOT NULL DEFAULT 'external' CHECK (link_open_mode IN ('external', 'internal')),
+      is_active BOOLEAN NOT NULL DEFAULT true,
+      start_at TIMESTAMPTZ,
+      end_at TIMESTAMPTZ,
+      display_order INTEGER NOT NULL DEFAULT 0,
+      click_count INTEGER NOT NULL DEFAULT 0,
+      impression_count INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );`,
+    `ALTER TABLE public.ad_banners ADD COLUMN IF NOT EXISTS link_open_mode TEXT NOT NULL DEFAULT 'external';`,
+    `CREATE INDEX IF NOT EXISTS idx_ad_banners_active_order ON public.ad_banners(is_active, display_order ASC, created_at DESC);`
   ];
 
 
@@ -3994,6 +4015,689 @@ app.post('/api/admin/login-notification', requireAdminAuth, ensureDatabaseReady,
   } catch (err) {
     console.error('[Admin Update Login Notif API Error]', err);
     res.status(500).json({ success: false, error: "خطا در بروزرسانی تنظیمات اطلاع‌رسانی." });
+  }
+});
+
+// ====================================================================
+// 13. Clickable Image Ad Banners Management System
+// ====================================================================
+
+const AD_BANNER_MAX_FILE_BYTES = 5 * 1024 * 1024; // 5MB
+const adBannerUploadMulter = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: AD_BANNER_MAX_FILE_BYTES },
+  fileFilter: (req, file, cb) => {
+    const allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (allowedMimes.includes((file.mimetype || '').toLowerCase())) {
+      cb(null, true);
+    } else {
+      cb(new Error('فرمت تصویر مجاز نیست. فقط JPG، PNG و WebP پشتیبانی می‌شوند.'));
+    }
+  }
+});
+
+function detectImageFormatFromBuffer(buffer) {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 12) return null;
+  // JPEG: FF D8 FF
+  if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) {
+    return { ext: 'jpg', mime: 'image/jpeg' };
+  }
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (
+    buffer[0] === 0x89 && buffer[1] === 0x50 &&
+    buffer[2] === 0x4E && buffer[3] === 0x47 &&
+    buffer[4] === 0x0D && buffer[5] === 0x0A &&
+    buffer[6] === 0x1A && buffer[7] === 0x0A
+  ) {
+    return { ext: 'png', mime: 'image/png' };
+  }
+  // WebP: RIFF....WEBP
+  if (
+    buffer.subarray(0, 4).toString('ascii') === 'RIFF' &&
+    buffer.subarray(8, 12).toString('ascii') === 'WEBP'
+  ) {
+    return { ext: 'webp', mime: 'image/webp' };
+  }
+  return null;
+}
+
+function validateBannerTargetUrl(rawUrl) {
+  if (typeof rawUrl !== 'string') {
+    return { valid: false, message: 'آدرس مقصد تبلیغ نامعتبر است.' };
+  }
+  const trimmed = rawUrl.trim();
+  if (!trimmed || trimmed.length > 2048) {
+    return { valid: false, message: 'لینک مقصد باید بین ۱ تا ۲۰۴۸ کاراکتر باشد.' };
+  }
+  if (/[\s\u0000-\u001F\u007F]/.test(trimmed)) {
+    return { valid: false, message: 'لینک مقصد نباید دارای فاصله یا کاراکترهای کنترلی باشد.' };
+  }
+  try {
+    const parsed = new URL(trimmed);
+    const protocol = (parsed.protocol || '').toLowerCase();
+    if (protocol !== 'http:' && protocol !== 'https:') {
+      return { valid: false, message: 'لینک مقصد باید با http:// یا https:// آغاز شود.' };
+    }
+    if (!parsed.hostname || parsed.hostname.length < 2) {
+      return { valid: false, message: 'دامنه لینک مقصد معتبر نیست.' };
+    }
+    if (parsed.username || parsed.password) {
+      return { valid: false, message: 'لینک مقصد نباید حاوی اطلاعات ورود در آدرس باشد.' };
+    }
+    return { valid: true, url: parsed.toString() };
+  } catch (e) {
+    return { valid: false, message: 'فرمت آدرس مقصد (URL) معتبر نیست.' };
+  }
+}
+
+function validateBannerImageUrl(rawUrl) {
+  if (typeof rawUrl !== 'string') {
+    return { valid: false, message: 'آدرس تصویر بنر نامعتبر است.' };
+  }
+  const trimmed = rawUrl.trim();
+  if (!trimmed || trimmed.length > 2048) {
+    return { valid: false, message: 'تصویر بنر الزامی است.' };
+  }
+  if (/[\u0000-\u001F\u007F]/.test(trimmed)) {
+    return { valid: false, message: 'آدرس تصویر بنر نامعتبر است.' };
+  }
+  if (trimmed.startsWith('/uploads/')) {
+    if (trimmed.includes('..')) {
+      return { valid: false, message: 'مسیر تصویر نامعتبر است.' };
+    }
+    return { valid: true, url: trimmed };
+  }
+  try {
+    const parsed = new URL(trimmed);
+    const protocol = (parsed.protocol || '').toLowerCase();
+    if (protocol !== 'http:' && protocol !== 'https:') {
+      return { valid: false, message: 'آدرس تصویر باید لینک معتبر http/https یا مسیر آپلود سرور باشد.' };
+    }
+    return { valid: true, url: parsed.toString() };
+  } catch (e) {
+    return { valid: false, message: 'آدرس تصویر بنر معتبر نیست.' };
+  }
+}
+
+function parseOptionalBannerDate(rawValue) {
+  if (rawValue === undefined || rawValue === null || String(rawValue).trim() === '') {
+    return { valid: true, date: null };
+  }
+  const parsed = new Date(rawValue);
+  if (Number.isNaN(parsed.getTime())) {
+    return { valid: false, message: 'فرمت تاریخ و زمان نامعتبر است.' };
+  }
+  return { valid: true, date: parsed };
+}
+
+function normalizeLinkOpenMode(rawMode) {
+  const mode = String(rawMode || 'external').trim().toLowerCase();
+  if (mode === 'internal' || mode === 'in_app' || mode === 'webview') return 'internal';
+  if (mode === 'external' || mode === 'browser') return 'external';
+  return null;
+}
+
+function enrichAdminBannerRow(row, nowMs = Date.now()) {
+  const startMs = row.start_at ? new Date(row.start_at).getTime() : null;
+  const endMs = row.end_at ? new Date(row.end_at).getTime() : null;
+  const isActive = Boolean(row.is_active);
+
+  let computedStatus = 'active';
+  if (!isActive) {
+    computedStatus = 'inactive';
+  } else if (startMs !== null && startMs > nowMs) {
+    computedStatus = 'scheduled';
+  } else if (endMs !== null && endMs <= nowMs) {
+    computedStatus = 'expired';
+  }
+
+  const impressions = Number(row.impression_count || 0);
+  const clicks = Number(row.click_count || 0);
+  const ctrPercent = impressions > 0 ? Number(((clicks / impressions) * 100).toFixed(2)) : 0;
+
+  return {
+    id: row.id,
+    title: row.title,
+    image_url: row.image_url,
+    target_url: row.target_url,
+    link_open_mode: row.link_open_mode === 'internal' ? 'internal' : 'external',
+    is_active: isActive,
+    start_at: row.start_at,
+    end_at: row.end_at,
+    display_order: Number(row.display_order || 0),
+    click_count: clicks,
+    impression_count: impressions,
+    ctr_percent: ctrPercent,
+    computed_status: computedStatus,
+    created_at: row.created_at,
+    updated_at: row.updated_at
+  };
+}
+
+function serializePublicBannerRow(row) {
+  return {
+    id: row.id,
+    title: row.title,
+    imageUrl: row.image_url,
+    targetUrl: row.target_url,
+    linkOpenMode: row.link_open_mode === 'internal' ? 'internal' : 'external',
+    isActive: Boolean(row.is_active),
+    startAt: row.start_at ? new Date(row.start_at).getTime() : null,
+    endAt: row.end_at ? new Date(row.end_at).getTime() : null,
+    displayOrder: Number(row.display_order || 0),
+    updatedAt: row.updated_at ? new Date(row.updated_at).getTime() : Date.now()
+  };
+}
+
+// Lightweight in-memory TTL deduplication for clicks & impressions
+const recentBannerClicks = new Map();
+const recentBannerImpressions = new Map();
+
+function pruneRecentTrackerMap(map, ttlMs, nowMs) {
+  if (map.size < 500) return;
+  for (const [k, ts] of map.entries()) {
+    if (nowMs - ts > ttlMs) map.delete(k);
+  }
+}
+
+// Admin: Upload Banner Image (Supabase Storage with safe local /uploads/ad-banners fallback)
+app.post('/api/admin/ad-banners/upload-image', requireAdminAuth, (req, res) => {
+  const uploader = adBannerUploadMulter.fields([
+    { name: 'image', maxCount: 1 },
+    { name: 'banner', maxCount: 1 }
+  ]);
+  uploader(req, res, async (uploadErr) => {
+    if (uploadErr) {
+      const msg = uploadErr.code === 'LIMIT_FILE_SIZE'
+        ? 'حجم تصویر بنر نباید بیشتر از ۵ مگابایت باشد.'
+        : (uploadErr.message || 'خطا در دریافت فایل تصویر.');
+      return res.status(400).json({ success: false, message: msg });
+    }
+
+    try {
+      const uploadedFile = (req.files && (req.files.image?.[0] || req.files.banner?.[0])) || req.file;
+      if (!uploadedFile || !uploadedFile.buffer) {
+        return res.status(400).json({ success: false, message: 'فایل تصویر ارسال نشده است.' });
+      }
+
+      const detected = detectImageFormatFromBuffer(uploadedFile.buffer);
+      if (!detected) {
+        return res.status(400).json({
+          success: false,
+          message: 'محتوای فایل تصویر معتبر نیست. لطفاً یک تصویر استاندارد JPG، PNG یا WebP انتخاب کنید.'
+        });
+      }
+
+      const fileName = `ad_banner_${Date.now()}_${crypto.randomBytes(6).toString('hex')}.${detected.ext}`;
+      const supabaseUrl = (process.env.SUPABASE_URL || '').trim().replace(/\/+$/, '');
+      const serviceRoleKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+
+      if (supabaseUrl && serviceRoleKey) {
+        const candidateBuckets = [
+          (process.env.SUPABASE_AD_BANNERS_BUCKET || '').trim(),
+          'ad-banners',
+          'gift-banners'
+        ].filter(Boolean);
+
+        for (const bucketName of candidateBuckets) {
+          try {
+            const uploadUrl = `${supabaseUrl}/storage/v1/object/${bucketName}/${fileName}`;
+            const uploadRes = await fetch(uploadUrl, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${serviceRoleKey}`,
+                'Content-Type': detected.mime,
+                'x-upsert': 'true'
+              },
+              body: uploadedFile.buffer
+            });
+            if (uploadRes.ok) {
+              const publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucketName}/${fileName}`;
+              return res.json({
+                success: true,
+                url: publicUrl,
+                storage: 'supabase',
+                message: 'تصویر تبلیغ با موفقیت در فضای ابری ذخیره شد.'
+              });
+            }
+          } catch (supErr) {
+            console.warn(`[AdBanner Upload] Supabase bucket "${bucketName}" failed:`, supErr.message);
+          }
+        }
+      }
+
+      const uploadsDir = path.join(__dirname, 'public', 'uploads', 'ad-banners');
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+      const filePath = path.join(uploadsDir, fileName);
+      fs.writeFileSync(filePath, uploadedFile.buffer);
+
+      return res.json({
+        success: true,
+        url: `/uploads/ad-banners/${fileName}`,
+        storage: 'local',
+        message: 'تصویر تبلیغ با موفقیت در سرور ذخیره شد.'
+      });
+    } catch (err) {
+      console.error('[AdBanner Upload Error]', err);
+      return res.status(500).json({ success: false, message: 'خطا در پردازش و ذخیره تصویر تبلیغ.' });
+    }
+  });
+});
+
+// Admin: List All Ad Banners with Search, Status Filter, and Summary Metrics
+app.get('/api/admin/ad-banners', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
+  try {
+    const search = String(req.query.search || '').trim().toLowerCase();
+    const statusFilter = String(req.query.status || 'all').trim().toLowerCase();
+
+    const result = await pool.query(`
+      SELECT id, title, image_url, target_url, link_open_mode, is_active, start_at, end_at,
+             display_order, click_count, impression_count, created_at, updated_at
+      FROM public.ad_banners
+      ORDER BY display_order ASC, created_at DESC
+    `);
+
+    const nowMs = Date.now();
+    const allBanners = result.rows.map((r) => enrichAdminBannerRow(r, nowMs));
+
+    const summary = {
+      total: allBanners.length,
+      activeCount: allBanners.filter((b) => b.computed_status === 'active').length,
+      inactiveCount: allBanners.filter((b) => b.computed_status === 'inactive').length,
+      scheduledCount: allBanners.filter((b) => b.computed_status === 'scheduled').length,
+      expiredCount: allBanners.filter((b) => b.computed_status === 'expired').length,
+      totalImpressions: allBanners.reduce((acc, b) => acc + b.impression_count, 0),
+      totalClicks: allBanners.reduce((acc, b) => acc + b.click_count, 0)
+    };
+    summary.avgCtr = summary.totalImpressions > 0
+      ? Number(((summary.totalClicks / summary.totalImpressions) * 100).toFixed(2))
+      : 0;
+
+    const filtered = allBanners.filter((b) => {
+      if (statusFilter !== 'all' && b.computed_status !== statusFilter) return false;
+      if (search) {
+        const hay = `${b.title} ${b.target_url}`.toLowerCase();
+        if (!hay.includes(search)) return false;
+      }
+      return true;
+    });
+
+    return res.json({ success: true, banners: filtered, summary });
+  } catch (err) {
+    console.error('[Admin List AdBanners Error]', err);
+    return res.status(500).json({ success: false, message: 'خطا در دریافت لیست بنرهای تبلیغاتی.' });
+  }
+});
+
+// Admin: Create New Ad Banner
+app.post('/api/admin/ad-banners', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const title = String(body.title || '').trim();
+    if (!title || title.length > 120) {
+      return res.status(400).json({ success: false, message: 'نام داخلی تبلیغ الزامی است و حداکثر ۱۲۰ کاراکتر می‌تواند باشد.' });
+    }
+
+    const imageCheck = validateBannerImageUrl(body.image_url);
+    if (!imageCheck.valid) {
+      return res.status(400).json({ success: false, message: imageCheck.message });
+    }
+
+    const urlCheck = validateBannerTargetUrl(body.target_url);
+    if (!urlCheck.valid) {
+      return res.status(400).json({ success: false, message: urlCheck.message });
+    }
+
+    const linkOpenMode = normalizeLinkOpenMode(body.link_open_mode);
+    if (!linkOpenMode) {
+      return res.status(400).json({ success: false, message: 'نوع باز شدن لینک باید external یا internal باشد.' });
+    }
+
+    const startCheck = parseOptionalBannerDate(body.start_at);
+    if (!startCheck.valid) {
+      return res.status(400).json({ success: false, message: 'تاریخ شروع نمایش نامعتبر است.' });
+    }
+
+    const endCheck = parseOptionalBannerDate(body.end_at);
+    if (!endCheck.valid) {
+      return res.status(400).json({ success: false, message: 'تاریخ پایان نمایش نامعتبر است.' });
+    }
+
+    if (startCheck.date && endCheck.date && endCheck.date.getTime() <= startCheck.date.getTime()) {
+      return res.status(400).json({ success: false, message: 'تاریخ پایان نمایش باید بعد از تاریخ شروع باشد.' });
+    }
+
+    const displayOrder = Number.isFinite(Number(body.display_order))
+      ? Math.max(0, Math.floor(Number(body.display_order)))
+      : 0;
+    const isActive = body.is_active === undefined ? true : Boolean(body.is_active);
+    const id = `ad_${crypto.randomUUID()}`;
+
+    const insertRes = await pool.query(
+      `INSERT INTO public.ad_banners
+        (id, title, image_url, target_url, link_open_mode, is_active, start_at, end_at, display_order, click_count, impression_count, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0, 0, NOW(), NOW())
+       RETURNING *`,
+      [
+        id,
+        title,
+        imageCheck.url,
+        urlCheck.url,
+        linkOpenMode,
+        isActive,
+        startCheck.date ? startCheck.date.toISOString() : null,
+        endCheck.date ? endCheck.date.toISOString() : null,
+        displayOrder
+      ]
+    );
+
+    return res.status(201).json({
+      success: true,
+      banner: enrichAdminBannerRow(insertRes.rows[0]),
+      message: 'بنر تبلیغاتی جدید با موفقیت ثبت شد.'
+    });
+  } catch (err) {
+    console.error('[Admin Create AdBanner Error]', err);
+    return res.status(500).json({ success: false, message: 'خطا در ایجاد بنر تبلیغاتی.' });
+  }
+});
+
+// Admin: Reorder Ad Banners
+app.patch('/api/admin/ad-banners/reorder', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
+  const items = Array.isArray(req.body?.items) ? req.body.items : (Array.isArray(req.body?.orders) ? req.body.orders : null);
+  if (!items || items.length === 0) {
+    return res.status(400).json({ success: false, message: 'لیست ترتیب نمایش ارسال نشده است.' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    for (const item of items) {
+      if (!item || !item.id) continue;
+      const orderVal = Number.isFinite(Number(item.display_order)) ? Math.max(0, Math.floor(Number(item.display_order))) : 0;
+      await client.query(
+        `UPDATE public.ad_banners SET display_order = $1, updated_at = NOW() WHERE id = $2`,
+        [orderVal, String(item.id)]
+      );
+    }
+    await client.query('COMMIT');
+    return res.json({ success: true, message: 'ترتیب نمایش بنرها به‌روزرسانی شد.' });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('[Admin Reorder AdBanners Error]', err);
+    return res.status(500).json({ success: false, message: 'خطا در تغییر ترتیب نمایش بنرها.' });
+  } finally {
+    client.release();
+  }
+});
+
+// Admin: Update Ad Banner
+app.put('/api/admin/ad-banners/:id', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
+  try {
+    const id = String(req.params.id || '').trim();
+    if (!id) {
+      return res.status(400).json({ success: false, message: 'شناسه بنر نامعتبر است.' });
+    }
+
+    const existingRes = await pool.query(`SELECT * FROM public.ad_banners WHERE id = $1 LIMIT 1`, [id]);
+    if (existingRes.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'بنر تبلیغاتی مورد نظر یافت نشد.' });
+    }
+    const existing = existingRes.rows[0];
+    const body = req.body || {};
+
+    const title = body.title !== undefined ? String(body.title).trim() : existing.title;
+    if (!title || title.length > 120) {
+      return res.status(400).json({ success: false, message: 'نام داخلی تبلیغ الزامی است و حداکثر ۱۲۰ کاراکتر می‌تواند باشد.' });
+    }
+
+    const imageCheck = body.image_url !== undefined
+      ? validateBannerImageUrl(body.image_url)
+      : { valid: true, url: existing.image_url };
+    if (!imageCheck.valid) {
+      return res.status(400).json({ success: false, message: imageCheck.message });
+    }
+
+    const urlCheck = body.target_url !== undefined
+      ? validateBannerTargetUrl(body.target_url)
+      : { valid: true, url: existing.target_url };
+    if (!urlCheck.valid) {
+      return res.status(400).json({ success: false, message: urlCheck.message });
+    }
+
+    const linkOpenMode = body.link_open_mode !== undefined
+      ? normalizeLinkOpenMode(body.link_open_mode)
+      : (existing.link_open_mode || 'external');
+    if (!linkOpenMode) {
+      return res.status(400).json({ success: false, message: 'نوع باز شدن لینک باید external یا internal باشد.' });
+    }
+
+    const startCheck = body.start_at !== undefined
+      ? parseOptionalBannerDate(body.start_at)
+      : { valid: true, date: existing.start_at ? new Date(existing.start_at) : null };
+    if (!startCheck.valid) {
+      return res.status(400).json({ success: false, message: 'تاریخ شروع نمایش نامعتبر است.' });
+    }
+
+    const endCheck = body.end_at !== undefined
+      ? parseOptionalBannerDate(body.end_at)
+      : { valid: true, date: existing.end_at ? new Date(existing.end_at) : null };
+    if (!endCheck.valid) {
+      return res.status(400).json({ success: false, message: 'تاریخ پایان نمایش نامعتبر است.' });
+    }
+
+    if (startCheck.date && endCheck.date && endCheck.date.getTime() <= startCheck.date.getTime()) {
+      return res.status(400).json({ success: false, message: 'تاریخ پایان نمایش باید بعد از تاریخ شروع باشد.' });
+    }
+
+    const isActive = body.is_active !== undefined ? Boolean(body.is_active) : Boolean(existing.is_active);
+    const displayOrder = body.display_order !== undefined
+      ? (Number.isFinite(Number(body.display_order)) ? Math.max(0, Math.floor(Number(body.display_order))) : 0)
+      : Number(existing.display_order || 0);
+
+    const updateRes = await pool.query(
+      `UPDATE public.ad_banners
+       SET title = $1,
+           image_url = $2,
+           target_url = $3,
+           link_open_mode = $4,
+           is_active = $5,
+           start_at = $6,
+           end_at = $7,
+           display_order = $8,
+           updated_at = NOW()
+       WHERE id = $9
+       RETURNING *`,
+      [
+        title,
+        imageCheck.url,
+        urlCheck.url,
+        linkOpenMode,
+        isActive,
+        startCheck.date ? startCheck.date.toISOString() : null,
+        endCheck.date ? endCheck.date.toISOString() : null,
+        displayOrder,
+        id
+      ]
+    );
+
+    return res.json({
+      success: true,
+      banner: enrichAdminBannerRow(updateRes.rows[0]),
+      message: 'تغییرات بنر تبلیغاتی با موفقیت ذخیره شد.'
+    });
+  } catch (err) {
+    console.error('[Admin Update AdBanner Error]', err);
+    return res.status(500).json({ success: false, message: 'خطا در ویرایش بنر تبلیغاتی.' });
+  }
+});
+
+// Admin: Toggle Active Status
+app.patch('/api/admin/ad-banners/:id/toggle', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
+  try {
+    const id = String(req.params.id || '').trim();
+    const result = await pool.query(
+      `UPDATE public.ad_banners
+       SET is_active = NOT is_active, updated_at = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'بنر تبلیغاتی مورد نظر یافت نشد.' });
+    }
+    return res.json({
+      success: true,
+      banner: enrichAdminBannerRow(result.rows[0]),
+      message: result.rows[0].is_active ? 'تبلیغ فعال شد.' : 'تبلیغ غیرفعال شد.'
+    });
+  } catch (err) {
+    console.error('[Admin Toggle AdBanner Error]', err);
+    return res.status(500).json({ success: false, message: 'خطا در تغییر وضعیت تبلیغ.' });
+  }
+});
+
+// Admin: Delete Ad Banner
+app.delete('/api/admin/ad-banners/:id', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
+  try {
+    const id = String(req.params.id || '').trim();
+    const delRes = await pool.query(
+      `DELETE FROM public.ad_banners WHERE id = $1 RETURNING id, image_url`,
+      [id]
+    );
+    if (delRes.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'بنر تبلیغاتی مورد نظر یافت نشد.' });
+    }
+
+    const oldImg = delRes.rows[0].image_url || '';
+    if (oldImg.startsWith('/uploads/ad-banners/')) {
+      try {
+        const refCheck = await pool.query(`SELECT 1 FROM public.ad_banners WHERE image_url = $1 LIMIT 1`, [oldImg]);
+        if (refCheck.rows.length === 0) {
+          const safeBase = path.basename(oldImg);
+          const candidatePath = path.join(__dirname, 'public', 'uploads', 'ad-banners', safeBase);
+          if (fs.existsSync(candidatePath)) {
+            fs.unlinkSync(candidatePath);
+          }
+        }
+      } catch (_cleanupErr) {
+        // Non-critical file cleanup
+      }
+    }
+
+    return res.json({ success: true, message: 'بنر تبلیغاتی با موفقیت حذف شد.' });
+  } catch (err) {
+    console.error('[Admin Delete AdBanner Error]', err);
+    return res.status(500).json({ success: false, message: 'خطا در حذف بنر تبلیغاتی.' });
+  }
+});
+
+// Public/App: Fetch Active, Valid-Schedule Ad Banners (Cloudflare-friendly cache + no admin metrics exposed)
+app.get('/api/ad-banners/active', async (req, res) => {
+  res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
+  if (!pool || !isDbConnected) {
+    return res.json({ success: true, banners: [], version: '0', fallback: true });
+  }
+
+  try {
+    const result = await pool.query(`
+      SELECT id, title, image_url, target_url, link_open_mode, is_active, start_at, end_at, display_order, updated_at
+      FROM public.ad_banners
+      WHERE is_active = true
+        AND (start_at IS NULL OR start_at <= NOW())
+        AND (end_at IS NULL OR end_at > NOW())
+      ORDER BY display_order ASC, created_at DESC
+    `);
+
+    const banners = result.rows
+      .filter((row) => validateBannerTargetUrl(row.target_url).valid)
+      .map(serializePublicBannerRow);
+
+    const latestTs = banners.reduce((max, b) => Math.max(max, b.updatedAt || 0), 0);
+    const version = `${banners.length}:${latestTs}`;
+    return res.json({ success: true, banners, version });
+  } catch (err) {
+    console.error('[Public Active AdBanners Error]', err.message);
+    return res.json({ success: true, banners: [], version: '0', fallback: true });
+  }
+});
+
+// Public/App: Record Banner Impression
+app.post('/api/ad-banners/:id/impression', async (req, res) => {
+  const id = String(req.params.id || '').trim();
+  if (!id || !pool || !isDbConnected) {
+    return res.status(200).json({ success: true, recorded: false });
+  }
+
+  const nowMs = Date.now();
+  const viewerKey = String(req.body?.userId || req.headers['x-user-id'] || req.ip || 'anon').slice(0, 64);
+  const dedupKey = `${id}:${viewerKey}`;
+  pruneRecentTrackerMap(recentBannerImpressions, 10000, nowMs);
+  const lastSeen = recentBannerImpressions.get(dedupKey);
+  if (lastSeen && nowMs - lastSeen < 10000) {
+    return res.json({ success: true, recorded: false, deduplicated: true });
+  }
+
+  try {
+    const updateRes = await pool.query(
+      `UPDATE public.ad_banners
+       SET impression_count = impression_count + 1
+       WHERE id = $1
+         AND is_active = true
+         AND (start_at IS NULL OR start_at <= NOW())
+         AND (end_at IS NULL OR end_at > NOW())
+       RETURNING id`,
+      [id]
+    );
+    if (updateRes.rows.length === 0) {
+      return res.status(404).json({ success: false, recorded: false, message: 'بنر فعال یافت نشد.' });
+    }
+    recentBannerImpressions.set(dedupKey, nowMs);
+    return res.json({ success: true, recorded: true });
+  } catch (err) {
+    console.error('[AdBanner Impression Error]', err.message);
+    return res.status(500).json({ success: false, recorded: false });
+  }
+});
+
+// Public/App: Record Banner Click (single-tap deduplicated)
+app.post('/api/ad-banners/:id/click', async (req, res) => {
+  const id = String(req.params.id || '').trim();
+  if (!id || !pool || !isDbConnected) {
+    return res.status(200).json({ success: true, recorded: false });
+  }
+
+  const nowMs = Date.now();
+  const tapNonce = String(req.body?.tapNonce || '').trim();
+  const viewerKey = String(req.body?.userId || req.headers['x-user-id'] || req.ip || 'anon').slice(0, 64);
+  const dedupKey = tapNonce ? `${id}:nonce:${tapNonce}` : `${id}:viewer:${viewerKey}`;
+  pruneRecentTrackerMap(recentBannerClicks, 2000, nowMs);
+  const lastClicked = recentBannerClicks.get(dedupKey);
+  if (lastClicked && nowMs - lastClicked < 2000) {
+    return res.json({ success: true, recorded: false, deduplicated: true });
+  }
+
+  try {
+    const updateRes = await pool.query(
+      `UPDATE public.ad_banners
+       SET click_count = click_count + 1
+       WHERE id = $1
+         AND is_active = true
+         AND (start_at IS NULL OR start_at <= NOW())
+         AND (end_at IS NULL OR end_at > NOW())
+       RETURNING id`,
+      [id]
+    );
+    if (updateRes.rows.length === 0) {
+      return res.status(404).json({ success: false, recorded: false, message: 'بنر فعال یافت نشد.' });
+    }
+    recentBannerClicks.set(dedupKey, nowMs);
+    return res.json({ success: true, recorded: true });
+  } catch (err) {
+    console.error('[AdBanner Click Error]', err.message);
+    return res.status(500).json({ success: false, recorded: false });
   }
 });
 

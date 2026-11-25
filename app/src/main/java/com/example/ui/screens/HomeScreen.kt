@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import com.example.model.CompetitionInfo
 import com.example.model.DailyCycle
 import com.example.model.HomeAnnouncement
+import com.example.model.PromoAdBanner
 import com.example.model.User
 import com.example.ui.components.HomeAnnouncementBanner
 import com.example.ui.components.LuxuryCard
@@ -57,6 +58,7 @@ import com.example.ui.components.LuxuryHighlightCard
 import com.example.ui.components.LuxuryPrimaryButton
 import com.example.ui.components.LuxuryScreenCanvas
 import com.example.ui.components.LuxuryTierBadge
+import com.example.ui.components.PromoAdBannerSection
 import com.example.ui.components.formatNumberPersian
 import com.example.ui.components.formatRemainingTimePersian
 import com.example.ui.components.getTehranGreeting
@@ -70,8 +72,11 @@ fun HomeScreen(
     cycle: DailyCycle?,
     competition: CompetitionInfo? = null,
     announcement: HomeAnnouncement? = null,
+    promoAdBanners: List<PromoAdBanner> = emptyList(),
     userRank: Int? = null,
     completedSquaresToday: Int? = null,
+    onPromoBannerVisible: (String) -> Unit = {},
+    onPromoBannerClick: (PromoAdBanner) -> Unit = {},
     onNavigate: (AppScreen) -> Unit
 ) {
     val scrollState = rememberScrollState()
@@ -277,7 +282,15 @@ fun HomeScreen(
                 )
             }
 
-            // 4. Unified Quick Services Card (only destinations not already in bottom navigation)
+            // 4. Optional Clickable Promotional Image Ad Banners (only when active & valid banners exist)
+            PromoAdBannerSection(
+                banners = promoAdBanners,
+                onBannerVisible = onPromoBannerVisible,
+                onBannerClick = onPromoBannerClick,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            // 5. Unified Quick Services Card (only destinations not already in bottom navigation)
             LuxuryCard(
                 borderColor = CharcoalBorder,
                 contentPadding = PaddingValues(vertical = 4.dp)
