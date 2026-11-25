@@ -6,7 +6,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -64,7 +63,6 @@ import com.example.model.DailyCycle
 import com.example.model.HomeAnnouncement
 import com.example.model.SquareStatus
 import com.example.ui.components.FeedbackTone
-import com.example.ui.components.HomeAnnouncementBanner
 import com.example.ui.components.LuxuryFeedbackBanner
 import com.example.ui.components.LuxuryHairlineDivider
 import com.example.ui.components.LuxuryScreenCanvas
@@ -103,7 +101,7 @@ fun SquaresScreen(
 
     LuxuryScreenCanvas {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Sticky Luxury Progress & Countdown Header
+            // Streamlined Sticky Header
             Surface(
                 modifier = Modifier.fillMaxWidth(),
                 color = ObsidianBlack.copy(alpha = 0.96f)
@@ -123,87 +121,54 @@ fun SquaresScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "جدول ۱۰۰ مربع جایزه‌دار",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    color = WarmWhite
-                                )
-                                Spacer(modifier = Modifier.height(3.dp))
-                                Text(
-                                    text = "${completedCount.toPersianDigits()} تکمیل‌شده  •  ${remainingCount.toPersianDigits()} باقی‌مانده",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = GoldLight
-                                )
-                            }
+                            Text(
+                                text = "۱۰۰ مربع روزانه",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = WarmWhite
+                            )
 
-                            Surface(
-                                shape = RoundedCornerShape(14.dp),
-                                color = CharcoalSurface,
-                                border = BorderStroke(1.dp, LuxuryBorderStrong)
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
+                            if (cycle != null) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
                                         imageVector = Icons.Rounded.Timer,
                                         contentDescription = null,
                                         tint = GoldLight,
-                                        modifier = Modifier.size(16.dp)
+                                        modifier = Modifier.size(14.dp)
                                     )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Column(horizontalAlignment = Alignment.End) {
-                                        Text(
-                                            text = "بازنشانی نیمه‌شب",
-                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp),
-                                            color = TextSecondary
-                                        )
-                                        Text(
-                                            text = formatRemainingTimePersian(cycle?.remainingMs ?: 0L),
-                                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.ExtraBold),
-                                            color = WarmWhite
-                                        )
-                                    }
+                                    Spacer(modifier = Modifier.width(5.dp))
+                                    Text(
+                                        text = formatRemainingTimePersian(cycle.remainingMs),
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = GoldLight
+                                    )
                                 }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Text(
+                            text = "${completedCount.toPersianDigits()} تکمیل  •  ${remainingCount.toPersianDigits()} باقی‌مانده",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextSecondary
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
 
                         LinearProgressIndicator(
                             progress = { progressFraction },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(7.dp)
+                                .height(6.dp)
                                 .clip(RoundedCornerShape(50)),
                             color = GoldAccent,
                             trackColor = DarkGraySurface,
                             strokeCap = StrokeCap.Round
                         )
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            LegendItem("آماده", GoldLight)
-                            LegendItem("در حال پخش", GoldAccent)
-                            LegendItem("تکمیل‌شده", SuccessGreen)
-                            LegendItem("تلاش مجدد", ErrorRed)
-                        }
                     }
 
                     LuxuryHairlineDivider(useGoldAccent = true)
                 }
-            }
-
-            if (announcement != null && announcement.isActive) {
-                HomeAnnouncementBanner(
-                    announcement = announcement,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                )
             }
 
             if (!errorMessage.isNullOrBlank()) {
@@ -211,11 +176,11 @@ fun SquaresScreen(
                     message = errorMessage,
                     tone = FeedbackTone.ERROR,
                     onDismiss = onDismissError,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
             }
 
-            // Responsive 100-Squares Grid (5 columns on phone, 8 on wider tablet viewports)
+            // Clean, Uncluttered 100-Squares Grid
             BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -226,9 +191,9 @@ fun SquaresScreen(
 
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(columns),
-                    contentPadding = PaddingValues(start = 14.dp, top = 12.dp, end = 14.dp, bottom = 108.dp),
-                    horizontalArrangement = Arrangement.spacedBy(9.dp),
-                    verticalArrangement = Arrangement.spacedBy(9.dp),
+                    contentPadding = PaddingValues(start = 16.dp, top = 14.dp, end = 16.dp, bottom = 108.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier
                         .fillMaxSize()
                         .testTag("grid_100_squares")
@@ -244,24 +209,6 @@ fun SquaresScreen(
                 }
             }
         }
-    }
-}
-
-@Composable
-fun LegendItem(label: String, dotColor: Color) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier
-                .size(8.dp)
-                .clip(CircleShape)
-                .background(dotColor)
-        )
-        Spacer(modifier = Modifier.width(5.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = TextSecondary
-        )
     }
 }
 
@@ -293,9 +240,9 @@ fun SquareCard(
     }
 
     val borderColor = when {
-        isCompleted -> SuccessGreen.copy(alpha = 0.65f)
+        isCompleted -> SuccessGreen.copy(alpha = 0.55f)
         isLoading || isPlaying -> GoldAccent
-        isFailed -> ErrorRed.copy(alpha = 0.65f)
+        isFailed -> ErrorRed.copy(alpha = 0.6f)
         else -> LuxuryBorder
     }
 
@@ -320,95 +267,100 @@ fun SquareCard(
         shape = RoundedCornerShape(14.dp),
         border = BorderStroke(1.dp, borderColor)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(4.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
         ) {
             when {
                 isLoading -> {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        strokeWidth = 2.dp,
-                        color = GoldLight
-                    )
-                }
-                isPlaying -> {
-                    Icon(
-                        imageVector = Icons.Rounded.PlayArrow,
-                        contentDescription = "در حال پخش",
-                        tint = GoldLight,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                isCompleted -> {
-                    Icon(
-                        imageVector = Icons.Rounded.CheckCircle,
-                        contentDescription = "تکمیل‌شده",
-                        tint = SuccessGreen,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                isFailed -> {
-                    Icon(
-                        imageVector = Icons.Rounded.Refresh,
-                        contentDescription = "تلاش مجدد",
-                        tint = ErrorRed,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                else -> {
-                    Box(
-                        modifier = Modifier
-                            .size(22.dp)
-                            .clip(CircleShape)
-                            .background(GoldAccent.copy(alpha = 0.14f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.PlayArrow,
-                            contentDescription = null,
-                            tint = GoldLight,
-                            modifier = Modifier.size(14.dp)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = GoldLight
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = square.squareNumber.toPersianDigits(),
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = GoldLight
                         )
                     }
                 }
+                isPlaying -> {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Rounded.PlayArrow,
+                            contentDescription = "در حال پخش",
+                            tint = GoldLight,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            text = square.squareNumber.toPersianDigits(),
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = GoldLight
+                        )
+                    }
+                }
+                isCompleted -> {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Rounded.CheckCircle,
+                            contentDescription = "تکمیل‌شده",
+                            tint = SuccessGreen,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Text(
+                            text = square.squareNumber.toPersianDigits(),
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            ),
+                            color = Color(0xFF6EE7B7)
+                        )
+                    }
+                }
+                isFailed -> {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Rounded.Refresh,
+                            contentDescription = "تلاش مجدد",
+                            tint = ErrorRed,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Text(
+                            text = square.squareNumber.toPersianDigits(),
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            ),
+                            color = ErrorRed
+                        )
+                    }
+                }
+                else -> {
+                    // Subtle 4dp gold dot indicator at top-start + bold clean numeral
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(7.dp)
+                            .size(4.dp)
+                            .clip(CircleShape)
+                            .background(GoldAccent.copy(alpha = 0.7f))
+                    )
+                    Text(
+                        text = square.squareNumber.toPersianDigits(),
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        ),
+                        color = WarmWhite,
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = square.squareNumber.toPersianDigits(),
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 12.sp
-                ),
-                color = if (isCompleted) Color(0xFF6EE7B7) else WarmWhite,
-                textAlign = TextAlign.Center
-            )
-
-            Text(
-                text = when {
-                    isCompleted -> "تکمیل"
-                    isLoading -> "صبر..."
-                    isPlaying -> "پخش"
-                    isFailed -> "تلاش"
-                    else -> "+۱"
-                },
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold
-                ),
-                color = when {
-                    isCompleted -> SuccessGreen
-                    isLoading || isPlaying -> GoldLight
-                    isFailed -> ErrorRed
-                    else -> GoldLight.copy(alpha = 0.85f)
-                },
-                textAlign = TextAlign.Center
-            )
         }
     }
 }

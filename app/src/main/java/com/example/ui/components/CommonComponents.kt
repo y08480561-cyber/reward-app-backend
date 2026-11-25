@@ -228,17 +228,17 @@ fun AppBottomNavigation(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .padding(horizontal = 14.dp, vertical = 10.dp),
             contentAlignment = Alignment.BottomCenter
         ) {
-            // Protrusion cradle behind central 100 Squares emblem
+            // Protrusion cradle behind central 100 Squares button
             Surface(
                 modifier = Modifier
-                    .offset(y = (-16).dp)
-                    .size(76.dp),
+                    .offset(y = (-14).dp)
+                    .size(72.dp),
                 shape = CircleShape,
                 color = DockSurfaceColor,
-                shadowElevation = 16.dp,
+                shadowElevation = 12.dp,
                 border = BorderStroke(1.dp, LuxuryBorderStrong)
             ) {}
 
@@ -247,16 +247,11 @@ fun AppBottomNavigation(
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 560.dp)
-                    .height(64.dp)
-                    .shadow(20.dp, RoundedCornerShape(30.dp), spotColor = Color.Black),
+                    .height(62.dp)
+                    .shadow(18.dp, RoundedCornerShape(28.dp), spotColor = Color.Black),
                 color = DockSurfaceColor,
-                shape = RoundedCornerShape(30.dp),
-                border = BorderStroke(
-                    1.dp,
-                    Brush.verticalGradient(
-                        listOf(GoldAccent.copy(alpha = 0.42f), CharcoalBorder)
-                    )
-                )
+                shape = RoundedCornerShape(28.dp),
+                border = BorderStroke(1.dp, CharcoalBorder)
             ) {
                 Row(
                     modifier = Modifier
@@ -281,7 +276,7 @@ fun AppBottomNavigation(
                         }
                     }
 
-                    Spacer(modifier = Modifier.width(74.dp))
+                    Spacer(modifier = Modifier.width(72.dp))
 
                     Row(
                         modifier = Modifier.weight(1f),
@@ -325,7 +320,7 @@ fun BottomNavItem(
 ) {
     val haptic = LocalHapticFeedback.current
     val scale by animateFloatAsState(
-        targetValue = if (selected) 1.08f else 1.0f,
+        targetValue = if (selected) 1.06f else 1.0f,
         animationSpec = spring(stiffness = Spring.StiffnessMedium),
         label = "nav_item_scale"
     )
@@ -348,30 +343,15 @@ fun BottomNavItem(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Box(
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = if (selected) GoldLight else TextSecondary,
             modifier = Modifier
-                .size(28.dp)
-                .graphicsLayer(scaleX = scale, scaleY = scale),
-            contentAlignment = Alignment.Center
-        ) {
-            if (selected) {
-                Box(
-                    modifier = Modifier
-                        .size(28.dp)
-                        .background(
-                            Brush.radialGradient(listOf(GoldAccent.copy(alpha = 0.22f), Color.Transparent)),
-                            CircleShape
-                        )
-                )
-            }
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = if (selected) GoldLight else TextSecondary,
-                modifier = Modifier.size(21.dp)
-            )
-        }
-        Spacer(modifier = Modifier.height(2.dp))
+                .size(22.dp)
+                .graphicsLayer(scaleX = scale, scaleY = scale)
+        )
+        Spacer(modifier = Modifier.height(3.dp))
         Text(
             text = label,
             style = MaterialTheme.typography.labelSmall.copy(
@@ -395,27 +375,17 @@ fun CentralLogoButton(
 ) {
     val haptic = LocalHapticFeedback.current
     val scale by animateFloatAsState(
-        targetValue = if (selected) 1.08f else 1.0f,
+        targetValue = if (selected) 1.06f else 1.0f,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label = "center_nav_scale"
-    )
-    val infiniteTransition = rememberInfiniteTransition(label = "center_float")
-    val floatOffset by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = -2.5f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2200, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "center_float_offset"
     )
 
     Box(
         modifier = modifier
-            .offset(y = (-18).dp)
-            .size(68.dp)
+            .offset(y = (-16).dp)
+            .size(64.dp)
             .graphicsLayer(scaleX = scale, scaleY = scale)
-            .shadow(14.dp, CircleShape, spotColor = GoldAccent.copy(alpha = 0.45f))
+            .shadow(12.dp, CircleShape, spotColor = GoldAccent.copy(alpha = 0.4f))
             .clip(CircleShape)
             .background(GoldGradientBrush, CircleShape)
             .border(
@@ -431,14 +401,13 @@ fun CentralLogoButton(
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-            modifier = Modifier.offset(y = if (!selected) floatOffset.dp else 0.dp)
+            verticalArrangement = Arrangement.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = label ?: "۱۰۰ مربع",
                 tint = ObsidianBlack,
-                modifier = Modifier.size(25.dp)
+                modifier = Modifier.size(23.dp)
             )
             if (label != null) {
                 Text(

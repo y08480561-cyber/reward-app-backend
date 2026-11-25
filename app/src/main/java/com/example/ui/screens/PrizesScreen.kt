@@ -2,7 +2,6 @@ package com.example.ui.screens
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,7 +20,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -37,7 +35,6 @@ import androidx.compose.material.icons.rounded.Save
 import androidx.compose.material.icons.rounded.Verified
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -72,7 +69,6 @@ import com.example.ui.components.LuxuryHighlightCard
 import com.example.ui.components.LuxuryLoadingState
 import com.example.ui.components.LuxuryPrimaryButton
 import com.example.ui.components.LuxuryScreenCanvas
-import com.example.ui.components.LuxurySectionHeader
 import com.example.ui.components.LuxuryTextField
 import com.example.ui.components.LuxuryTopBar
 import com.example.ui.components.toPersianDigits
@@ -99,10 +95,8 @@ fun PrizesScreen(
     LuxuryScreenCanvas {
         Column(modifier = Modifier.fillMaxSize()) {
             LuxuryTopBar(
-                title = "ویترین جوایز",
-                subtitle = "هدیه ویژه دوره جاری رقابت",
-                onBack = onBack,
-                scoreValue = uiState.currentUser?.totalScore ?: 0
+                title = "جایزه دوره",
+                onBack = onBack
             )
 
             Box(
@@ -111,7 +105,7 @@ fun PrizesScreen(
                     .weight(1f)
             ) {
                 if (uiState.isRewardsLoading) {
-                    LuxuryLoadingState(message = "در حال دریافت ویترین جوایز…")
+                    LuxuryLoadingState(message = "در حال دریافت جایزه دوره…")
                 } else {
                     Column(
                         modifier = Modifier
@@ -149,41 +143,37 @@ fun PrizesScreen(
                         SingleGiftBannerCard(
                             heroTitle = banner.heroTitle.ifBlank { "اینترنت ۲۰ گیگابایتی هدیه دوره جاری" },
                             heroSubtitle = banner.heroSubtitle.ifBlank {
-                                "هدیه ویژه دوره جاری برای برترین‌های جدول رتبه‌بندی و شرکت‌کنندگان فعال باشگاه"
+                                "هدیه ویژه برای نفرات برتر جدول رتبه‌بندی"
                             },
                             heroBannerUrl = banner.heroBannerUrl,
                             termsText = banner.termsText.ifBlank {
-                                "این بخش صرفاً برای معرفی جایزه دوره بوده و اهدای هدیه بدون کسر امتیاز انجام می‌شود."
+                                "اهدای هدیه در پایان دوره بدون کسر امتیاز انجام می‌شود."
                             },
                             isActive = banner.isActive
                         )
 
-                        LuxurySectionHeader(
-                            title = "نحوه شرکت و دریافت هدیه",
-                            modifier = Modifier.widthIn(max = 600.dp)
-                        )
-
+                        // Concise 3-Step Overview
                         LuxuryCard(
                             borderColor = CharcoalBorder,
                             contentPadding = PaddingValues(18.dp)
                         ) {
-                            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                 PrizeGuideStepRow(
                                     stepNumber = "۱",
-                                    title = "تکمیل جدول ۱۰۰ مربع روزانه",
-                                    description = "با مشاهده تبلیغات در بخش ۱۰۰ مربع، هر روز امتیاز بیشتری کسب کنید و شانس خود را بالا ببرید."
+                                    title = "تکمیل مربع‌های روزانه",
+                                    description = "هر روز امتیاز بیشتر جمع‌آوری کنید."
                                 )
                                 LuxuryHairlineDivider()
                                 PrizeGuideStepRow(
                                     stepNumber = "۲",
                                     title = "صعود در جدول رتبه‌بندی",
-                                    description = "جدول برترین‌ها به‌صورت زنده به‌روزرسانی می‌شود و جایگاه شما در پایان دوره ملاک انتخاب برنده است."
+                                    description = "رتبه نهایی پایان دوره ملاک انتخاب برنده است."
                                 )
                                 LuxuryHairlineDivider()
                                 PrizeGuideStepRow(
                                     stepNumber = "۳",
-                                    title = "اهدا بدون کسر امتیاز",
-                                    description = "برای دریافت هدیه نیازی به ثبت سفارش یا کسر امتیاز نیست؛ تیم پشتیبانی مستقیماً با برندگان هماهنگ می‌کند."
+                                    title = "دریافت بدون کسر امتیاز",
+                                    description = "تیم پشتیبانی مستقیماً با برندگان هماهنگ می‌کند."
                                 )
                             }
                         }
@@ -204,33 +194,23 @@ private fun PrizeGuideStepRow(
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.Top
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(28.dp)
-                .clip(CircleShape)
-                .background(GoldAccent.copy(alpha = 0.14f))
-                .border(1.dp, LuxuryBorderStrong, CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = stepNumber.toPersianDigits(),
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                color = GoldLight
-            )
-        }
-        Spacer(modifier = Modifier.width(12.dp))
+        Text(
+            text = "${stepNumber.toPersianDigits()}.",
+            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.ExtraBold),
+            color = GoldLight,
+            modifier = Modifier.width(24.dp)
+        )
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleSmall,
                 color = WarmWhite
             )
-            Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = description,
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.labelSmall,
                 color = TextSecondary
             )
         }
@@ -275,7 +255,6 @@ fun SingleGiftBannerCard(
                 contentScale = ContentScale.Crop
             )
 
-            // Bottom subtle vignette for seamless join with card content
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -283,7 +262,7 @@ fun SingleGiftBannerCard(
                     .align(Alignment.BottomCenter)
                     .background(
                         Brush.verticalGradient(
-                            listOf(Color.Transparent, CharcoalSurface.copy(alpha = 0.85f))
+                            listOf(Color.Transparent, CharcoalSurface.copy(alpha = 0.88f))
                         )
                     )
             )
@@ -294,7 +273,7 @@ fun SingleGiftBannerCard(
                     .padding(14.dp)
             ) {
                 LuxuryBadge(
-                    text = if (isActive) "جایزه فعال دوره" else "در حال به‌روزرسانی",
+                    text = if (isActive) "جایزه فعال" else "در حال به‌روزرسانی",
                     icon = if (isActive) Icons.Rounded.CardGiftcard else Icons.Rounded.HourglassEmpty,
                     tone = if (isActive) LuxuryBadgeTone.GOLD else LuxuryBadgeTone.NEUTRAL
                 )
@@ -314,7 +293,7 @@ fun SingleGiftBannerCard(
                 color = WarmWhite
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             Text(
                 text = heroSubtitle,
@@ -323,30 +302,22 @@ fun SingleGiftBannerCard(
             )
 
             if (termsText.isNotBlank()) {
-                Spacer(modifier = Modifier.height(16.dp))
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = ObsidianBlack.copy(alpha = 0.55f),
-                    shape = RoundedCornerShape(14.dp),
-                    border = BorderStroke(1.dp, LuxuryBorder)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Verified,
-                            contentDescription = null,
-                            tint = GoldLight,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = termsText,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = WarmWhite.copy(alpha = 0.88f)
-                        )
-                    }
+                Spacer(modifier = Modifier.height(14.dp))
+                LuxuryHairlineDivider()
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Rounded.Verified,
+                        contentDescription = null,
+                        tint = GoldLight,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = termsText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = WarmWhite.copy(alpha = 0.88f)
+                    )
                 }
             }
         }

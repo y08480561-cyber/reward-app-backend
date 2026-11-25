@@ -1,7 +1,7 @@
 package com.example.ui.screens
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -25,20 +25,21 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.rounded.Logout
-import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Storefront
+import androidx.compose.material.icons.outlined.SupportAgent
+import androidx.compose.material.icons.outlined.WorkspacePremium
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Person
-import androidx.compose.material.icons.rounded.Storefront
-import androidx.compose.material.icons.rounded.SupportAgent
-import androidx.compose.material.icons.rounded.WorkspacePremium
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -51,20 +52,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.model.CompetitionInfo
 import com.example.model.User
 import com.example.ui.components.LuxuryCard
 import com.example.ui.components.LuxuryHairlineDivider
 import com.example.ui.components.LuxuryHighlightCard
-import com.example.ui.components.LuxuryPrimaryButton
 import com.example.ui.components.LuxuryScreenCanvas
 import com.example.ui.components.LuxurySecondaryButton
-import com.example.ui.components.LuxurySectionHeader
 import com.example.ui.components.LuxuryTierBadge
 import com.example.ui.components.LuxuryTopBar
 import com.example.ui.components.formatNumberPersian
@@ -86,6 +85,7 @@ fun ProfileScreen(
     onToggleNotifications: (Boolean) -> Unit
 ) {
     var showLogoutDialog by remember { mutableStateOf(false) }
+    var showRules by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
 
     BackHandler(enabled = onBack != null) {
@@ -95,10 +95,8 @@ fun ProfileScreen(
     LuxuryScreenCanvas {
         Column(modifier = Modifier.fillMaxSize()) {
             LuxuryTopBar(
-                title = "پروفایل کاربری",
-                subtitle = "مشخصات حساب و تنظیمات",
-                onBack = onBack,
-                scoreValue = user.totalScore
+                title = "پروفایل",
+                onBack = onBack
             )
 
             Column(
@@ -111,7 +109,7 @@ fun ProfileScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // VIP Identity Showcase Card
+                // 1. Clean Identity & Key Stats Card
                 LuxuryHighlightCard(contentPadding = PaddingValues(22.dp)) {
                     Column(
                         modifier = Modifier.fillMaxWidth(),
@@ -119,21 +117,21 @@ fun ProfileScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(74.dp)
+                                .size(64.dp)
                                 .clip(CircleShape)
                                 .background(GoldGradientBrush)
-                                .border(2.dp, GoldLight.copy(alpha = 0.8f), CircleShape),
+                                .border(1.5.dp, GoldLight.copy(alpha = 0.75f), CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Rounded.Person,
                                 contentDescription = "تصویر پروفایل",
                                 tint = ObsidianBlack,
-                                modifier = Modifier.size(40.dp)
+                                modifier = Modifier.size(34.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(14.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
 
                         Text(
                             text = user.fullName.ifBlank { "عضو باشگاه رقابت" },
@@ -141,102 +139,104 @@ fun ProfileScreen(
                             color = WarmWhite
                         )
 
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Text(
+                            text = formatPhonePersian(user.phoneNumber),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = TextSecondary
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
 
                         LuxuryTierBadge(
                             panelType = user.panelType,
                             multiplier = user.multiplier
                         )
 
-                        Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(18.dp))
+                        LuxuryHairlineDivider(useGoldAccent = true)
+                        Spacer(modifier = Modifier.height(14.dp))
 
-                        Text(
-                            text = formatPhonePersian(user.phoneNumber),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = TextSecondary
-                        )
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        Surface(
-                            shape = RoundedCornerShape(50),
-                            color = ObsidianBlack.copy(alpha = 0.65f),
-                            border = BorderStroke(1.dp, CharcoalBorder)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly
                         ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "امتیاز دوره",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = TextSecondary
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = formatNumberPersian(user.totalScore),
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
+                                    color = GoldLight
+                                )
+                            }
+
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "ضریب فعلی",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = TextSecondary
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "${user.multiplier.toPersianDigits()} برابر",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = WarmWhite
+                                )
+                            }
+                        }
+
+                        if (activeCompetition != null) {
+                            Spacer(modifier = Modifier.height(10.dp))
                             Text(
-                                text = "شناسه کاربری: ${user.id}",
+                                text = "دوره ${activeCompetition.competitionNumber.toPersianDigits()} • ${activeCompetition.title}",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = TextSecondary,
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                                color = TextMuted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
                 }
 
-                // Store Primary Action
-                LuxuryPrimaryButton(
-                    text = "فروشگاه، ارتقای حساب و بازگشایی آنی",
-                    icon = Icons.Rounded.Storefront,
-                    onClick = onNavigateToStore,
-                    modifier = Modifier
-                        .widthIn(max = 600.dp)
-                        .testTag("btn_goto_store")
-                )
-
-                // Quick Navigation Rows
-                ProfileActionRowCard(
-                    title = "سطوح عضویت و ضرایب امتیاز",
-                    subtitle = "بررسی و مقایسه پنل پایه، نقره‌ای و طلایی",
-                    icon = Icons.Rounded.WorkspacePremium,
-                    onClick = onNavigateToMembership
-                )
-
-                ProfileActionRowCard(
-                    title = "مرکز پشتیبانی و پیام‌ها",
-                    subtitle = "ثبت تیکت جدید، پیگیری وضعیت و گفت‌وگو با پشتیبانی",
-                    icon = Icons.Rounded.SupportAgent,
-                    onClick = onNavigateToSupport,
-                    modifier = Modifier.testTag("btn_profile_support")
-                )
-
-                LuxurySectionHeader(
-                    title = "اطلاعات حساب و تنظیمات",
-                    modifier = Modifier.widthIn(max = 600.dp)
-                )
-
+                // 2. Unified Account Menu & Settings Card
                 LuxuryCard(
                     borderColor = CharcoalBorder,
-                    contentPadding = PaddingValues(18.dp)
+                    contentPadding = PaddingValues(vertical = 4.dp)
                 ) {
-                    activeCompetition?.let { comp ->
-                        ProfileStatRow(
-                            label = "دوره فعال رقابت",
-                            value = "دوره ${comp.competitionNumber.toPersianDigits()} • ${comp.title}"
-                        )
-                    }
-                    ProfileStatRow(
-                        label = "مجموع امتیازهای دوره جاری",
-                        value = "${formatNumberPersian(user.totalScore)} امتیاز",
-                        isHighlight = true
+                    ProfileMenuRow(
+                        title = "فروشگاه و ارتقای حساب",
+                        icon = Icons.Outlined.Storefront,
+                        onClick = onNavigateToStore,
+                        modifier = Modifier.testTag("btn_goto_store")
                     )
-                    ProfileStatRow(
-                        label = "ضریب امتیاز فعلی",
-                        value = "${user.multiplier.toPersianDigits()} برابر"
+                    LuxuryHairlineDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                    ProfileMenuRow(
+                        title = "سطوح عضویت و ضریب امتیاز",
+                        icon = Icons.Outlined.WorkspacePremium,
+                        onClick = onNavigateToMembership
                     )
-                    ProfileStatRow(
-                        label = "وضعیت حساب",
-                        value = "فعال و تأیید شده"
+                    LuxuryHairlineDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                    ProfileMenuRow(
+                        title = "مرکز پشتیبانی و پیام‌ها",
+                        icon = Icons.Outlined.SupportAgent,
+                        onClick = onNavigateToSupport,
+                        modifier = Modifier.testTag("btn_profile_support")
                     )
+                    LuxuryHairlineDivider(modifier = Modifier.padding(horizontal = 16.dp))
 
-                    Spacer(modifier = Modifier.height(10.dp))
-                    LuxuryHairlineDivider()
-                    Spacer(modifier = Modifier.height(10.dp))
-
+                    // Notifications Toggle
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(min = 48.dp)
-                            .clickable { onToggleNotifications(!user.notificationsEnabled) },
+                            .heightIn(min = 58.dp)
+                            .clickable { onToggleNotifications(!user.notificationsEnabled) }
+                            .padding(horizontal = 18.dp, vertical = 10.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -245,26 +245,18 @@ fun ProfileScreen(
                             modifier = Modifier.weight(1f)
                         ) {
                             Icon(
-                                imageVector = Icons.Rounded.NotificationsActive,
+                                imageVector = Icons.Outlined.Notifications,
                                 contentDescription = null,
                                 tint = GoldLight,
-                                modifier = Modifier.size(19.dp)
+                                modifier = Modifier.size(21.dp)
                             )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Column {
-                                Text(
-                                    text = "دریافت اعلان‌ها و اطلاعیه‌ها",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = WarmWhite
-                                )
-                                Text(
-                                    text = "اطلاع از شروع دوره‌های جدید و پیام‌های پشتیبانی",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = TextSecondary
-                                )
-                            }
+                            Spacer(modifier = Modifier.width(14.dp))
+                            Text(
+                                text = "دریافت اعلان‌ها و یادآورها",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = WarmWhite
+                            )
                         }
-                        Spacer(modifier = Modifier.width(8.dp))
                         Switch(
                             checked = user.notificationsEnabled,
                             onCheckedChange = onToggleNotifications,
@@ -277,35 +269,58 @@ fun ProfileScreen(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
-                    LuxuryHairlineDivider()
-                    Spacer(modifier = Modifier.height(12.dp))
+                    LuxuryHairlineDivider(modifier = Modifier.padding(horizontal = 16.dp))
 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Collapsible Rules Row (collapsed by default to keep screen calm)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 58.dp)
+                            .clickable { showRules = !showRules }
+                            .padding(horizontal = 18.dp, vertical = 14.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Outlined.Info,
+                                contentDescription = null,
+                                tint = GoldLight,
+                                modifier = Modifier.size(21.dp)
+                            )
+                            Spacer(modifier = Modifier.width(14.dp))
+                            Text(
+                                text = "راهنما و قوانین باشگاه",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = WarmWhite
+                            )
+                        }
                         Icon(
-                            imageVector = Icons.Rounded.Info,
-                            contentDescription = null,
-                            tint = GoldLight,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "قوانین کلی باشگاه رقابت",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = GoldLight
+                            imageVector = if (showRules) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                            contentDescription = if (showRules) "بستن" else "باز کردن",
+                            tint = TextMuted,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "• کسب امتیاز: با مشاهده کامل هر تبلیغ در بخش ۱۰۰ مربع، امتیاز مربع با ضریب سطح عضویت شما ثبت می‌شود.\n" +
-                                "• رتبه‌بندی و جوایز: جایگاه نهایی شما بر اساس مجموع امتیاز دوره تعیین شده و برندگان بدون کسر امتیاز هدیه دریافت می‌کنند.\n" +
-                                "• ارتقا و بازگشایی: بسته‌های فروشگاه صرفاً از طریق درگاه امن مایکت پردازش می‌شوند.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary
-                    )
+
+                    AnimatedVisibility(visible = showRules) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 18.dp, end = 18.dp, bottom = 16.dp)
+                        ) {
+                            Text(
+                                text = "• با مشاهده کامل هر مربع، امتیاز آن بر اساس ضریب سطح عضویت شما ثبت می‌شود.\n" +
+                                    "• برندگان هر دوره بر پایه رتبه‌بندی پایانی انتخاب شده و بدون کسر امتیاز هدیه دریافت می‌کنند.\n" +
+                                    "• خرید بسته‌ها فقط از طریق درگاه امن مایکت انجام می‌شود.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextSecondary
+                            )
+                        }
+                    }
                 }
 
-                // Logout Action
+                // 3. Logout Action
                 LuxurySecondaryButton(
                     text = "خروج از حساب کاربری",
                     icon = Icons.AutoMirrored.Rounded.Logout,
@@ -374,91 +389,46 @@ fun ProfileScreen(
 }
 
 @Composable
-private fun ProfileActionRowCard(
+private fun ProfileMenuRow(
     title: String,
-    subtitle: String,
     icon: ImageVector,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    LuxuryCard(
-        modifier = modifier,
-        onClick = onClick,
-        borderColor = LuxuryBorder,
-        contentPadding = PaddingValues(16.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(42.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(DarkGraySurface)
-                        .border(1.dp, LuxuryBorder, RoundedCornerShape(12.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = GoldLight,
-                        modifier = Modifier.size(21.dp)
-                    )
-                }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = WarmWhite
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextSecondary
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-            Icon(
-                imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
-                contentDescription = null,
-                tint = GoldLight,
-                modifier = Modifier.size(18.dp)
-            )
-        }
-    }
-}
-
-@Composable
-private fun ProfileStatRow(
-    label: String,
-    value: String,
-    isHighlight: Boolean = false
-) {
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 7.dp),
+            .heightIn(min = 58.dp)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 14.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodySmall,
-            color = TextSecondary
-        )
-        Text(
-            text = value,
-            style = if (isHighlight) MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.ExtraBold) else MaterialTheme.typography.labelLarge,
-            color = if (isHighlight) GoldLight else WarmWhite
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = GoldLight,
+                modifier = Modifier.size(21.dp)
+            )
+            Spacer(modifier = Modifier.width(14.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                color = WarmWhite,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Icon(
+            imageVector = Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+            contentDescription = null,
+            tint = TextMuted,
+            modifier = Modifier.size(20.dp)
         )
     }
 }

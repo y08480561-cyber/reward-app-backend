@@ -5,7 +5,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Campaign
@@ -37,12 +37,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.model.HomeAnnouncement
 import com.example.ui.theme.*
@@ -72,39 +71,29 @@ fun HomeAnnouncementBanner(
 
         val typeConfig = when (announcement.type) {
             "COMPETITION_START" -> AnnouncementTypeUiConfig(
-                label = "شروع دوره جدید",
                 icon = Icons.Rounded.PlayCircle,
                 accentColor = SuccessGreen,
-                borderColor = SuccessGreen.copy(alpha = 0.45f),
-                bgGradient = listOf(Color(0xFF101915), CharcoalSurface)
+                borderColor = SuccessGreen.copy(alpha = 0.35f)
             )
             "COMPETITION_END" -> AnnouncementTypeUiConfig(
-                label = "ساعات پایانی دوره",
                 icon = Icons.Rounded.Timer,
                 accentColor = ErrorRed,
-                borderColor = ErrorRed.copy(alpha = 0.45f),
-                bgGradient = listOf(Color(0xFF1C1112), CharcoalSurface)
+                borderColor = ErrorRed.copy(alpha = 0.35f)
             )
             "WINNERS" -> AnnouncementTypeUiConfig(
-                label = "اعلام برندگان",
                 icon = Icons.Rounded.EmojiEvents,
                 accentColor = GoldAccent,
-                borderColor = LuxuryBorderStrong,
-                bgGradient = listOf(Color(0xFF1E1A10), CharcoalSurface)
+                borderColor = LuxuryBorderStrong
             )
             "CUSTOM" -> AnnouncementTypeUiConfig(
-                label = "پیام ویژه",
                 icon = Icons.Rounded.Star,
                 accentColor = GoldLight,
-                borderColor = LuxuryBorderStrong,
-                bgGradient = listOf(Color(0xFF191712), CharcoalSurface)
+                borderColor = LuxuryBorder
             )
             else -> AnnouncementTypeUiConfig(
-                label = "اطلاعیه رسمی",
                 icon = Icons.Rounded.Campaign,
                 accentColor = GoldLight,
-                borderColor = LuxuryBorder,
-                bgGradient = listOf(DarkGraySurface, CharcoalSurface)
+                borderColor = CharcoalBorder
             )
         }
 
@@ -112,123 +101,89 @@ fun HomeAnnouncementBanner(
             modifier = Modifier
                 .fillMaxWidth()
                 .widthIn(max = 600.dp)
-                .shadow(10.dp, RoundedCornerShape(18.dp), spotColor = Color.Black)
-                .border(1.dp, typeConfig.borderColor, RoundedCornerShape(18.dp))
                 .testTag("home_announcement_banner"),
-            shape = RoundedCornerShape(18.dp),
-            color = CharcoalSurface
+            shape = RoundedCornerShape(16.dp),
+            color = CharcoalSurface,
+            border = BorderStroke(1.dp, typeConfig.borderColor)
         ) {
-            Column(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Brush.verticalGradient(typeConfig.bgGradient))
-                    .padding(16.dp)
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.Top
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(typeConfig.accentColor.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center
                 ) {
+                    Icon(
+                        imageVector = typeConfig.icon,
+                        contentDescription = null,
+                        tint = typeConfig.accentColor,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(50))
-                            .background(typeConfig.accentColor.copy(alpha = 0.14f))
-                            .border(1.dp, typeConfig.accentColor.copy(alpha = 0.4f), RoundedCornerShape(50))
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = typeConfig.icon,
-                            contentDescription = null,
-                            tint = typeConfig.accentColor,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(5.dp))
                         Text(
-                            text = typeConfig.label,
+                            text = announcement.title,
                             color = WarmWhite,
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
                         )
-                    }
 
-                    if (announcement.endsAtMs != null) {
-                        val diffMs = (announcement.endsAtMs - currentEpochMs).coerceAtLeast(0L)
-                        if (diffMs > 0) {
-                            val days = diffMs / (24 * 3600 * 1000L)
-                            val hours = (diffMs % (24 * 3600 * 1000L)) / (3600 * 1000L)
-                            val minutes = (diffMs % (3600 * 1000L)) / (60 * 1000L)
-                            val seconds = (diffMs % (60 * 1000L)) / 1000L
-
-                            val timeText = if (days > 0) {
-                                "${days.toPersianDigits()} روز و ${hours.toPersianDigits()} ساعت"
-                            } else {
-                                String.format(Locale.US, "%02d:%02d:%02d", hours, minutes, seconds).toPersianDigits()
-                            }
-
-                            Surface(
-                                shape = RoundedCornerShape(50),
-                                color = DarkGraySurface,
-                                border = BorderStroke(1.dp, LuxuryBorder)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Rounded.Timer,
-                                        contentDescription = null,
-                                        tint = GoldLight,
-                                        modifier = Modifier.size(13.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = "فرصت باقی‌مانده: $timeText",
-                                        color = GoldLight,
-                                        style = MaterialTheme.typography.labelSmall
-                                    )
+                        if (announcement.endsAtMs != null) {
+                            val diffMs = (announcement.endsAtMs - currentEpochMs).coerceAtLeast(0L)
+                            if (diffMs > 0) {
+                                val days = diffMs / (24 * 3600 * 1000L)
+                                val hours = (diffMs % (24 * 3600 * 1000L)) / (3600 * 1000L)
+                                val minutes = (diffMs % (3600 * 1000L)) / (60 * 1000L)
+                                val seconds = (diffMs % (60 * 1000L)) / 1000L
+                                val timeText = if (days > 0) {
+                                    "${days.toPersianDigits()} روز"
+                                } else {
+                                    String.format(Locale.US, "%02d:%02d:%02d", hours, minutes, seconds).toPersianDigits()
                                 }
-                            }
-                        } else {
-                            Surface(
-                                shape = RoundedCornerShape(50),
-                                color = DarkGraySurface,
-                                border = BorderStroke(1.dp, CharcoalBorder)
-                            ) {
+                                Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "پایان مهلت دوره",
-                                    color = TextSecondary,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                    text = timeText,
+                                    color = GoldLight,
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
                                 )
                             }
                         }
                     }
+
+                    if (announcement.content.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Text(
+                            text = announcement.content,
+                            color = TextSecondary,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text(
-                    text = announcement.title,
-                    color = GoldLight,
-                    style = MaterialTheme.typography.titleMedium
-                )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                Text(
-                    text = announcement.content,
-                    color = WarmWhite.copy(alpha = 0.88f),
-                    style = MaterialTheme.typography.bodySmall
-                )
             }
         }
     }
 }
 
 private data class AnnouncementTypeUiConfig(
-    val label: String,
     val icon: ImageVector,
     val accentColor: Color,
-    val borderColor: Color,
-    val bgGradient: List<Color>
+    val borderColor: Color
 )
