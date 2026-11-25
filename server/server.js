@@ -4594,11 +4594,14 @@ app.delete('/api/admin/ad-banners/:id', requireAdminAuth, ensureDatabaseReady, a
   }
 });
 
-// Public/App: Fetch Active, Valid-Schedule Ad Banners (Cloudflare-friendly cache + no admin metrics exposed)
+// Public/App: Fetch Active, Valid-Schedule Ad Banners (Always fresh + no admin metrics exposed)
 app.get('/api/ad-banners/active', async (req, res) => {
-  res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  const serverNow = Date.now();
   if (!pool || !isDbConnected) {
-    return res.json({ success: true, banners: [], version: '0', fallback: true });
+    return res.json({ success: true, banners: [], version: '0', serverNow, fallback: true });
   }
 
   try {
@@ -4617,10 +4620,10 @@ app.get('/api/ad-banners/active', async (req, res) => {
 
     const latestTs = banners.reduce((max, b) => Math.max(max, b.updatedAt || 0), 0);
     const version = `${banners.length}:${latestTs}`;
-    return res.json({ success: true, banners, version });
+    return res.json({ success: true, banners, version, serverNow });
   } catch (err) {
     console.error('[Public Active AdBanners Error]', err.message);
-    return res.json({ success: true, banners: [], version: '0', fallback: true });
+    return res.json({ success: true, banners: [], version: '0', serverNow, fallback: true });
   }
 });
 

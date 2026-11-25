@@ -73,6 +73,7 @@ fun HomeScreen(
     competition: CompetitionInfo? = null,
     announcement: HomeAnnouncement? = null,
     promoAdBanners: List<PromoAdBanner> = emptyList(),
+    promoAdBannersClockOffsetMs: Long = 0L,
     userRank: Int? = null,
     completedSquaresToday: Int? = null,
     onPromoBannerVisible: (String) -> Unit = {},
@@ -274,21 +275,22 @@ fun HomeScreen(
                 )
             }
 
-            // 3. Optional Quiet Announcement Strip (only when server has an active message)
+            // 3. Clickable Promotional Image Ad Banners (only when active & valid banners exist)
+            PromoAdBannerSection(
+                banners = promoAdBanners,
+                clockOffsetMs = promoAdBannersClockOffsetMs,
+                onBannerVisible = onPromoBannerVisible,
+                onBannerClick = onPromoBannerClick,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            // 4. Optional Quiet Announcement Strip (only when server has an active message)
             if (announcement != null && announcement.isActive) {
                 HomeAnnouncementBanner(
                     announcement = announcement,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
-
-            // 4. Optional Clickable Promotional Image Ad Banners (only when active & valid banners exist)
-            PromoAdBannerSection(
-                banners = promoAdBanners,
-                onBannerVisible = onPromoBannerVisible,
-                onBannerClick = onPromoBannerClick,
-                modifier = Modifier.fillMaxWidth()
-            )
 
             // 5. Unified Quick Services Card (only destinations not already in bottom navigation)
             LuxuryCard(

@@ -66,6 +66,7 @@ data class MainUiState(
     val activeAnnouncement: com.example.model.HomeAnnouncement? = null,
     // Active Clickable Promotional Ad Banners
     val promoAdBanners: List<com.example.model.PromoAdBanner> = emptyList(),
+    val promoAdBannersClockOffsetMs: Long = 0L,
     // Support System State
     val supportTickets: List<com.example.model.SupportTicket> = emptyList(),
     val activeSupportTicket: com.example.model.SupportTicket? = null,

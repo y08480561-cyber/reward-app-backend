@@ -333,15 +333,18 @@ async function runTests() {
     // Public active listing must ONLY return bannerFirst then bannerSecond, ordered by display_order
     const activeRes = await fetch(`${baseUrl}/api/ad-banners/active`);
     assert.strictEqual(activeRes.status, 200);
+    const cacheControl = String(activeRes.headers.get('cache-control') || '');
+    assert.ok(cacheControl.includes('no-store'), `Expected Cache-Control no-store, got: ${cacheControl}`);
     const activeJson = await activeRes.json();
     assert.strictEqual(activeJson.success, true);
+    assert.strictEqual(typeof activeJson.serverNow, 'number');
     assert.strictEqual(activeJson.banners.length, 2);
     assert.strictEqual(activeJson.banners[0].id, bannerFirst.id);
     assert.strictEqual(activeJson.banners[0].linkOpenMode, 'internal');
     assert.strictEqual(activeJson.banners[1].id, bannerSecond.id);
     assert.strictEqual(activeJson.banners[1].linkOpenMode, 'external');
     assert.strictEqual(activeJson.banners[0].click_count, undefined, 'Public endpoint must not expose admin click_count');
-    console.log('  ✓ Test 4 Passed: Active endpoint returns only valid active non-expired banners sorted by display_order.');
+    console.log('  ✓ Test 4 Passed: Active endpoint returns only valid active non-expired banners with no-store & serverNow.');
 
     // 5. Admin listing exposes computed statuses & summary counts
     const adminListRes = await fetch(`${baseUrl}/api/admin/ad-banners`, {

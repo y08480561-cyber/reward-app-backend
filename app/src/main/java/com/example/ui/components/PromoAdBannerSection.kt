@@ -2,6 +2,7 @@ package com.example.ui.components
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
+import android.util.Log
 import android.view.ViewGroup
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
@@ -41,6 +42,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -49,6 +52,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -58,6 +62,8 @@ import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImagePainter
 import coil.compose.SubcomposeAsyncImage
 import coil.compose.SubcomposeAsyncImageContent
+import coil.request.CachePolicy
+import coil.request.ImageRequest
 import com.example.model.PromoAdBanner
 import com.example.model.PromoBannerUrlValidator
 import com.example.ui.theme.CharcoalBorder
@@ -77,10 +83,14 @@ fun PromoAdBannerSection(
     banners: List<PromoAdBanner>,
     onBannerVisible: (String) -> Unit,
     onBannerClick: (PromoAdBanner) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    clockOffsetMs: Long = 0L
 ) {
-    val activeBanners = remember(banners) {
-        PromoBannerUrlValidator.filterAndSortActive(banners)
+    val effectiveNowMs = remember(banners, clockOffsetMs) {
+        System.currentTimeMillis() + clockOffsetMs
+    }
+    val activeBanners = remember(banners, effectiveNowMs) {
+        PromoBannerUrlValidator.filterAndSortActive(banners, nowMs = effectiveNowMs)
     }
     if (activeBanners.isEmpty()) return
 
@@ -161,10 +171,44 @@ private fun PromoAdBannerCard(
     banner: PromoAdBanner,
     onClick: () -> Unit
 ) {
+    val context = LocalContext.current
+    var retryAttempt by remember(banner.id, banner.imageUrl, banner.updatedAtMs) { mutableIntStateOf(0) }
+    var imageAspectRatio by remember(banner.id, banner.imageUrl, banner.updatedAtMs) { mutableFloatStateOf(16f / 9f) }
+
+    val imageRequest = remember(banner.id, banner.imageUrl, banner.updatedAtMs, retryAttempt) {
+        ImageRequest.Builder(context)
+            .data(banner.imageUrl)
+            .memoryCacheKey("${banner.id}_${banner.updatedAtMs}_$retryAttempt")
+            .diskCacheKey("${banner.id}_${banner.updatedAtMs}")
+            .apply {
+                if (retryAttempt > 0) {
+                    memoryCachePolicy(CachePolicy.WRITE_ONLY)
+                    diskCachePolicy(CachePolicy.WRITE_ONLY)
+                }
+            }
+            .crossfade(true)
+            .listener(
+                onSuccess = { _, result ->
+                    val w = result.drawable.intrinsicWidth
+                    val h = result.drawable.intrinsicHeight
+                    if (w > 0 && h > 0) {
+                        imageAspectRatio = (w.toFloat() / h.toFloat()).coerceIn(1.35f, 2.8f)
+                    }
+                },
+                onError = { _, err ->
+                    Log.w(
+                        "PromoAdBanner",
+                        "Failed loading banner image (${banner.id}) url=${banner.imageUrl}: ${err.throwable.message}"
+                    )
+                }
+            )
+            .build()
+    }
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(16f / 7.5f)
+            .aspectRatio(imageAspectRatio)
             .clip(RoundedCornerShape(18.dp))
             .clickable(onClick = onClick)
             .testTag("promo_ad_banner_card_${banner.id}"),
@@ -173,7 +217,7 @@ private fun PromoAdBannerCard(
         border = BorderStroke(1.dp, LuxuryBorder)
     ) {
         SubcomposeAsyncImage(
-            model = banner.imageUrl,
+            model = imageRequest,
             contentDescription = banner.title.ifBlank { "پیشنهاد ویژه" },
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()
@@ -194,6 +238,12 @@ private fun PromoAdBannerCard(
                     }
                 }
                 is AsyncImagePainter.State.Error -> {
+                    LaunchedEffect(banner.id, banner.imageUrl, retryAttempt) {
+                        if (retryAttempt < 1) {
+                            delay(1500L)
+                            retryAttempt++
+                        }
+                    }
                     Box(
                         modifier = Modifier
                             .fillMaxSize()

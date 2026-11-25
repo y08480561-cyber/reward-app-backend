@@ -104,6 +104,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 currentUser = user,
                 activeAnnouncement = cachedAnn,
                 promoAdBanners = cachedBanners,
+                promoAdBannersClockOffsetMs = prefs.cachedAdBannersClockOffsetMs,
                 currentScreen = AppScreen.HOME,
                 isTestAdsEnabled = prefs.useTestAds
             )
@@ -171,6 +172,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun refreshData() {
         val user = _uiState.value.currentUser ?: return
+        refreshAdBanners(force = true)
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             val cycle = backendRepository.ensureActiveCycle(user.id)
@@ -199,10 +201,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val loginNotifResult = backendRepository.fetchLoginNotificationConfig()
             val loginNotif = if (loginNotifResult is Result.Success) loginNotifResult.data else _uiState.value.loginNotification
 
-            // Fetch active clickable promotional ad banners
-            val promoBannersRes = backendRepository.fetchActiveAdBanners()
-            val promoBanners = if (promoBannersRes is Result.Success) promoBannersRes.data else _uiState.value.promoAdBanners
-
             _uiState.update {
                 it.copy(
                     dailyCycle = cycle,
@@ -211,7 +209,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     activeCompetition = activeComp ?: it.activeCompetition,
                     activeAnnouncement = activeAnn,
                     loginNotification = loginNotif,
-                    promoAdBanners = promoBanners,
                     currentUser = updatedUser,
                     isLoading = false
                 )
@@ -1321,6 +1318,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val trackedBannerImpressions = mutableSetOf<String>()
     private var lastPromoBannerClickTimeMs: Long = 0L
     private var lastPromoBannerClickedId: String? = null
+    private var lastAdBannersRefreshMs: Long = 0L
+    private var adBannersRefreshJob: kotlinx.coroutines.Job? = null
+
+    fun refreshAdBanners(force: Boolean = false) {
+        if (_uiState.value.currentUser == null) return
+        val nowMs = System.currentTimeMillis()
+        if (!force && (nowMs - lastAdBannersRefreshMs) < 1_500L) return
+        if (adBannersRefreshJob?.isActive == true && !force) return
+
+        adBannersRefreshJob?.cancel()
+        adBannersRefreshJob = viewModelScope.launch {
+            lastAdBannersRefreshMs = System.currentTimeMillis()
+            val res = backendRepository.fetchActiveAdBanners()
+            if (res is Result.Success) {
+                _uiState.update {
+                    it.copy(
+                        promoAdBanners = res.data,
+                        promoAdBannersClockOffsetMs = prefs.cachedAdBannersClockOffsetMs
+                    )
+                }
+            }
+        }
+    }
 
     fun onPromoBannerVisible(bannerId: String) {
         if (bannerId.isBlank()) return
@@ -1341,7 +1361,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         val safeUrl = com.example.model.PromoBannerUrlValidator.normalizeSafeHttpUrl(banner.targetUrl)
             ?: return
-        if (!banner.isCurrentlyDisplayable(nowMs)) return
+        val effectiveNowMs = nowMs + _uiState.value.promoAdBannersClockOffsetMs
+        if (!banner.isCurrentlyDisplayable(effectiveNowMs)) return
 
         lastPromoBannerClickedId = banner.id
         lastPromoBannerClickTimeMs = nowMs

@@ -1763,25 +1763,45 @@ class BackendRepository(
     suspend fun fetchActiveAdBanners(): Result<List<com.example.model.PromoAdBanner>> = withContext(Dispatchers.IO) {
         val baseUrl = prefs.serverUrl.trimEnd('/')
         val url = "$baseUrl/api/ad-banners/active"
-        try {
-            val request = Request.Builder().url(url).get().build()
-            client.newCall(request).execute().use { response ->
-                val body = response.body?.string().orEmpty()
-                if (response.isSuccessful) {
-                    val json = JSONObject(body)
-                    val arr = json.optJSONArray("banners") ?: org.json.JSONArray()
-                    val parsed = parseAdBannersJsonArray(arr, baseUrl)
-                    prefs.cachedAdBannersJson = arr.toString()
-                    Result.Success(parsed)
-                } else {
-                    val cached = parseCachedAdBanners()
-                    Result.Success(cached)
+
+        for (attempt in 1..2) {
+            try {
+                val request = Request.Builder()
+                    .url(url)
+                    .cacheControl(okhttp3.CacheControl.FORCE_NETWORK)
+                    .header("Cache-Control", "no-cache")
+                    .header("Pragma", "no-cache")
+                    .get()
+                    .build()
+                client.newCall(request).execute().use { response ->
+                    val body = response.body?.string().orEmpty()
+                    if (response.isSuccessful) {
+                        val json = JSONObject(body)
+                        val arr = json.optJSONArray("banners") ?: org.json.JSONArray()
+                        val deviceNowMs = System.currentTimeMillis()
+                        val serverNowMs = json.optLong("serverNow", deviceNowMs).takeIf { it > 0L } ?: deviceNowMs
+                        prefs.cachedAdBannersClockOffsetMs = serverNowMs - deviceNowMs
+                        val parsed = parseAdBannersJsonArray(arr, baseUrl, referenceNowMs = serverNowMs)
+                        prefs.cachedAdBannersJson = arr.toString()
+                        Log.d("BackendRepository", "[AdBanners] Fetched ${parsed.size} active banner(s) from $url")
+                        return@withContext Result.Success(parsed)
+                    } else {
+                        Log.w("BackendRepository", "[AdBanners] Server returned HTTP ${response.code} from $url (attempt $attempt)")
+                        if (attempt < 2 && response.code in 502..504) {
+                            kotlinx.coroutines.delay(900)
+                        } else {
+                            return@withContext Result.Success(parseCachedAdBanners())
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w("BackendRepository", "[AdBanners] Network error fetching $url (attempt $attempt): ${e.message}")
+                if (attempt < 2) {
+                    kotlinx.coroutines.delay(900)
                 }
             }
-        } catch (_: Exception) {
-            val cached = parseCachedAdBanners()
-            Result.Success(cached)
         }
+        Result.Success(parseCachedAdBanners())
     }
 
     fun parseCachedAdBanners(): List<com.example.model.PromoAdBanner> {
@@ -1789,15 +1809,37 @@ class BackendRepository(
         if (raw.isBlank()) return emptyList()
         return try {
             val arr = org.json.JSONArray(raw)
-            parseAdBannersJsonArray(arr, prefs.serverUrl.trimEnd('/'))
+            val effectiveNowMs = System.currentTimeMillis() + prefs.cachedAdBannersClockOffsetMs
+            parseAdBannersJsonArray(arr, prefs.serverUrl.trimEnd('/'), referenceNowMs = effectiveNowMs)
         } catch (_: Exception) {
             emptyList()
         }
     }
 
+    private fun parseFlexibleTimestampMs(obj: JSONObject, camelKey: String, snakeKey: String): Long? {
+        val key = when {
+            obj.has(camelKey) && !obj.isNull(camelKey) -> camelKey
+            obj.has(snakeKey) && !obj.isNull(snakeKey) -> snakeKey
+            else -> return null
+        }
+        val num = obj.optLong(key, -1L)
+        if (num > 0L) return num
+        val str = obj.optString(key, "").trim()
+        if (str.isBlank()) return null
+        str.toLongOrNull()?.let { if (it > 0L) return it }
+        return try {
+            java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US).apply {
+                timeZone = java.util.TimeZone.getTimeZone("UTC")
+            }.parse(str)?.time
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     fun parseAdBannersJsonArray(
         arr: org.json.JSONArray,
-        baseUrl: String = ApiConfig.BASE_URL
+        baseUrl: String = ApiConfig.BASE_URL,
+        referenceNowMs: Long = System.currentTimeMillis()
     ): List<com.example.model.PromoAdBanner> {
         val list = mutableListOf<com.example.model.PromoAdBanner>()
         for (i in 0 until arr.length()) {
@@ -1809,16 +1851,8 @@ class BackendRepository(
             if (id.isBlank() || resolvedImage.isBlank()) continue
             if (!com.example.model.PromoBannerUrlValidator.isSafeHttpUrl(targetUrl)) continue
 
-            val startAtMs = when {
-                obj.has("startAt") && !obj.isNull("startAt") -> obj.optLong("startAt", -1L).takeIf { it > 0L }
-                obj.has("start_at") && !obj.isNull("start_at") -> obj.optLong("start_at", -1L).takeIf { it > 0L }
-                else -> null
-            }
-            val endAtMs = when {
-                obj.has("endAt") && !obj.isNull("endAt") -> obj.optLong("endAt", -1L).takeIf { it > 0L }
-                obj.has("end_at") && !obj.isNull("end_at") -> obj.optLong("end_at", -1L).takeIf { it > 0L }
-                else -> null
-            }
+            val startAtMs = parseFlexibleTimestampMs(obj, "startAt", "start_at")
+            val endAtMs = parseFlexibleTimestampMs(obj, "endAt", "end_at")
 
             list.add(
                 com.example.model.PromoAdBanner(
@@ -1833,11 +1867,11 @@ class BackendRepository(
                     startAtMs = startAtMs,
                     endAtMs = endAtMs,
                     displayOrder = obj.optInt("displayOrder", obj.optInt("display_order", i)),
-                    updatedAtMs = obj.optLong("updatedAt", System.currentTimeMillis())
+                    updatedAtMs = parseFlexibleTimestampMs(obj, "updatedAt", "updated_at") ?: 0L
                 )
             )
         }
-        return com.example.model.PromoBannerUrlValidator.filterAndSortActive(list)
+        return com.example.model.PromoBannerUrlValidator.filterAndSortActive(list, nowMs = referenceNowMs)
     }
 
     suspend fun recordAdBannerImpression(bannerId: String, userId: String) = withContext(Dispatchers.IO) {

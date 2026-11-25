@@ -160,6 +160,7 @@ class MainActivity : ComponentActivity() {
                                                 competition = uiState.activeCompetition,
                                                 announcement = uiState.activeAnnouncement,
                                                 promoAdBanners = uiState.promoAdBanners,
+                                                promoAdBannersClockOffsetMs = uiState.promoAdBannersClockOffsetMs,
                                                 userRank = currentUserRank,
                                                 completedSquaresToday = completedToday,
                                                 onPromoBannerVisible = { bannerId ->
@@ -377,6 +378,7 @@ class MainActivity : ComponentActivity() {
         try {
             val viewModel: MainViewModel = androidx.lifecycle.ViewModelProvider(this)[MainViewModel::class.java]
             viewModel.myketBillingManager.startConnection()
+            viewModel.refreshAdBanners(force = false)
         } catch (_: Exception) {
         }
     }

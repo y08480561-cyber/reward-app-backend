@@ -181,6 +181,10 @@ class PreferencesManager(context: Context) {
         get() = prefs.getString("cached_ad_banners_json", "") ?: ""
         set(value) = prefs.edit().putString("cached_ad_banners_json", value).apply()
 
+    var cachedAdBannersClockOffsetMs: Long
+        get() = prefs.getLong("cached_ad_banners_clock_offset_ms", 0L)
+        set(value) = prefs.edit().putLong("cached_ad_banners_clock_offset_ms", value).apply()
+
     var notificationsEnabled: Boolean
         get() = prefs.getBoolean("notifications_enabled", true)
         set(value) = prefs.edit().putBoolean("notifications_enabled", value).apply()
