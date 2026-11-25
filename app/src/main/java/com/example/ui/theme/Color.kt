@@ -4,68 +4,85 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
 // ====================================================================
-// Luxury Premium UI - Core Brand Palette
+// Luxury Obsidian & Champagne Gold Design System Palette
 // ====================================================================
-val NavyPrimary = Color(0xFF0B192C)      // سرمه‌ای عمیق
-val LuxuryBlack = Color(0xFF101114)      // مشکی لوکس
-val GoldAccent = Color(0xFFD4AF37)       // طلایی اصلی (Metallic Gold)
-val GoldLight = Color(0xFFF5D77A)        // طلایی روشن (Shimmer Gold)
-val SilverAccent = Color(0xFFC0C0C0)     // نقره‌ای
-val WarmWhite = Color(0xFFF5F2E9)        // سفید گرم
 
-// Legacy & Supporting Navy Shades
-val NavySecondary = Color(0xFF132238)
-val NavyLight = Color(0xFF1E3554)
-val SlateBackground = Color(0xFF0E1218)   // Deep Luxury Dark Background
+// Primary Canvas & Surface Hierarchy
+val ObsidianBlack = Color(0xFF080808)        // مشکی عمیق (پس‌زمینه اصلی)
+val CharcoalSurface = Color(0xFF121212)      // مشکی زغالی (سطح اول کارت‌ها)
+val DarkGraySurface = Color(0xFF1B1B1B)      // خاکستری تیره (سطح دوم / عناصر برجسته)
+val ElevatedObsidian = Color(0xFF232323)     // سطح تعاملی / حالت فشرده
 
-// Luxury Surfaces & Cards
-val CardSurface = Color(0xFF161B24)      // Elevated Dark Luxury Card
-val CardSurfaceElevated = Color(0xFF1D2330)
-val DarkBackground = Color(0xFF101114)
-val DarkSurface = Color(0xFF161A22)
-val DarkSurfaceElevated = Color(0xFF1F2533)
+// Gold Accent Spectrum (Controlled Luxury Use)
+val GoldAccent = Color(0xFFD4AF37)           // طلایی اصلی
+val GoldLight = Color(0xFFE8D5A3)            // طلایی شامپاینی
+val GoldDark = Color(0xFFB99745)             // طلایی مات
 
-// Gold Palette Variations
-val GoldDark = Color(0xFFAA8010)
-val BronzeTrophy = Color(0xFFCD7F32)
+// Typography Colors
+val WarmWhite = Color(0xFFF5F1E8)            // سفید گرم (متن اصلی)
+val TextPrimary = WarmWhite
+val TextSecondary = Color(0xFFA7A39A)        // خاکستری متن ثانویه
+val TextMuted = Color(0xFF77736B)            // خاکستری کم‌رنگ (راهنما و غیرفعال)
+val TextOnDark = WarmWhite
+val TextGold = GoldLight
 
-// Functional & Feedback Colors (Tuned for Luxury Dark UI)
-val SuccessGreen = Color(0xFF10B981)
-val SuccessGreenLight = Color(0x2A10B981)
-val WarningOrange = Color(0xFFF59E0B)
-val ErrorRed = Color(0xFFEF4444)
-val ErrorRedLight = Color(0x2AEF4444)
+// Legacy Aliases Remapped to Exact Obsidian/Charcoal Tokens for Seamless Compatibility
+val LuxuryBlack = ObsidianBlack
+val NavyPrimary = CharcoalSurface
+val NavySecondary = DarkGraySurface
+val NavyLight = ElevatedObsidian
+val SlateBackground = ObsidianBlack
+val CardSurface = CharcoalSurface
+val CardSurfaceElevated = DarkGraySurface
+val DarkBackground = ObsidianBlack
+val DarkSurface = CharcoalSurface
+val DarkSurfaceElevated = DarkGraySurface
+val SilverAccent = Color(0xFFC8C4BC)
+val BronzeTrophy = Color(0xFFC08A54)
 
-// Luxury Text Colors
-val TextPrimary = Color(0xFFF5F2E9)      // Warm White for primary readable text
-val TextSecondary = Color(0xFFB0B7C3)    // Soft Silver-Slate for secondary text
-val TextMuted = Color(0xFF7E8899)        // Muted Slate for captions
-val TextOnDark = Color(0xFFF5F2E9)
-val TextGold = Color(0xFFF5D77A)
+// Refined Muted Semantic Feedback Colors (No Neon, High Legibility on Obsidian)
+val SuccessGreen = Color(0xFF2EA070)
+val SuccessGreenLight = Color(0x1E2EA070)
+val WarningOrange = Color(0xFFD89A3C)
+val WarningOrangeLight = Color(0x1ED89A3C)
+val ErrorRed = Color(0xFFD65A5A)
+val ErrorRedLight = Color(0x1ED65A5A)
 
-// Glassmorphism & Borders
-val LuxuryBorder = Color(0x33D4AF37)     // 20% Alpha Gold border
-val LuxuryBorderStrong = Color(0x66D4AF37) // 40% Alpha Gold border
-val SilverBorder = Color(0x33C0C0C0)     // 20% Alpha Silver border
-val GlassSurface = Color(0x1AFFFFFF)
+// Subtle Hairline Borders & Overlays
+val CharcoalBorder = Color(0xFF282828)
+val LuxuryBorder = Color(0x33D4AF37)         // 20% Gold hairline
+val LuxuryBorderStrong = Color(0x66D4AF37)   // 40% Gold accent hairline
+val SilverBorder = Color(0x2EC8C4BC)
+val GlassSurface = Color(0x14F5F1E8)
+val DockSurfaceColor = Color(0xF5121212)
 
-// Gradients
+// Subtle Editorial Gradients
+val ObsidianCanvasGradient = Brush.verticalGradient(
+    listOf(ObsidianBlack, Color(0xFF0E0E0E), ObsidianBlack)
+)
+
+val LuxuryDarkGradient = ObsidianCanvasGradient
+
+val LuxuryCardGradient = Brush.verticalGradient(
+    listOf(DarkGraySurface, CharcoalSurface)
+)
+
+val LuxuryElevatedCardGradient = Brush.verticalGradient(
+    listOf(Color(0xFF201E19), CharcoalSurface)
+)
+
 val GoldGradientBrush = Brush.linearGradient(
-    listOf(Color(0xFFD4AF37), Color(0xFFF5D77A), Color(0xFFAA8010))
+    listOf(GoldLight, GoldAccent, GoldDark)
 )
 
 val GoldHorizontalBrush = Brush.horizontalGradient(
-    listOf(Color(0xFFD4AF37), Color(0xFFF5D77A))
+    listOf(GoldAccent, GoldLight)
+)
+
+val GoldHairlineBrush = Brush.horizontalGradient(
+    listOf(Color.Transparent, GoldAccent.copy(alpha = 0.55f), GoldLight.copy(alpha = 0.75f), GoldAccent.copy(alpha = 0.55f), Color.Transparent)
 )
 
 val SilverGradientBrush = Brush.linearGradient(
-    listOf(Color(0xFFE2E8F0), Color(0xFFC0C0C0), Color(0xFF94A3B8))
-)
-
-val LuxuryDarkGradient = Brush.verticalGradient(
-    listOf(LuxuryBlack, NavyPrimary)
-)
-
-val LuxuryCardGradient = Brush.verticalGradient(
-    listOf(Color(0xFF1B2230), Color(0xFF131722))
+    listOf(Color(0xFFE5E2DA), SilverAccent, Color(0xFF949088))
 )

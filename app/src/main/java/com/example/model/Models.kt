@@ -256,11 +256,11 @@ data class RewardCategoryItem(
  */
 data class RewardAppearanceConfig(
     val id: String = "default",
-    val heroTitle: String = "ویترین هدیه و پاداش ویژه",
-    val heroSubtitle: String = "هدیه اختصاصی این دوره برای کاربران فعال مسابقه رقابت کن جایزه ببر",
+    val heroTitle: String = "جایزه ویژه دوره جاری",
+    val heroSubtitle: String = "هدیه اختصاصی این دوره برای برترین‌های باشگاه رقابت و شرکت‌کنندگان فعال",
     val heroBannerUrl: String = "",
-    val primaryColor: String = "#10B981",
-    val termsText: String = "این بنر صرفاً جهت معرفی هدیه ویژه دوره جاری بوده و نیازی به ثبت درخواست ندارد.",
+    val primaryColor: String = "#D4AF37",
+    val termsText: String = "این بخش صرفاً برای معرفی جایزه دوره بوده و اهدای هدیه بدون کسر امتیاز انجام می‌شود.",
     val isActive: Boolean = true
 )
 
@@ -326,13 +326,13 @@ data class PurchaseSuccessModalData(
 data class LoginNotificationConfig(
     val id: String = "default",
     val isVisible: Boolean = true,
-    val badgeText: String = "سرویس اختصاصی مشترکین ایرانسل",
+    val badgeText: String = "سرویس اختصاصی مشترکان ایرانسل",
     val badgeIcon: String = "verified",
-    val mainTitle: String = "سامانه منحصرأ ویژه مشترکان ارجمند ایرانسل",
-    val mainDescription: String = "با کمال احترام و افتخار، این سامانه منحصراً جهت حضور، رقابت و بهره‌مندی مشترکین گرامی و همراهان وفادار اپراتور ایرانسل طراحی گردیده است.",
+    val mainTitle: String = "باشگاه اختصاصی مشترکان ارجمند ایرانسل",
+    val mainDescription: String = "این سامانه منحصراً برای حضور، رقابت و بهره‌مندی مشترکان گرامی و همراهان وفادار اپراتور ایرانسل طراحی شده است.",
     val warningIsVisible: Boolean = true,
-    val warningTitle: String = "شرط الزامی: ورود با «اینترنت دیتای ایرانسل»",
-    val warningDescription: String = "لطفاً پیش از ورود، وای‌فای و فیلترشکن را خاموش نموده و از طریق اینترنت همراه سیم‌کارت ایرانسل متصل گردید.",
+    val warningTitle: String = "نکته مهم: اتصال با اینترنت همراه ایرانسل",
+    val warningDescription: String = "لطفاً پیش از ورود، وای‌فای و فیلترشکن را خاموش کرده و با اینترنت سیم‌کارت ایرانسل متصل شوید.",
     val warningIcon: String = "signal_cellular_alt",
     val updatedAt: Long = System.currentTimeMillis()
 )

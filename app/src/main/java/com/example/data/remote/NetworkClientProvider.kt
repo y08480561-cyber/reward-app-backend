@@ -28,7 +28,7 @@ enum class NetworkErrorCategory(val code: String, val titlePersian: String) {
     TLS_HANDSHAKE_FAILURE("TLS_ERROR", "خطای دست‌دهی امن TLS/گواهی امنیتی"),
     TCP_CONNECT_FAILURE("CONNECT_ERROR", "عدم امکان برقراری ارتباط TCP با سرور"),
     HTTP_CLIENT_ERROR("HTTP_4XX", "خطای سمت کلاینت یا احراز هویت"),
-    HTTP_SERVER_ERROR("HTTP_5XX", "خطای سمت سرور یا گیت‌وی Render"),
+    HTTP_SERVER_ERROR("HTTP_5XX", "خطای سمت سرور اصلی"),
     GENERAL_NETWORK_ERROR("NET_UNKNOWN", "خطای عمومی شبکه")
 }
 
@@ -43,10 +43,9 @@ data class ClassifiedNetworkError(
  * Custom DNS implementation that prioritizes IPv4 over IPv6.
  *
  * Motivation for Hamrah Aval (MCI):
- * MCI cellular APNs frequently issue dual-stack IPv4/IPv6 addresses, but international
- * IPv6 routes to Render/Cloudflare CDNs can experience severe packet dropping or blackholing.
- * Prioritizing IPv4 addresses prevents OkHttp from getting stuck waiting for dead IPv6 SYN packets,
- * while still maintaining IPv6 as a fallback.
+ * MCI cellular APNs frequently issue dual-stack IPv4/IPv6 addresses, where IPv6 routes
+ * can experience packet dropping or blackholing. Prioritizing IPv4 addresses prevents
+ * OkHttp from getting stuck waiting for stalled IPv6 SYN packets while keeping IPv6 fallback.
  */
 class ResilientDns : Dns {
     companion object {
@@ -77,12 +76,15 @@ class SafeLoggingInterceptor : Interceptor {
 
     override fun intercept(chain: Interceptor.Chain): Response {
         val request = chain.request()
+        if (!request.isHttps && !ApiConfig.isLocalTestUrl(request.url.toString())) {
+            throw SSLHandshakeException("Cleartext HTTP is prohibited; HTTPS is required.")
+        }
         val path = request.url.encodedPath
         val host = request.url.host
         val method = request.method
         val startTime = System.currentTimeMillis()
 
-        Log.d(TAG, "-> $method https://$host$path")
+        Log.d(TAG, "-> $method ${request.url.scheme}://$host$path")
 
         val response: Response
         try {
@@ -116,7 +118,7 @@ fun classifyNetworkException(e: Throwable): ClassifiedNetworkError {
             category = NetworkErrorCategory.TIMEOUT_FAILURE,
             technicalMessage = "Socket timeout during connection/read: ${e.message?.take(60)}",
             userFacingMessage = "مهلت زمانی اتصال به پایان رسید (Timeout). سرور در زمان مقرر پاسخ نداد.",
-            recommendedAction = "سرورهای ابری Render در صورت عدم استفاده موقتاً به حالت خواب می‌روند و بیدار شدن آن‌ها تا ۴۰ ثانیه طول می‌کشد. لطفاً ۲۰ ثانیه دیگر دوباره امتحان کنید."
+            recommendedAction = "پایداری اتصال اینترنت خود را بررسی کنید و چند لحظه بعد دوباره تلاش نمایید."
         )
         is SSLHandshakeException,
         is SSLException -> ClassifiedNetworkError(
@@ -141,18 +143,16 @@ fun classifyNetworkException(e: Throwable): ClassifiedNetworkError {
 }
 
 /**
- * Provides a resilient OkHttpClient configured specifically for high-latency cellular networks,
- * Render cloud cold starts, and operator TLS compatibility.
+ * Provides a resilient OkHttpClient configured for cellular networks and standard system TLS.
  */
 object NetworkClientProvider {
 
     fun createResilientClient(): OkHttpClient {
         return OkHttpClient.Builder()
-            // Generous timeouts to withstand Render free-tier cold starts (spins up in ~30-45s)
-            .connectTimeout(35, TimeUnit.SECONDS)
-            .readTimeout(45, TimeUnit.SECONDS)
-            .writeTimeout(35, TimeUnit.SECONDS)
-            .callTimeout(60, TimeUnit.SECONDS)
+            .connectTimeout(25, TimeUnit.SECONDS)
+            .readTimeout(35, TimeUnit.SECONDS)
+            .writeTimeout(25, TimeUnit.SECONDS)
+            .callTimeout(50, TimeUnit.SECONDS)
             // Enable retry on connection drop/reset
             .retryOnConnectionFailure(true)
             // Support both modern TLS and compatible TLS specifications

@@ -1,30 +1,69 @@
 package com.example.ui.screens
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
+import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.automirrored.rounded.FormatListBulleted
+import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.material.icons.rounded.AddComment
+import androidx.compose.material.icons.rounded.ConfirmationNumber
+import androidx.compose.material.icons.rounded.Lock
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.SupportAgent
+import androidx.compose.material.icons.rounded.Verified
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
-import androidx.compose.runtime.*
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
@@ -32,19 +71,30 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.model.SupportCategory
 import com.example.model.SupportMessage
 import com.example.model.SupportStatus
 import com.example.model.SupportTicket
+import com.example.ui.components.FeedbackTone
+import com.example.ui.components.LuxuryBadge
+import com.example.ui.components.LuxuryBadgeTone
+import com.example.ui.components.LuxuryCard
+import com.example.ui.components.LuxuryEmptyState
+import com.example.ui.components.LuxuryFeedbackBanner
+import com.example.ui.components.LuxuryHairlineDivider
+import com.example.ui.components.LuxuryLoadingState
+import com.example.ui.components.LuxuryPrimaryButton
+import com.example.ui.components.LuxuryScreenCanvas
+import com.example.ui.components.LuxuryTextField
+import com.example.ui.components.LuxuryTopBar
 import com.example.ui.components.toPersianDigits
 import com.example.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SupportScreen(
     tickets: List<SupportTicket>,
@@ -62,7 +112,6 @@ fun SupportScreen(
     onClearMessages: () -> Unit,
     onBackToHome: () -> Unit
 ) {
-    // Handle back button: if in conversation view, close detail first; else go back to Home/Profile
     BackHandler {
         if (activeTicket != null) {
             onCloseTicketDetail()
@@ -75,46 +124,24 @@ fun SupportScreen(
         onRefresh()
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = if (activeTicket != null) "گفت‌وگوی تیکت پشتیبانی" else "مرکز پشتیبانی و ارتباط با مدیریت",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = WarmWhite
-                        )
-                        if (activeTicket != null) {
-                            Text(
-                                text = "کد پیگیری: ${activeTicket.trackingCode}",
-                                fontSize = 12.sp,
-                                color = GoldLight,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
+    LuxuryScreenCanvas {
+        Column(modifier = Modifier.fillMaxSize()) {
+            LuxuryTopBar(
+                title = if (activeTicket != null) "گفت‌وگوی تیکت" else "مرکز پشتیبانی",
+                subtitle = if (activeTicket != null) {
+                    "کد پیگیری: ${activeTicket.trackingCode.toPersianDigits()}"
+                } else {
+                    "ارتباط مستقیم با تیم پشتیبانی"
+                },
+                onBack = {
+                    if (activeTicket != null) {
+                        onCloseTicketDetail()
+                    } else {
+                        onBackToHome()
                     }
                 },
-                navigationIcon = {
-                    IconButton(
-                        onClick = {
-                            if (activeTicket != null) {
-                                onCloseTicketDetail()
-                            } else {
-                                onBackToHome()
-                            }
-                        },
-                        modifier = Modifier.testTag("btn_support_back")
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "بازگشت",
-                            tint = GoldAccent
-                        )
-                    }
-                },
-                actions = {
+                backTestTag = "btn_support_back",
+                trailingContent = {
                     IconButton(
                         onClick = {
                             if (activeTicket != null) {
@@ -123,51 +150,47 @@ fun SupportScreen(
                                 onRefresh()
                             }
                         },
-                        modifier = Modifier.testTag("btn_support_refresh")
+                        modifier = Modifier
+                            .size(48.dp)
+                            .testTag("btn_support_refresh")
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Refresh,
+                            imageVector = Icons.Rounded.Refresh,
                             contentDescription = "به‌روزرسانی",
-                            tint = GoldAccent
+                            tint = GoldLight
                         )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = LuxuryBlack
-                )
+                }
             )
-        }
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .background(LuxuryDarkGradient)
-        ) {
-            if (activeTicket != null) {
-                // Detail / Conversation Thread View
-                TicketConversationView(
-                    ticket = activeTicket,
-                    messages = messages,
-                    isLoading = isLoading,
-                    isSending = isSending,
-                    errorMessage = errorMessage,
-                    onSendMessage = { text -> onSendMessage(activeTicket.id, text) },
-                    onRetry = { onOpenTicket(activeTicket.id) }
-                )
-            } else {
-                // Tickets List + Create New Tab View
-                SupportTabsView(
-                    tickets = tickets,
-                    isLoading = isLoading,
-                    isSending = isSending,
-                    errorMessage = errorMessage,
-                    successMessage = successMessage,
-                    onOpenTicket = onOpenTicket,
-                    onCreateTicket = onCreateTicket,
-                    onClearMessages = onClearMessages,
-                    onRefresh = onRefresh
-                )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            ) {
+                if (activeTicket != null) {
+                    TicketConversationView(
+                        ticket = activeTicket,
+                        messages = messages,
+                        isLoading = isLoading,
+                        isSending = isSending,
+                        errorMessage = errorMessage,
+                        onSendMessage = { text -> onSendMessage(activeTicket.id, text) },
+                        onRetry = { onOpenTicket(activeTicket.id) }
+                    )
+                } else {
+                    SupportTabsView(
+                        tickets = tickets,
+                        isLoading = isLoading,
+                        isSending = isSending,
+                        errorMessage = errorMessage,
+                        successMessage = successMessage,
+                        onOpenTicket = onOpenTicket,
+                        onCreateTicket = onCreateTicket,
+                        onClearMessages = onClearMessages,
+                        onRefresh = onRefresh
+                    )
+                }
             }
         }
     }
@@ -188,10 +211,9 @@ fun SupportTabsView(
     var selectedTab by remember { mutableIntStateOf(0) }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Luxury Tab Selection
         TabRow(
             selectedTabIndex = selectedTab,
-            containerColor = CardSurface,
+            containerColor = CharcoalSurface,
             contentColor = WarmWhite,
             indicator = { tabPositions ->
                 TabRowDefaults.SecondaryIndicator(
@@ -199,31 +221,27 @@ fun SupportTabsView(
                     color = GoldAccent
                 )
             },
-            modifier = Modifier.border(
-                width = 1.dp,
-                brush = Brush.horizontalGradient(
-                    listOf(Color.Transparent, LuxuryBorder, Color.Transparent)
-                ),
-                shape = androidx.compose.ui.graphics.RectangleShape
-            )
+            divider = {
+                LuxuryHairlineDivider()
+            }
         ) {
             Tab(
                 selected = selectedTab == 0,
                 onClick = { selectedTab = 0 },
+                modifier = Modifier.heightIn(min = 50.dp),
                 text = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            Icons.Default.ListAlt,
+                            imageVector = Icons.AutoMirrored.Rounded.FormatListBulleted,
                             contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = if (selectedTab == 0) GoldLight else SilverAccent
+                            modifier = Modifier.size(17.dp),
+                            tint = if (selectedTab == 0) GoldLight else TextSecondary
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            "درخواست‌های من (${tickets.size.toPersianDigits()})",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp,
-                            color = if (selectedTab == 0) GoldLight else SilverAccent
+                            text = "درخواست‌های من (${tickets.size.toPersianDigits()})",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (selectedTab == 0) GoldLight else TextSecondary
                         )
                     }
                 }
@@ -231,74 +249,49 @@ fun SupportTabsView(
             Tab(
                 selected = selectedTab == 1,
                 onClick = { selectedTab = 1 },
+                modifier = Modifier.heightIn(min = 50.dp),
                 text = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            Icons.Default.AddComment,
+                            imageVector = Icons.Rounded.AddComment,
                             contentDescription = null,
-                            modifier = Modifier.size(16.dp),
-                            tint = if (selectedTab == 1) GoldLight else SilverAccent
+                            modifier = Modifier.size(17.dp),
+                            tint = if (selectedTab == 1) GoldLight else TextSecondary
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            "ثبت درخواست جدید",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp,
-                            color = if (selectedTab == 1) GoldLight else SilverAccent
+                            text = "ثبت درخواست جدید",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (selectedTab == 1) GoldLight else TextSecondary
                         )
                     }
                 }
             )
         }
 
-        // Error & Success Feedback
-        if (!errorMessage.isNullOrBlank()) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-                shape = RoundedCornerShape(14.dp),
-                color = ErrorRed.copy(alpha = 0.15f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, ErrorRed.copy(alpha = 0.5f))
-            ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.Warning, contentDescription = null, tint = ErrorRed, modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = errorMessage, color = WarmWhite, fontSize = 12.sp, modifier = Modifier.weight(1f))
-                    IconButton(onClick = onClearMessages, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.Close, contentDescription = null, tint = WarmWhite, modifier = Modifier.size(16.dp))
-                    }
-                }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+        ) {
+            if (!errorMessage.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                LuxuryFeedbackBanner(
+                    message = errorMessage,
+                    tone = FeedbackTone.ERROR,
+                    onDismiss = onClearMessages
+                )
+            }
+            if (!successMessage.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                LuxuryFeedbackBanner(
+                    message = successMessage,
+                    tone = FeedbackTone.SUCCESS,
+                    onDismiss = onClearMessages
+                )
             }
         }
 
-        if (!successMessage.isNullOrBlank()) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-                shape = RoundedCornerShape(14.dp),
-                color = SuccessGreen.copy(alpha = 0.15f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, SuccessGreen.copy(alpha = 0.5f))
-            ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = SuccessGreen, modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = successMessage, color = WarmWhite, fontSize = 12.sp, modifier = Modifier.weight(1f))
-                    IconButton(onClick = onClearMessages, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.Close, contentDescription = null, tint = WarmWhite, modifier = Modifier.size(16.dp))
-                    }
-                }
-            }
-        }
-
-        // Tab Content
         if (selectedTab == 0) {
             TicketsListTab(
                 tickets = tickets,
@@ -328,68 +321,27 @@ fun TicketsListTab(
     onRefresh: () -> Unit
 ) {
     if (isLoading && tickets.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = GoldAccent)
-        }
+        LuxuryLoadingState(message = "در حال دریافت فهرست تیکت‌ها…")
         return
     }
 
     if (tickets.isEmpty()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(80.dp)
-                    .clip(CircleShape)
-                    .background(GoldAccent.copy(alpha = 0.12f))
-                    .border(1.dp, LuxuryBorder, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.SupportAgent,
-                    contentDescription = null,
-                    tint = GoldLight,
-                    modifier = Modifier.size(44.dp)
-                )
-            }
-            Spacer(modifier = Modifier.height(18.dp))
-            Text(
-                text = "هنوز درخواست پشتیبانی ثبت نکرده‌اید",
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                color = WarmWhite
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "در صورت بروز هرگونه سوال یا مسئله پیرامون امتیازها، جوایز یا عضویت، می‌توانید تیکت جدید ارسال نمایید.",
-                fontSize = 12.sp,
-                color = SilverAccent,
-                textAlign = TextAlign.Center,
-                lineHeight = 20.sp
-            )
-            Spacer(modifier = Modifier.height(24.dp))
-            Button(
-                onClick = onGoToNewTicket,
-                shape = RoundedCornerShape(14.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = GoldAccent),
-                modifier = Modifier.shadow(8.dp, RoundedCornerShape(14.dp), spotColor = GoldAccent)
-            ) {
-                Icon(Icons.Default.Add, contentDescription = null, tint = LuxuryBlack, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("ثبت اولین تیکت پشتیبانی", color = LuxuryBlack, fontWeight = FontWeight.ExtraBold)
-            }
-        }
+        LuxuryEmptyState(
+            icon = Icons.Rounded.SupportAgent,
+            title = "هنوز درخواستی ثبت نکرده‌اید",
+            description = "در صورت داشتن پرسش درباره امتیازها، جوایز یا خریدها، می‌توانید تیکت پشتیبانی جدید ارسال کنید.",
+            actionLabel = "ثبت اولین تیکت",
+            onAction = onGoToNewTicket
+        )
         return
     }
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 100.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .navigationBarsPadding(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        contentPadding = PaddingValues(start = 16.dp, top = 16.dp, end = 16.dp, bottom = 108.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         items(tickets, key = { it.id }) { ticket ->
@@ -400,98 +352,98 @@ fun TicketsListTab(
 
 @Composable
 fun SupportTicketCard(ticket: SupportTicket, onClick: () -> Unit) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .shadow(6.dp, RoundedCornerShape(18.dp))
-            .border(1.dp, LuxuryBorder, RoundedCornerShape(18.dp))
-            .testTag("ticket_card_${ticket.trackingCode}"),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = CardSurface)
+    LuxuryCard(
+        modifier = Modifier.testTag("ticket_card_${ticket.trackingCode}"),
+        onClick = onClick,
+        borderColor = LuxuryBorder,
+        contentPadding = PaddingValues(16.dp)
     ) {
-        Column(modifier = Modifier.padding(18.dp)) {
-            // Header: Tracking Code + Status Badge
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.ConfirmationNumber,
-                        contentDescription = null,
-                        tint = GoldLight,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = ticket.trackingCode,
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 13.sp,
-                        color = GoldLight
-                    )
-                }
-                TicketStatusBadge(status = ticket.statusEnum)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Rounded.ConfirmationNumber,
+                    contentDescription = null,
+                    tint = GoldLight,
+                    modifier = Modifier.size(17.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = ticket.trackingCode.toPersianDigits(),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = GoldLight
+                )
             }
+            TicketStatusBadge(status = ticket.statusEnum)
+        }
 
+        Spacer(modifier = Modifier.height(10.dp))
+
+        Text(
+            text = ticket.subject,
+            style = MaterialTheme.typography.titleMedium,
+            color = WarmWhite,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Text(
+            text = "دسته‌بندی: ${ticket.categoryEnum.titlePersian}",
+            style = MaterialTheme.typography.bodySmall,
+            color = TextSecondary
+        )
+
+        if (ticket.lastMessage.isNotBlank()) {
             Spacer(modifier = Modifier.height(10.dp))
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = ObsidianBlack.copy(alpha = 0.55f),
+                border = BorderStroke(1.dp, CharcoalBorder),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = if (ticket.lastSenderType == "ADMIN") {
+                        "پاسخ پشتیبانی: ${ticket.lastMessage}"
+                    } else {
+                        "پیام شما: ${ticket.lastMessage}"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (ticket.lastSenderType == "ADMIN") GoldLight else WarmWhite.copy(alpha = 0.85f),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(10.dp)
+                )
+            }
+        }
 
-            // Subject
+        Spacer(modifier = Modifier.height(12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             Text(
-                text = ticket.subject,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                color = WarmWhite,
-                maxLines = 1
+                text = formatTicketDate(ticket.updatedAtMs),
+                style = MaterialTheme.typography.labelSmall,
+                color = TextMuted
             )
-
-            // Category
-            Spacer(modifier = Modifier.height(4.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "موضوع: ${ticket.categoryEnum.titlePersian}",
-                    fontSize = 11.sp,
-                    color = SilverAccent
-                )
-            }
-
-            // Last message preview
-            if (ticket.lastMessage.isNotBlank()) {
-                Spacer(modifier = Modifier.height(10.dp))
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = Color(0x1AF5F2E9),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, LuxuryBorder.copy(alpha = 0.3f)),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        text = if (ticket.lastSenderType == "ADMIN") "پاسخ مدیریت: ${ticket.lastMessage}" else "پیام شما: ${ticket.lastMessage}",
-                        fontSize = 11.sp,
-                        color = if (ticket.lastSenderType == "ADMIN") GoldLight else WarmWhite.copy(alpha = 0.85f),
-                        maxLines = 2,
-                        modifier = Modifier.padding(10.dp)
-                    )
-                }
-            }
-
-            // Footer: Date and Chevron
-            Spacer(modifier = Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = formatTicketDate(ticket.updatedAtMs),
-                    fontSize = 10.sp,
-                    color = SilverAccent
-                )
-                Text(
-                    text = "مشاهده گفت‌وگو ←",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
+                    text = "مشاهده گفت‌وگو",
+                    style = MaterialTheme.typography.labelMedium,
                     color = GoldLight
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Icon(
+                    imageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+                    contentDescription = null,
+                    tint = GoldLight,
+                    modifier = Modifier.size(15.dp)
                 )
             }
         }
@@ -500,26 +452,16 @@ fun SupportTicketCard(ticket: SupportTicket, onClick: () -> Unit) {
 
 @Composable
 fun TicketStatusBadge(status: SupportStatus) {
-    val (bgColor, textColor) = when (status) {
-        SupportStatus.NEW -> Pair(Color(0x28EF4444), Color(0xFFF87171))
-        SupportStatus.IN_PROGRESS -> Pair(Color(0x28F59E0B), Color(0xFFFBBF24))
-        SupportStatus.ANSWERED -> Pair(Color(0x2810B981), Color(0xFF34D399))
-        SupportStatus.CLOSED -> Pair(Color(0x2864748B), Color(0xFF94A3B8))
+    val tone = when (status) {
+        SupportStatus.NEW -> LuxuryBadgeTone.ERROR
+        SupportStatus.IN_PROGRESS -> LuxuryBadgeTone.WARNING
+        SupportStatus.ANSWERED -> LuxuryBadgeTone.SUCCESS
+        SupportStatus.CLOSED -> LuxuryBadgeTone.NEUTRAL
     }
-
-    Surface(
-        shape = RoundedCornerShape(20.dp),
-        color = bgColor,
-        border = androidx.compose.foundation.BorderStroke(1.dp, textColor.copy(alpha = 0.4f))
-    ) {
-        Text(
-            text = status.titlePersian,
-            color = textColor,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
-        )
-    }
+    LuxuryBadge(
+        text = status.titlePersian,
+        tone = tone
+    )
 }
 
 @Composable
@@ -535,142 +477,103 @@ fun NewTicketTab(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .navigationBarsPadding()
             .verticalScroll(scrollState)
-            .padding(16.dp),
+            .padding(horizontal = 16.dp, vertical = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Card(
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = CardSurface),
-            border = androidx.compose.foundation.BorderStroke(1.dp, LuxuryBorder),
-            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+        LuxuryCard(
+            borderColor = LuxuryBorder,
+            contentPadding = PaddingValues(18.dp)
         ) {
-            Column(modifier = Modifier.padding(20.dp)) {
-                Text(
-                    text = "ثبت درخواست پشتیبانی جدید",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    color = WarmWhite
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "پیام شما مستقیماً برای مدیر ارسال شده و پاسخ در همین بخش نمایش داده می‌شود.",
-                    fontSize = 11.sp,
-                    color = SilverAccent
-                )
+            Text(
+                text = "ثبت درخواست پشتیبانی جدید",
+                style = MaterialTheme.typography.titleMedium,
+                color = WarmWhite
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "درخواست شما مستقیماً برای تیم پشتیبانی ارسال شده و پاسخ در همین بخش نمایش داده می‌شود.",
+                style = MaterialTheme.typography.bodySmall,
+                color = TextSecondary
+            )
 
-                Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-                // Category Selection
-                Text(
-                    text = "انتخاب موضوع درخواست:",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
-                    color = GoldLight
-                )
-                Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "موضوع درخواست",
+                style = MaterialTheme.typography.labelLarge,
+                color = GoldLight
+            )
+            Spacer(modifier = Modifier.height(8.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    val firstRow = listOf(SupportCategory.SCORES, SupportCategory.ADS, SupportCategory.PRIZES)
-                    firstRow.forEach { cat ->
-                        CategoryChip(
-                            category = cat,
-                            isSelected = selectedCategory == cat,
-                            onClick = { selectedCategory = cat },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(6.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    val secondRow = listOf(SupportCategory.MEMBERSHIP, SupportCategory.PURCHASE, SupportCategory.LOGIN, SupportCategory.OTHER)
-                    secondRow.forEach { cat ->
-                        CategoryChip(
-                            category = cat,
-                            isSelected = selectedCategory == cat,
-                            onClick = { selectedCategory = cat },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(18.dp))
-
-                // Subject Input
-                OutlinedTextField(
-                    value = subject,
-                    onValueChange = { subject = it },
-                    label = { Text("عنوان درخواست") },
-                    placeholder = { Text("مثال: عدم افزایش امتیاز پس از مشاهده ویدیو", fontSize = 12.sp) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    textStyle = androidx.compose.ui.text.TextStyle(color = WarmWhite),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = GoldAccent,
-                        unfocusedBorderColor = LuxuryBorder,
-                        focusedLabelColor = GoldLight,
-                        unfocusedLabelColor = SilverAccent
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                listOf(SupportCategory.SCORES, SupportCategory.ADS, SupportCategory.PRIZES).forEach { cat ->
+                    CategoryChip(
+                        category = cat,
+                        isSelected = selectedCategory == cat,
+                        onClick = { selectedCategory = cat },
+                        modifier = Modifier.weight(1f)
                     )
-                )
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Message Body Input
-                OutlinedTextField(
-                    value = message,
-                    onValueChange = { message = it },
-                    label = { Text("متن و شرح کامل مشکل یا سوال") },
-                    placeholder = { Text("لطفاً توضیحات خود را با جزئیات بنویسید...", fontSize = 12.sp) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(130.dp),
-                    maxLines = 6,
-                    textStyle = androidx.compose.ui.text.TextStyle(color = WarmWhite),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = GoldAccent,
-                        unfocusedBorderColor = LuxuryBorder,
-                        focusedLabelColor = GoldLight,
-                        unfocusedLabelColor = SilverAccent
-                    )
-                )
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                Button(
-                    onClick = {
-                        if (subject.isNotBlank() && message.isNotBlank() && !isSending) {
-                            onSubmit(subject.trim(), selectedCategory.name, message.trim())
-                        }
-                    },
-                    enabled = subject.isNotBlank() && message.isNotBlank() && !isSending,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp)
-                        .shadow(8.dp, RoundedCornerShape(14.dp), spotColor = GoldAccent)
-                        .testTag("btn_submit_ticket"),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = GoldAccent)
-                ) {
-                    if (isSending) {
-                        CircularProgressIndicator(color = LuxuryBlack, modifier = Modifier.size(20.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("در حال ثبت درخواست...", color = LuxuryBlack)
-                    } else {
-                        Icon(Icons.Default.Send, contentDescription = null, tint = LuxuryBlack, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("ارسال درخواست به مدیریت", fontWeight = FontWeight.ExtraBold, color = LuxuryBlack)
-                    }
                 }
             }
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                listOf(SupportCategory.MEMBERSHIP, SupportCategory.PURCHASE, SupportCategory.LOGIN, SupportCategory.OTHER).forEach { cat ->
+                    CategoryChip(
+                        category = cat,
+                        isSelected = selectedCategory == cat,
+                        onClick = { selectedCategory = cat },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            LuxuryTextField(
+                value = subject,
+                onValueChange = { subject = it },
+                label = "عنوان درخواست",
+                placeholder = "مثال: بررسی امتیاز مربع‌های امروز"
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            LuxuryTextField(
+                value = message,
+                onValueChange = { message = it },
+                label = "شرح کامل درخواست یا پرسش",
+                placeholder = "جزئیات مورد نیاز را بنویسید…",
+                singleLine = false,
+                maxLines = 6,
+                modifier = Modifier.heightIn(min = 128.dp)
+            )
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            LuxuryPrimaryButton(
+                text = "ارسال درخواست",
+                icon = Icons.AutoMirrored.Rounded.Send,
+                isLoading = isSending,
+                enabled = subject.isNotBlank() && message.isNotBlank(),
+                onClick = {
+                    if (subject.isNotBlank() && message.isNotBlank() && !isSending) {
+                        onSubmit(subject.trim(), selectedCategory.name, message.trim())
+                    }
+                },
+                modifier = Modifier.testTag("btn_submit_ticket")
+            )
         }
 
-        Spacer(modifier = Modifier.height(100.dp))
+        Spacer(modifier = Modifier.height(104.dp))
     }
 }
 
@@ -683,24 +586,33 @@ fun CategoryChip(
 ) {
     Surface(
         modifier = modifier
-            .clip(RoundedCornerShape(10.dp))
+            .heightIn(min = 48.dp)
+            .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(10.dp),
-        color = if (isSelected) Color(0x33D4AF37) else Color(0x1AF5F2E9),
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            if (isSelected) GoldAccent else LuxuryBorder.copy(alpha = 0.4f)
+        shape = RoundedCornerShape(12.dp),
+        color = if (isSelected) GoldAccent.copy(alpha = 0.18f) else DarkGraySurface,
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (isSelected) GoldAccent else CharcoalBorder
         )
     ) {
-        Text(
-            text = category.titlePersian,
-            color = if (isSelected) GoldLight else SilverAccent,
-            fontSize = 11.sp,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
-            maxLines = 1
-        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 6.dp, vertical = 10.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = category.titlePersian,
+                color = if (isSelected) GoldLight else TextSecondary,
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                ),
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 
@@ -721,95 +633,90 @@ fun TicketConversationView(
     val imeBottomPx = WindowInsets.ime.getBottom(density)
     val navBarsBottomPx = WindowInsets.navigationBars.getBottom(density)
     val isImeVisible = imeBottomPx > 0
-
-    // Height of floating AppBottomNavigation + clearance so reply bar sits cleanly above it
     val bottomNavHeightPx = with(density) { 92.dp.roundToPx() }
-
-    // When IME is open, pad by IME height. When closed, pad by navigation bars + bottom navigation height.
     val dynamicBottomPadding = with(density) {
         maxOf(imeBottomPx, navBarsBottomPx + bottomNavHeightPx).toDp()
     }
 
-    // Auto scroll to bottom when messages update or keyboard opens
     LaunchedEffect(messages.size, isImeVisible) {
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(messages.size - 1)
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Ticket Header Banner - Luxury Styling
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Ticket Summary Strip
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            color = LuxuryBlack,
-            shadowElevation = 6.dp,
-            border = androidx.compose.foundation.BorderStroke(
-                1.dp,
-                Brush.horizontalGradient(listOf(Color.Transparent, LuxuryBorder, Color.Transparent))
-            )
+            color = CharcoalSurface
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
                 ) {
-                    Text(
-                        text = ticket.subject,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = WarmWhite,
-                        modifier = Modifier.weight(1f)
-                    )
-                    TicketStatusBadge(status = ticket.statusEnum)
-                }
-                Spacer(modifier = Modifier.height(6.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "موضوع: ${ticket.categoryEnum.titlePersian}",
-                        fontSize = 11.sp,
-                        color = SilverAccent
-                    )
-                    Text(
-                        text = "ثبت: ${formatTicketDate(ticket.createdAtMs)}",
-                        fontSize = 10.sp,
-                        color = SilverAccent
-                    )
-                }
-            }
-        }
-
-        // Error Banner
-        if (!errorMessage.isNullOrBlank()) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(8.dp),
-                shape = RoundedCornerShape(10.dp),
-                color = ErrorRed.copy(alpha = 0.15f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, ErrorRed.copy(alpha = 0.4f))
-            ) {
-                Row(
-                    modifier = Modifier.padding(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.Error, contentDescription = null, tint = ErrorRed, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(text = errorMessage, color = WarmWhite, fontSize = 11.sp, modifier = Modifier.weight(1f))
-                    IconButton(onClick = onRetry, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.Refresh, contentDescription = "تلاش مجدد", tint = WarmWhite, modifier = Modifier.size(16.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = ticket.subject,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = WarmWhite,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        TicketStatusBadge(status = ticket.statusEnum)
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "دسته‌بندی: ${ticket.categoryEnum.titlePersian}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextSecondary
+                        )
+                        Text(
+                            text = "ثبت: ${formatTicketDate(ticket.createdAtMs)}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextMuted
+                        )
                     }
                 }
+                LuxuryHairlineDivider()
             }
         }
 
-        // Message Bubbles List
+        if (!errorMessage.isNullOrBlank()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                LuxuryFeedbackBanner(
+                    message = errorMessage,
+                    tone = FeedbackTone.ERROR,
+                    onRetry = onRetry
+                )
+            }
+        }
+
         if (isLoading && messages.isEmpty()) {
-            Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = GoldAccent)
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+            ) {
+                LuxuryLoadingState(message = "در حال دریافت پیام‌های تیکت…")
             }
         } else {
             LazyColumn(
@@ -817,7 +724,8 @@ fun TicketConversationView(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                    .widthIn(max = 600.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(messages, key = { it.id }) { msg ->
@@ -826,27 +734,32 @@ fun TicketConversationView(
             }
         }
 
-        // Reply Bar or Closed Notice
         if (ticket.isClosed) {
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .widthIn(max = 600.dp)
                     .padding(bottom = dynamicBottomPadding)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                shape = RoundedCornerShape(14.dp),
-                color = CardSurface,
-                border = androidx.compose.foundation.BorderStroke(1.dp, LuxuryBorder)
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                shape = RoundedCornerShape(16.dp),
+                color = CharcoalSurface,
+                border = BorderStroke(1.dp, CharcoalBorder)
             ) {
                 Row(
                     modifier = Modifier.padding(14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.Lock, contentDescription = null, tint = SilverAccent, modifier = Modifier.size(20.dp))
+                    Icon(
+                        imageVector = Icons.Rounded.Lock,
+                        contentDescription = null,
+                        tint = TextSecondary,
+                        modifier = Modifier.size(19.dp)
+                    )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "این تیکت توسط مدیریت بسته شده است. در صورت نیاز به راهنمایی بیشتر، لطفاً یک درخواست جدید ثبت کنید.",
-                        fontSize = 11.sp,
-                        color = SilverAccent
+                        text = "این تیکت بسته شده است. در صورت نیاز به راهنمایی بیشتر، می‌توانید درخواست جدیدی ثبت کنید.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
                     )
                 }
             }
@@ -855,10 +768,9 @@ fun TicketConversationView(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = dynamicBottomPadding),
-                color = CardSurface,
-                shadowElevation = 12.dp,
+                color = CharcoalSurface,
                 shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, LuxuryBorder)
+                border = BorderStroke(1.dp, LuxuryBorder)
             ) {
                 Row(
                     modifier = Modifier
@@ -869,22 +781,29 @@ fun TicketConversationView(
                     OutlinedTextField(
                         value = replyText,
                         onValueChange = { replyText = it },
-                        placeholder = { Text("پاسخ خود را بنویسید...", fontSize = 12.sp, color = SilverAccent) },
+                        placeholder = {
+                            Text(
+                                text = "پاسخ خود را بنویسید…",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextMuted
+                            )
+                        },
                         modifier = Modifier
                             .weight(1f)
                             .testTag("input_ticket_reply"),
-                        shape = RoundedCornerShape(24.dp),
+                        shape = RoundedCornerShape(18.dp),
                         maxLines = 3,
-                        textStyle = androidx.compose.ui.text.TextStyle(color = WarmWhite),
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(color = WarmWhite),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = GoldAccent,
-                            unfocusedBorderColor = LuxuryBorder,
+                            unfocusedBorderColor = CharcoalBorder,
                             focusedTextColor = WarmWhite,
-                            unfocusedTextColor = WarmWhite
+                            unfocusedTextColor = WarmWhite,
+                            focusedContainerColor = ObsidianBlack,
+                            unfocusedContainerColor = ObsidianBlack,
+                            cursorColor = GoldAccent
                         ),
-                        keyboardOptions = KeyboardOptions(
-                            imeAction = ImeAction.Send
-                        ),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                         keyboardActions = KeyboardActions(
                             onSend = {
                                 if (replyText.trim().isNotEmpty() && !isSending) {
@@ -896,6 +815,7 @@ fun TicketConversationView(
                         )
                     )
                     Spacer(modifier = Modifier.width(10.dp))
+                    val canSend = replyText.trim().isNotEmpty() && !isSending
                     IconButton(
                         onClick = {
                             if (replyText.trim().isNotEmpty() && !isSending) {
@@ -904,23 +824,33 @@ fun TicketConversationView(
                                 onSendMessage(text)
                             }
                         },
-                        enabled = !isSending && replyText.trim().isNotEmpty(),
+                        enabled = canSend,
                         modifier = Modifier
-                            .size(46.dp)
+                            .size(48.dp)
+                            .clip(CircleShape)
                             .background(
-                                if (replyText.trim().isNotEmpty()) GoldGradientBrush else Brush.linearGradient(listOf(Color(0xFF334155), Color(0xFF1E293B))),
-                                CircleShape
+                                if (canSend) GoldGradientBrush else Brush.linearGradient(
+                                    listOf(DarkGraySurface, DarkGraySurface)
+                                )
                             )
-                            .shadow(if (replyText.trim().isNotEmpty()) 6.dp else 0.dp, CircleShape, spotColor = GoldAccent)
+                            .border(
+                                width = 1.dp,
+                                color = if (canSend) GoldLight.copy(alpha = 0.6f) else CharcoalBorder,
+                                shape = CircleShape
+                            )
                             .testTag("btn_send_reply")
                     ) {
                         if (isSending) {
-                            CircularProgressIndicator(color = LuxuryBlack, modifier = Modifier.size(18.dp))
+                            CircularProgressIndicator(
+                                color = GoldLight,
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(18.dp)
+                            )
                         } else {
                             Icon(
-                                imageVector = Icons.AutoMirrored.Filled.Send,
+                                imageVector = Icons.AutoMirrored.Rounded.Send,
                                 contentDescription = "ارسال پاسخ",
-                                tint = if (replyText.trim().isNotEmpty()) LuxuryBlack else SilverAccent,
+                                tint = if (canSend) ObsidianBlack else TextMuted,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -939,57 +869,58 @@ fun MessageBubble(message: SupportMessage) {
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = if (isAdmin) Alignment.Start else Alignment.End
     ) {
-        // Sender label + Timestamp
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = if (isAdmin) Arrangement.Start else Arrangement.End,
             modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
         ) {
             if (isAdmin) {
-                Icon(Icons.Default.Verified, contentDescription = null, tint = GoldLight, modifier = Modifier.size(13.dp))
+                Icon(
+                    imageVector = Icons.Rounded.Verified,
+                    contentDescription = null,
+                    tint = GoldLight,
+                    modifier = Modifier.size(13.dp)
+                )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = "پشتیبانی مدیریت",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
+                    text = "پشتیبانی باشگاه",
+                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                     color = GoldLight
                 )
             } else {
                 Text(
                     text = "شما",
-                    fontSize = 10.sp,
-                    color = SilverAccent
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextSecondary
                 )
             }
             Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = formatMessageTime(message.createdAtMs),
-                fontSize = 9.sp,
-                color = SilverAccent.copy(alpha = 0.8f)
+                style = MaterialTheme.typography.labelSmall,
+                color = TextMuted
             )
         }
 
-        // Bubble Body - Luxury Dark Styling
         Surface(
+            modifier = Modifier.widthIn(max = 320.dp),
             shape = RoundedCornerShape(
                 topStart = 16.dp,
                 topEnd = 16.dp,
-                bottomStart = if (isAdmin) 3.dp else 16.dp,
-                bottomEnd = if (isAdmin) 16.dp else 3.dp
+                bottomStart = if (isAdmin) 4.dp else 16.dp,
+                bottomEnd = if (isAdmin) 16.dp else 4.dp
             ),
-            color = if (isAdmin) Color(0xFF182030) else Color(0xFF222B3C),
-            border = androidx.compose.foundation.BorderStroke(
-                1.dp,
-                if (isAdmin) LuxuryBorder else Color(0x33C0C0C0)
-            ),
-            shadowElevation = 2.dp
+            color = if (isAdmin) CharcoalSurface else DarkGraySurface,
+            border = BorderStroke(
+                width = 1.dp,
+                color = if (isAdmin) LuxuryBorderStrong else CharcoalBorder
+            )
         ) {
             Text(
                 text = message.messageText,
+                style = MaterialTheme.typography.bodyMedium,
                 color = WarmWhite,
-                fontSize = 13.sp,
-                modifier = Modifier.padding(14.dp),
-                lineHeight = 20.sp
+                modifier = Modifier.padding(14.dp)
             )
         }
     }
@@ -997,18 +928,18 @@ fun MessageBubble(message: SupportMessage) {
 
 private fun formatTicketDate(timestamp: Long): String {
     return try {
-        val sdf = SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault())
+        val sdf = SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.US)
         sdf.format(Date(timestamp)).toPersianDigits()
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         ""
     }
 }
 
 private fun formatMessageTime(timestamp: Long): String {
     return try {
-        val sdf = SimpleDateFormat("HH:mm", Locale.getDefault())
+        val sdf = SimpleDateFormat("HH:mm", Locale.US)
         sdf.format(Date(timestamp)).toPersianDigits()
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         ""
     }
 }

@@ -94,17 +94,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             lastName = prefs.lastName,
             phoneNumber = prefs.phoneNumber,
             totalScore = prefs.totalScore,
-            token = prefs.authToken
+            token = prefs.authToken,
+            notificationsEnabled = prefs.notificationsEnabled
         )
         val cachedAnn = backendRepository.parseCachedAnnouncement()
         _uiState.update {
             it.copy(
                 currentUser = user,
                 activeAnnouncement = cachedAnn,
-                currentScreen = AppScreen.PROFILE,
+                currentScreen = AppScreen.HOME,
                 isTestAdsEnabled = prefs.useTestAds
             )
         }
+        com.example.CompetitionReminderManager.onUserAuthenticated(getApplication())
         viewModelScope.launch {
             val res = backendRepository.fetchLoginNotificationConfig()
             if (res is Result.Success) {
@@ -209,6 +211,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
             launch(Dispatchers.IO) {
                 tapsellAdsManager.initializeSdk()
+            }
+            if (_uiState.value.leaderboard.isEmpty()) {
+                launch {
+                    val lbResult = backendRepository.fetchLeaderboard(user.id)
+                    if (lbResult is Result.Success) {
+                        _uiState.update { it.copy(leaderboard = lbResult.data) }
+                    }
+                }
             }
             checkAndShowFeedbackDialog()
         }
@@ -533,47 +543,127 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // --- Authentication ---
 
-    fun onFirstNameChange(value: String) = _authUiState.update { it.copy(firstName = value, errorMessage = null) }
-    fun onLastNameChange(value: String) = _authUiState.update { it.copy(lastName = value, errorMessage = null) }
-    fun onPhoneNumberChange(value: String) = _authUiState.update { it.copy(phoneNumber = value, errorMessage = null) }
+    private fun isAllowedPersianNameChar(ch: Char): Boolean {
+        return ch in '\u0621'..'\u064A' ||
+            ch == '\u067E' || // پ
+            ch == '\u0686' || // چ
+            ch == '\u0698' || // ژ
+            ch == '\u06A9' || // ک
+            ch == '\u06AF' || // گ
+            ch == '\u06CC' || // ی
+            ch == '\u0622' || // آ
+            ch == '\u0623' || // أ
+            ch == '\u0624' || // ؤ
+            ch == '\u0625' || // إ
+            ch == '\u0626' || // ئ
+            ch == '\u06C0' || // ۀ
+            ch == '\u200C' || // نیم‌فاصله
+            ch == ' '
+    }
+
+    private fun sanitizePersianName(input: String): Pair<String, Boolean> {
+        val filtered = input.filter { isAllowedPersianNameChar(it) }
+        return filtered to (filtered.length != input.length)
+    }
+
+    private fun isValidPersianName(value: String): Boolean {
+        val trimmed = value.trim()
+        if (trimmed.isEmpty()) return false
+        val hasPersianLetter = trimmed.any { it != ' ' && it != '\u200C' && isAllowedPersianNameChar(it) }
+        return hasPersianLetter && trimmed.all { isAllowedPersianNameChar(it) }
+    }
+
+    private fun normalizePhoneDigits(input: String): String {
+        val sb = StringBuilder(input.length)
+        for (ch in input) {
+            when (ch) {
+                in '۰'..'۹' -> sb.append(('0'.code + (ch.code - '۰'.code)).toChar())
+                in '٠'..'٩' -> sb.append(('0'.code + (ch.code - '٠'.code)).toChar())
+                in '0'..'9' -> sb.append(ch)
+            }
+        }
+        return sb.toString()
+    }
+
+    fun onFirstNameChange(value: String) {
+        val (filtered, hadInvalidChars) = sanitizePersianName(value)
+        _authUiState.update {
+            it.copy(
+                firstName = filtered,
+                errorMessage = if (hadInvalidChars) "نام باید فقط با حروف فارسی وارد شود." else null
+            )
+        }
+    }
+
+    fun onLastNameChange(value: String) {
+        val (filtered, hadInvalidChars) = sanitizePersianName(value)
+        _authUiState.update {
+            it.copy(
+                lastName = filtered,
+                errorMessage = if (hadInvalidChars) "نام خانوادگی باید فقط با حروف فارسی وارد شود." else null
+            )
+        }
+    }
+
+    fun onPhoneNumberChange(value: String) {
+        val digitsOnly = normalizePhoneDigits(value).take(11)
+        val phoneErr = if (digitsOnly.isNotEmpty() && !digitsOnly.startsWith("0")) {
+            "شماره موبایل حتماً باید با عدد 0 شروع شود."
+        } else null
+        _authUiState.update { it.copy(phoneNumber = digitsOnly, errorMessage = phoneErr) }
+    }
+
     fun onPasswordChange(value: String) = _authUiState.update { it.copy(password = value, errorMessage = null) }
     fun onAuthModeChange(mode: AuthMode) = _authUiState.update { it.copy(authMode = mode, errorMessage = null, infoMessage = null) }
     fun onOtpCodeChange(value: String) = _authUiState.update { it.copy(otpCode = value, errorMessage = null) }
 
+    private fun validateAuthInputs(state: AuthUiState): String? {
+        val first = state.firstName.trim()
+        val last = state.lastName.trim()
+        val phone = normalizePhoneDigits(state.phoneNumber.trim())
+
+        if (first.isEmpty()) return "لطفاً نام خود را با حروف فارسی وارد کنید."
+        if (!isValidPersianName(first)) return "نام باید فقط شامل حروف فارسی باشد."
+        if (last.isEmpty()) return "لطفاً نام خانوادگی خود را با حروف فارسی وارد کنید."
+        if (!isValidPersianName(last)) return "نام خانوادگی باید فقط شامل حروف فارسی باشد."
+        if (phone.isEmpty()) return "لطفاً شماره موبایل ۱۱ رقمی خود را وارد کنید."
+        if (!phone.startsWith("0")) return "شماره موبایل حتماً باید با عدد 0 شروع شود."
+        if (phone.length != 11) return "شماره موبایل باید دقیقاً ۱۱ رقم باشد."
+        if (!phone.matches(Regex("^09[0-9]{9}\$"))) return "شماره موبایل معتبر نیست؛ باید ۱۱ رقم بوده و با 09 آغاز شود."
+        return null
+    }
+
     fun loginOrRegister() {
         val state = _authUiState.value
-        if (state.firstName.trim().isEmpty()) {
-            _authUiState.update { it.copy(errorMessage = "لطفاً نام خود را وارد کنید.") }
+        val validationError = validateAuthInputs(state)
+        if (validationError != null) {
+            _authUiState.update { it.copy(errorMessage = validationError) }
             return
         }
-        if (state.lastName.trim().isEmpty()) {
-            _authUiState.update { it.copy(errorMessage = "لطفاً نام خانوادگی خود را وارد کنید.") }
-            return
-        }
-        if (!state.phoneNumber.trim().matches(Regex("^09[0-9]{9}\$"))) {
-            _authUiState.update { it.copy(errorMessage = "شماره موبایل وارد شده باید ۱۱ رقم و با 09 آغاز شود.") }
-            return
-        }
+        val cleanFirstName = state.firstName.trim()
+        val cleanLastName = state.lastName.trim()
+        val cleanPhone = normalizePhoneDigits(state.phoneNumber.trim())
         val pin = state.password.trim()
 
         viewModelScope.launch {
             _authUiState.update { it.copy(isLoading = true, errorMessage = null) }
             when (val result = backendRepository.loginDirectly(
-                firstName = state.firstName,
-                lastName = state.lastName,
-                phoneNumber = state.phoneNumber,
+                firstName = cleanFirstName,
+                lastName = cleanLastName,
+                phoneNumber = cleanPhone,
                 password = pin
             )) {
                 is Result.Success -> {
-                    val user = result.data
+                    val user = result.data.copy(notificationsEnabled = prefs.notificationsEnabled)
                     _authUiState.update { AuthUiState() }
                     _uiState.update {
                         it.copy(
                             currentUser = user,
-                            currentScreen = AppScreen.SQUARES,
+                            currentScreen = AppScreen.HOME,
                             infoMessage = "خوش آمدید، ${user.firstName} عزیز!"
                         )
                     }
+                    com.example.CompetitionReminderManager.onUserAuthenticated(getApplication())
                     refreshData()
                 }
                 is Result.Error -> {
@@ -585,16 +675,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun requestOtp() {
         val state = _authUiState.value
-        if (state.firstName.trim().isEmpty()) {
-            _authUiState.update { it.copy(errorMessage = "لطفاً نام خود را وارد کنید.") }
-            return
-        }
-        if (state.lastName.trim().isEmpty()) {
-            _authUiState.update { it.copy(errorMessage = "لطفاً نام خانوادگی خود را وارد کنید.") }
-            return
-        }
-        if (!state.phoneNumber.trim().matches(Regex("^09[0-9]{9}\$"))) {
-            _authUiState.update { it.copy(errorMessage = "شماره موبایل وارد شده باید ۱۱ رقم و با 09 آغاز شود.") }
+        val validationError = validateAuthInputs(state)
+        if (validationError != null) {
+            _authUiState.update { it.copy(errorMessage = validationError) }
             return
         }
 
@@ -647,15 +730,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 otpCode = state.otpCode
             )) {
                 is Result.Success -> {
-                    val user = result.data
+                    val user = result.data.copy(notificationsEnabled = prefs.notificationsEnabled)
                     _authUiState.update { AuthUiState() }
                     _uiState.update {
                         it.copy(
                             currentUser = user,
-                            currentScreen = AppScreen.SQUARES,
+                            currentScreen = AppScreen.HOME,
                             infoMessage = "خوش آمدید، ${user.firstName} عزیز!"
                         )
                     }
+                    com.example.CompetitionReminderManager.onUserAuthenticated(getApplication())
                     refreshData()
                 }
                 is Result.Error -> {
@@ -668,6 +752,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun logout() {
         val currentLoginNotif = _uiState.value.loginNotification
         val cachedLogin = backendRepository.parseCachedLoginNotification()
+        com.example.CompetitionReminderManager.onUserLoggedOut(getApplication())
         prefs.clearSession()
         _uiState.update {
             MainUiState(
@@ -676,25 +761,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
         fetchLoginNotification()
-    }
-
-    private val _healthCheckResult = MutableStateFlow<com.example.data.remote.HealthCheckResult?>(null)
-    val healthCheckResult: StateFlow<com.example.data.remote.HealthCheckResult?> = _healthCheckResult.asStateFlow()
-
-    private val _isCheckingHealth = MutableStateFlow(false)
-    val isCheckingHealth: StateFlow<Boolean> = _isCheckingHealth.asStateFlow()
-
-    fun performServerHealthCheck() {
-        viewModelScope.launch {
-            _isCheckingHealth.value = true
-            val res = backendRepository.checkServerHealth()
-            _healthCheckResult.value = res
-            _isCheckingHealth.value = false
-        }
-    }
-
-    fun dismissHealthCheck() {
-        _healthCheckResult.value = null
     }
 
     fun loadMembershipData() {
@@ -924,6 +990,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.update { it.copy(isLoading = true) }
             when (val result = backendRepository.updateNotificationPreference(user.id, enabled)) {
                 is Result.Success -> {
+                    prefs.notificationsEnabled = enabled
+                    if (enabled) {
+                        com.example.CompetitionReminderManager.onUserAuthenticated(getApplication())
+                    } else {
+                        com.example.CompetitionReminderManager.onUserLoggedOut(getApplication())
+                    }
                     _uiState.update {
                         it.copy(
                             currentUser = user.copy(notificationsEnabled = enabled),

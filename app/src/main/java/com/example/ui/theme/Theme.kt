@@ -1,48 +1,50 @@
 package com.example.ui.theme
 
-import android.os.Build
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 
-// Unified Luxury Premium Color Scheme
 private val LuxuryColorScheme = darkColorScheme(
     primary = GoldAccent,
-    onPrimary = LuxuryBlack,
-    primaryContainer = NavyPrimary,
+    onPrimary = ObsidianBlack,
+    primaryContainer = DarkGraySurface,
     onPrimaryContainer = WarmWhite,
     secondary = GoldLight,
-    onSecondary = LuxuryBlack,
-    secondaryContainer = Color(0xFF2A2412),
+    onSecondary = ObsidianBlack,
+    secondaryContainer = Color(0xFF231E12),
     onSecondaryContainer = GoldLight,
-    tertiary = SilverAccent,
-    onTertiary = LuxuryBlack,
-    tertiaryContainer = Color(0xFF1E2430),
+    tertiary = GoldDark,
+    onTertiary = ObsidianBlack,
+    tertiaryContainer = DarkGraySurface,
     onTertiaryContainer = WarmWhite,
-    background = LuxuryBlack,
+    background = ObsidianBlack,
     onBackground = WarmWhite,
-    surface = CardSurface,
+    surface = CharcoalSurface,
     onSurface = WarmWhite,
-    surfaceVariant = CardSurfaceElevated,
+    surfaceVariant = DarkGraySurface,
     onSurfaceVariant = TextSecondary,
     outline = LuxuryBorder,
-    outlineVariant = Color(0x22FFFFFF),
+    outlineVariant = CharcoalBorder,
     error = ErrorRed,
-    onError = Color.White
+    onError = WarmWhite
 )
 
 @Composable
 fun MyApplicationTheme(
-    darkTheme: Boolean = true, // Force consistent Luxury Dark & Gold aesthetic
-    dynamicColor: Boolean = false, // Keep consistent Luxury Gold & Deep Navy brand identity
+    darkTheme: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
-    MaterialTheme(
-        colorScheme = LuxuryColorScheme,
-        typography = Typography,
-        content = content
-    )
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+        MaterialTheme(
+            colorScheme = LuxuryColorScheme,
+            typography = Typography,
+            shapes = LuxuryShapes,
+            content = content
+        )
+    }
 }

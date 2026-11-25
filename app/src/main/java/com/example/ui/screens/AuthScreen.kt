@@ -1,60 +1,80 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CellTower
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.EmojiEvents
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PhoneAndroid
-import androidx.compose.material.icons.filled.SignalCellularAlt
-import androidx.compose.material.icons.filled.Stars
-import androidx.compose.material.icons.filled.Verified
-import androidx.compose.material.icons.filled.WifiOff
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material.icons.automirrored.rounded.Login
+import androidx.compose.material.icons.rounded.CellTower
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.EmojiEvents
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.PhoneAndroid
+import androidx.compose.material.icons.rounded.SignalCellularAlt
+import androidx.compose.material.icons.rounded.Stars
+import androidx.compose.material.icons.rounded.Verified
+import androidx.compose.material.icons.rounded.WifiOff
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.R
-import com.example.data.remote.HealthCheckResult
+import com.example.ui.components.FeedbackTone
+import com.example.ui.components.LuxuryCard
+import com.example.ui.components.LuxuryFeedbackBanner
+import com.example.ui.components.LuxuryHairlineDivider
+import com.example.ui.components.LuxuryPrimaryButton
+import com.example.ui.components.LuxuryScreenCanvas
+import com.example.ui.components.LuxuryTextField
+import com.example.ui.components.toPersianDigits
 import com.example.ui.theme.*
 import com.example.viewmodel.AuthMode
 import com.example.viewmodel.AuthUiState
@@ -71,245 +91,152 @@ fun AuthScreen(
     onDirectLogin: () -> Unit,
     onOtpChange: (String) -> Unit,
     onRequestOtp: () -> Unit,
-    onVerifyOtp: () -> Unit,
-    healthCheckResult: HealthCheckResult? = null,
-    isCheckingHealth: Boolean = false,
-    onTestConnection: () -> Unit = {},
-    onDismissHealthCheck: () -> Unit = {}
+    onVerifyOtp: () -> Unit
 ) {
     val scrollState = rememberScrollState()
+    var isNoticeExpanded by remember { mutableStateOf(false) }
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = LuxuryBlack
-    ) {
+    LuxuryScreenCanvas {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(LuxuryBlack, NavyPrimary, LuxuryBlack)
-                    )
-                )
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .imePadding()
                 .verticalScroll(scrollState)
+                .padding(horizontal = 20.dp, vertical = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            // Header Hero Banner
-            Box(
+            // Minimal Brand Header (no box, open space)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(210.dp)
-                    .clip(RoundedCornerShape(bottomStart = 36.dp, bottomEnd = 36.dp))
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(NavyPrimary, LuxuryBlack)
-                        )
-                    )
-                    .border(
-                        width = 1.dp,
-                        brush = Brush.verticalGradient(listOf(Color(0x33D4AF37), Color(0x11D4AF37))),
-                        shape = RoundedCornerShape(bottomStart = 36.dp, bottomEnd = 36.dp)
-                    ),
-                contentAlignment = Alignment.Center
+                    .widthIn(max = 520.dp)
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(16.dp)
+                Box(
+                    modifier = Modifier
+                        .size(78.dp)
+                        .shadow(14.dp, RoundedCornerShape(22.dp), spotColor = GoldAccent.copy(alpha = 0.35f))
+                        .clip(RoundedCornerShape(22.dp))
+                        .border(1.2.dp, LuxuryBorderStrong, RoundedCornerShape(22.dp)),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(70.dp)
-                            .clip(CircleShape)
-                            .background(
-                                Brush.linearGradient(
-                                    listOf(GoldLight, GoldAccent, GoldDark)
-                                )
-                            )
-                            .border(1.5.dp, Color.White.copy(alpha = 0.5f), CircleShape)
-                            .shadow(16.dp, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.EmojiEvents,
-                            contentDescription = null,
-                            tint = LuxuryBlack,
-                            modifier = Modifier.size(42.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = "رقابت کن، جایزه ببر",
-                        fontFamily = VazirmatnFontFamily,
-                        color = WarmWhite,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "سامانه مسابقه ۱۰۰ مربع جایزه‌دار و ثبت زنده در سرور",
-                        fontFamily = VazirmatnFontFamily,
-                        color = GoldLight,
-                        fontSize = 12.5.sp,
-                        fontWeight = FontWeight.Medium,
-                        textAlign = TextAlign.Center
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_app_trophy),
+                        contentDescription = stringResource(R.string.app_full_title),
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
                     )
                 }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Text(
+                    text = stringResource(R.string.app_full_title),
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = WarmWhite,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = "ورود و عضویت در باشگاه رقابت",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary,
+                    textAlign = TextAlign.Center
+                )
             }
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 14.dp)
-            ) {
-                // ==============================================================
-                // Eye-catching Dynamic Notification Card (Luxury Glass Style)
-                // ==============================================================
-                if (loginNotification.isVisible) {
-                    Card(
+            Spacer(modifier = Modifier.height(22.dp))
+
+            // Quiet, Single-Layer Collapsible Irancell Strip (no nested cards)
+            if (loginNotification.isVisible) {
+                val hasMoreDetails = loginNotification.mainDescription.isNotBlank() ||
+                    (loginNotification.warningIsVisible && loginNotification.warningDescription.isNotBlank())
+
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .widthIn(max = 520.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .let { mod ->
+                            if (hasMoreDetails) mod.clickable { isNoticeExpanded = !isNoticeExpanded } else mod
+                        },
+                    shape = RoundedCornerShape(16.dp),
+                    color = CharcoalSurface.copy(alpha = 0.72f),
+                    border = BorderStroke(1.dp, CharcoalBorder)
+                ) {
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .shadow(12.dp, RoundedCornerShape(22.dp))
-                            .border(
-                                width = 1.dp,
-                                brush = Brush.linearGradient(
-                                    listOf(GoldAccent, Color(0x44D4AF37), GoldLight)
-                                ),
-                                shape = RoundedCornerShape(22.dp)
-                            ),
-                        shape = RoundedCornerShape(22.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+                            .padding(horizontal = 14.dp, vertical = 12.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    Brush.verticalGradient(
-                                        listOf(
-                                            Color(0xF0161D28),
-                                            Color(0xF00F151E)
-                                        )
-                                    )
-                                )
-                                .padding(18.dp)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                // Top Tag: Irancell Exclusive
-                                Row(
-                                    horizontalArrangement = Arrangement.Center,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(30.dp))
-                                            .background(
-                                                Brush.horizontalGradient(
-                                                    listOf(GoldAccent, GoldLight)
-                                                )
-                                            )
-                                            .padding(horizontal = 14.dp, vertical = 5.dp)
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.Center
-                                        ) {
-                                            Icon(
-                                                imageVector = getIconByName(loginNotification.badgeIcon),
-                                                contentDescription = null,
-                                                tint = LuxuryBlack,
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text(
-                                                text = loginNotification.badgeText,
-                                                fontFamily = VazirmatnFontFamily,
-                                                fontSize = 11.sp,
-                                                fontWeight = FontWeight.Black,
-                                                color = LuxuryBlack
-                                            )
-                                        }
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(14.dp))
-
-                                // Main Title
+                            Icon(
+                                imageVector = getIconByName(loginNotification.badgeIcon),
+                                contentDescription = null,
+                                tint = GoldLight,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = loginNotification.mainTitle,
-                                    fontFamily = VazirmatnFontFamily,
-                                    fontSize = 17.sp,
-                                    fontWeight = FontWeight.ExtraBold,
+                                    text = loginNotification.badgeText.ifBlank { loginNotification.mainTitle },
+                                    style = MaterialTheme.typography.labelLarge,
                                     color = GoldLight,
-                                    textAlign = TextAlign.Center,
-                                    lineHeight = 26.sp
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
+                                if (loginNotification.warningIsVisible && loginNotification.warningTitle.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = loginNotification.warningTitle,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = TextSecondary,
+                                        maxLines = if (isNoticeExpanded) 3 else 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                            if (hasMoreDetails) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Icon(
+                                    imageVector = if (isNoticeExpanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                                    contentDescription = if (isNoticeExpanded) "بستن توضیحات" else "نمایش توضیحات",
+                                    tint = TextSecondary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
 
+                        AnimatedVisibility(visible = isNoticeExpanded) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 10.dp)
+                            ) {
+                                LuxuryHairlineDivider()
+                                Spacer(modifier = Modifier.height(8.dp))
                                 if (loginNotification.mainDescription.isNotBlank()) {
-                                    Spacer(modifier = Modifier.height(8.dp))
                                     Text(
                                         text = loginNotification.mainDescription,
-                                        fontFamily = VazirmatnFontFamily,
-                                        fontSize = 12.5.sp,
-                                        fontWeight = FontWeight.Normal,
-                                        color = WarmWhite.copy(alpha = 0.9f),
-                                        textAlign = TextAlign.Center,
-                                        lineHeight = 21.sp
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = WarmWhite.copy(alpha = 0.85f)
                                     )
                                 }
-
-                                // Warning Banner
-                                if (loginNotification.warningIsVisible) {
-                                    Spacer(modifier = Modifier.height(16.dp))
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(16.dp))
-                                            .background(Color(0xFF1B2332).copy(alpha = 0.85f))
-                                            .border(1.dp, Color(0x44D4AF37), RoundedCornerShape(16.dp))
-                                            .padding(14.dp)
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(38.dp)
-                                                    .clip(CircleShape)
-                                                    .background(GoldAccent.copy(alpha = 0.15f))
-                                                    .border(1.dp, GoldAccent.copy(alpha = 0.3f), CircleShape),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Icon(
-                                                    imageVector = getIconByName(loginNotification.warningIcon),
-                                                    contentDescription = null,
-                                                    tint = GoldAccent,
-                                                    modifier = Modifier.size(20.dp)
-                                                )
-                                            }
-                                            Spacer(modifier = Modifier.width(12.dp))
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text(
-                                                    text = loginNotification.warningTitle,
-                                                    fontFamily = VazirmatnFontFamily,
-                                                    fontSize = 13.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = GoldLight
-                                                )
-                                                if (loginNotification.warningDescription.isNotBlank()) {
-                                                    Spacer(modifier = Modifier.height(3.dp))
-                                                    Text(
-                                                        text = loginNotification.warningDescription,
-                                                        fontFamily = VazirmatnFontFamily,
-                                                        fontSize = 11.sp,
-                                                        color = TextSecondary,
-                                                        lineHeight = 18.sp
-                                                    )
-                                                }
-                                            }
-                                        }
-                                    }
+                                if (loginNotification.warningIsVisible && loginNotification.warningDescription.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        text = loginNotification.warningDescription,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = GoldLight.copy(alpha = 0.9f)
+                                    )
                                 }
                             }
                         }
@@ -317,258 +244,105 @@ fun AuthScreen(
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
+            }
 
-                // ==============================================================
-                // Personal Info Card (Luxury Obsidian & Gold)
-                // ==============================================================
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .shadow(8.dp, RoundedCornerShape(18.dp))
-                        .border(1.dp, Color(0x33D4AF37), RoundedCornerShape(18.dp)),
-                    colors = CardDefaults.cardColors(containerColor = CardSurface),
-                    shape = RoundedCornerShape(18.dp)
+            // Streamlined Single Authentication Card
+            LuxuryCard(
+                modifier = Modifier.widthIn(max = 520.dp),
+                borderColor = CharcoalBorder,
+                contentPadding = PaddingValues(18.dp)
+            ) {
+                // First & Last Name side-by-side for clean density
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Column(
+                    LuxuryTextField(
+                        value = state.firstName,
+                        onValueChange = onFirstNameChange,
+                        label = "نام",
+                        placeholder = "علی",
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(18.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(bottom = 12.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(34.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(0x1AD4AF37))
-                                    .border(1.dp, Color(0x44D4AF37), CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Person,
-                                    contentDescription = null,
-                                    tint = GoldLight,
-                                    modifier = Modifier.size(19.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = "اطلاعات هویتی شرکت‌کننده",
-                                fontFamily = VazirmatnFontFamily,
-                                fontSize = 14.5.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = WarmWhite
-                            )
-                        }
+                            .weight(1f)
+                            .testTag("input_first_name")
+                    )
 
-                        OutlinedTextField(
-                            value = state.firstName,
-                            onValueChange = onFirstNameChange,
-                            label = { Text("نام کوچک", fontFamily = VazirmatnFontFamily, color = TextSecondary) },
-                            placeholder = { Text("مثلاً علی", fontFamily = VazirmatnFontFamily, color = TextMuted) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("input_first_name"),
-                            shape = RoundedCornerShape(14.dp),
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = WarmWhite,
-                                unfocusedTextColor = WarmWhite,
-                                focusedBorderColor = GoldAccent,
-                                unfocusedBorderColor = Color(0x33D4AF37),
-                                focusedContainerColor = Color(0xFF131722),
-                                unfocusedContainerColor = Color(0xFF131722)
-                            )
-                        )
-
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        OutlinedTextField(
-                            value = state.lastName,
-                            onValueChange = onLastNameChange,
-                            label = { Text("نام خانوادگی", fontFamily = VazirmatnFontFamily, color = TextSecondary) },
-                            placeholder = { Text("مثلاً رضایی", fontFamily = VazirmatnFontFamily, color = TextMuted) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("input_last_name"),
-                            shape = RoundedCornerShape(14.dp),
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = WarmWhite,
-                                unfocusedTextColor = WarmWhite,
-                                focusedBorderColor = GoldAccent,
-                                unfocusedBorderColor = Color(0x33D4AF37),
-                                focusedContainerColor = Color(0xFF131722),
-                                unfocusedContainerColor = Color(0xFF131722)
-                            )
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // ==============================================================
-                // Irancell Phone Number & Direct Login Card
-                // ==============================================================
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .shadow(8.dp, RoundedCornerShape(18.dp))
-                        .border(1.dp, Color(0x33D4AF37), RoundedCornerShape(18.dp)),
-                    colors = CardDefaults.cardColors(containerColor = CardSurface),
-                    shape = RoundedCornerShape(18.dp)
-                ) {
-                    Column(
+                    LuxuryTextField(
+                        value = state.lastName,
+                        onValueChange = onLastNameChange,
+                        label = "نام خانوادگی",
+                        placeholder = "رضایی",
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(18.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(bottom = 12.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(34.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(0x1AD4AF37))
-                                    .border(1.dp, Color(0x44D4AF37), CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.PhoneAndroid,
-                                    contentDescription = null,
-                                    tint = GoldLight,
-                                    modifier = Modifier.size(19.dp)
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(
-                                text = "ورود مستقیم با سیم‌کارت ایرانسل",
-                                fontFamily = VazirmatnFontFamily,
-                                fontSize = 14.5.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                color = WarmWhite
-                            )
-                        }
-
-                        OutlinedTextField(
-                            value = state.phoneNumber,
-                            onValueChange = onPhoneChange,
-                            label = {
-                                Text(
-                                    text = stringResource(R.string.irancell_phone_hint),
-                                    fontFamily = VazirmatnFontFamily,
-                                    color = TextSecondary
-                                )
-                            },
-                            placeholder = { Text("09351234567", fontFamily = VazirmatnFontFamily, color = TextMuted) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .testTag("input_phone_number"),
-                            shape = RoundedCornerShape(14.dp),
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = WarmWhite,
-                                unfocusedTextColor = WarmWhite,
-                                focusedBorderColor = GoldAccent,
-                                unfocusedBorderColor = Color(0x33D4AF37),
-                                focusedContainerColor = Color(0xFF131722),
-                                unfocusedContainerColor = Color(0xFF131722)
-                            ),
-                            supportingText = {
-                                Text(
-                                    text = "تنها شماره‌های معتبر شبکه ایرانسل مجاز به شرکت در رقابت می‌باشند.",
-                                    fontFamily = VazirmatnFontFamily,
-                                    fontSize = 11.sp,
-                                    color = TextSecondary
-                                )
-                            }
-                        )
-
-                        Spacer(modifier = Modifier.height(18.dp))
-
-                        Button(
-                            onClick = onDirectLogin,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(54.dp)
-                                .shadow(8.dp, RoundedCornerShape(14.dp))
-                                .testTag("btn_direct_login"),
-                            shape = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = GoldAccent
-                            ),
-                            enabled = !state.isLoading
-                        ) {
-                            if (state.isLoading) {
-                                CircularProgressIndicator(color = LuxuryBlack, modifier = Modifier.size(24.dp))
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Default.CheckCircle,
-                                    contentDescription = null,
-                                    tint = LuxuryBlack,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "ورود مستقیم و شروع مسابقه",
-                                    fontFamily = VazirmatnFontFamily,
-                                    fontWeight = FontWeight.Black,
-                                    color = LuxuryBlack,
-                                    fontSize = 15.5.sp
-                                )
-                            }
-                        }
-                    }
+                            .weight(1f)
+                            .testTag("input_last_name")
+                    )
                 }
 
-                // Info / Notice Feedback (if any)
-                AnimatedVisibility(visible = state.infoMessage != null) {
-                    Column {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(Color(0xFF16253A))
-                                .border(1.dp, Color(0x66D4AF37), RoundedCornerShape(14.dp))
-                                .padding(14.dp)
-                        ) {
-                            Text(
-                                text = state.infoMessage ?: "",
-                                fontFamily = VazirmatnFontFamily,
-                                color = GoldLight,
-                                fontSize = 12.5.sp,
-                                fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                    }
+                Spacer(modifier = Modifier.height(12.dp))
+
+                val phoneHelper = if (state.phoneNumber.isNotEmpty() && state.phoneNumber.length < 11) {
+                    "${state.phoneNumber.length.toPersianDigits()} از ۱۱ رقم"
+                } else null
+
+                LuxuryTextField(
+                    value = state.phoneNumber,
+                    onValueChange = onPhoneChange,
+                    label = "شماره موبایل ایرانسل",
+                    placeholder = "09351234567",
+                    supportingText = phoneHelper,
+                    leadingIcon = Icons.Rounded.PhoneAndroid,
+                    isLtrContent = true,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Phone,
+                        imeAction = ImeAction.Done
+                    ),
+                    modifier = Modifier.testTag("input_phone_number")
+                )
+
+                if (!state.errorMessage.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    LuxuryFeedbackBanner(
+                        message = state.errorMessage,
+                        tone = FeedbackTone.ERROR
+                    )
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                if (!state.infoMessage.isNullOrBlank()) {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    LuxuryFeedbackBanner(
+                        message = state.infoMessage,
+                        tone = FeedbackTone.INFO
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                LuxuryPrimaryButton(
+                    text = "ورود",
+                    icon = Icons.AutoMirrored.Rounded.Login,
+                    isLoading = state.isLoading,
+                    onClick = onDirectLogin,
+                    modifier = Modifier.testTag("btn_direct_login")
+                )
             }
         }
     }
 }
 
 @Composable
-fun getIconByName(name: String): androidx.compose.ui.graphics.vector.ImageVector {
+fun getIconByName(name: String): ImageVector {
     return when (name.lowercase()) {
-        "verified" -> Icons.Default.Verified
-        "signal_cellular_alt" -> Icons.Default.SignalCellularAlt
-        "check_circle" -> Icons.Default.CheckCircle
-        "cell_tower" -> Icons.Default.CellTower
-        "wifi_off" -> Icons.Default.WifiOff
-        "stars" -> Icons.Default.Stars
-        "emoji_events" -> Icons.Default.EmojiEvents
-        "person" -> Icons.Default.Person
-        "phone_android" -> Icons.Default.PhoneAndroid
-        else -> Icons.Default.Verified
+        "verified" -> Icons.Rounded.Verified
+        "signal_cellular_alt" -> Icons.Rounded.SignalCellularAlt
+        "check_circle" -> Icons.Rounded.CheckCircle
+        "cell_tower" -> Icons.Rounded.CellTower
+        "wifi_off" -> Icons.Rounded.WifiOff
+        "stars" -> Icons.Rounded.Stars
+        "emoji_events" -> Icons.Rounded.EmojiEvents
+        "person" -> Icons.Rounded.Person
+        "phone_android" -> Icons.Rounded.PhoneAndroid
+        else -> Icons.Rounded.Verified
     }
 }

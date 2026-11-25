@@ -1,11 +1,18 @@
 package com.example.ui.screens
 
 import android.app.Activity
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -14,8 +21,10 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -23,23 +32,28 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -47,12 +61,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.model.AdSquare
 import com.example.model.DailyCycle
+import com.example.model.HomeAnnouncement
 import com.example.model.SquareStatus
+import com.example.ui.components.FeedbackTone
+import com.example.ui.components.HomeAnnouncementBanner
+import com.example.ui.components.LuxuryFeedbackBanner
+import com.example.ui.components.LuxuryHairlineDivider
+import com.example.ui.components.LuxuryScreenCanvas
+import com.example.ui.components.formatRemainingTimePersian
 import com.example.ui.components.toPersianDigits
 import com.example.ui.theme.*
-
-import com.example.ui.components.HomeAnnouncementBanner
-import com.example.model.HomeAnnouncement
 
 @Composable
 fun SquaresScreen(
@@ -66,218 +84,184 @@ fun SquaresScreen(
     val context = LocalContext.current
     val activity = context as? Activity
 
-    val displaySquares = if (squares.size >= 100) {
-        squares
-    } else {
-        (1..100).map { num ->
-            squares.find { it.squareNumber == num } ?: AdSquare(
-                squareNumber = num,
-                status = SquareStatus.READY
-            )
+    val displaySquares = remember(squares) {
+        if (squares.size >= 100) {
+            squares
+        } else {
+            (1..100).map { num ->
+                squares.find { it.squareNumber == num } ?: AdSquare(
+                    squareNumber = num,
+                    status = SquareStatus.READY
+                )
+            }
         }
     }
 
     val completedCount = displaySquares.count { it.status == SquareStatus.COMPLETED }
-    val remainingCount = 100 - completedCount
+    val remainingCount = (100 - completedCount).coerceAtLeast(0)
+    val progressFraction = (completedCount.toFloat() / 100f).coerceIn(0f, 1f)
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(LuxuryBlack, NavyPrimary, LuxuryBlack)
-                )
-            )
-    ) {
-        // Top Sticky Banner: 100 Squares Progress & Midnight Iran Countdown
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .shadow(10.dp, RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)),
-            color = CardSurface,
-            border = androidx.compose.foundation.BorderStroke(
-                1.dp,
-                Brush.horizontalGradient(
-                    listOf(Color(0x33D4AF37), Color(0x11D4AF37), Color(0x33D4AF37))
-                )
-            )
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 14.dp)
+    LuxuryScreenCanvas {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Sticky Luxury Progress & Countdown Header
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = ObsidianBlack.copy(alpha = 0.96f)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = "۱۰۰ مربع جایزه‌دار",
-                            fontSize = 17.5.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = WarmWhite
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "${completedCount.toPersianDigits()} تکمیل شده • ${remainingCount.toPersianDigits()} باقیمانده",
-                            fontSize = 12.sp,
-                            color = GoldLight,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-
-                    val remainingMs = cycle?.remainingMs ?: 0L
-                    val hours = (remainingMs / (1000 * 60 * 60))
-                    val minutes = (remainingMs / (1000 * 60)) % 60
-                    val seconds = (remainingMs / 1000) % 60
-                    val countdownStr = String.format("%02d:%02d:%02d", hours, minutes, seconds).toPersianDigits()
-
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(
-                                Brush.horizontalGradient(
-                                    listOf(Color(0xFF161F2E), Color(0xFF0F1520))
-                                )
-                            )
-                            .border(1.dp, Color(0x66D4AF37), RoundedCornerShape(14.dp))
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = "ریست ساعت ۱۲ شب",
-                                color = GoldLight,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Spacer(modifier = Modifier.height(1.dp))
-                            Text(
-                                text = countdownStr,
-                                color = WarmWhite,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.ExtraBold
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                val progressFraction = (completedCount.toFloat() / 100f).coerceIn(0f, 1f)
-                LinearProgressIndicator(
-                    progress = { progressFraction },
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(4.dp)),
-                    color = GoldAccent,
-                    trackColor = Color(0xFF222938)
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Legend row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
+                        .statusBarsPadding()
                 ) {
-                    LegendItem("آماده", Color(0x33D4AF37), GoldLight)
-                    LegendItem("در حال بارگذاری", Color(0xFFFEF3C7), GoldAccent)
-                    LegendItem("تکمیل (قفل)", Color(0xFF10B981), SuccessGreen)
-                    LegendItem("تلاش مجدد", Color(0xFFEF4444), ErrorRed)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 14.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "جدول ۱۰۰ مربع جایزه‌دار",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = WarmWhite
+                                )
+                                Spacer(modifier = Modifier.height(3.dp))
+                                Text(
+                                    text = "${completedCount.toPersianDigits()} تکمیل‌شده  •  ${remainingCount.toPersianDigits()} باقی‌مانده",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = GoldLight
+                                )
+                            }
+
+                            Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = CharcoalSurface,
+                                border = BorderStroke(1.dp, LuxuryBorderStrong)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Timer,
+                                        contentDescription = null,
+                                        tint = GoldLight,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Column(horizontalAlignment = Alignment.End) {
+                                        Text(
+                                            text = "بازنشانی نیمه‌شب",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.5.sp),
+                                            color = TextSecondary
+                                        )
+                                        Text(
+                                            text = formatRemainingTimePersian(cycle?.remainingMs ?: 0L),
+                                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.ExtraBold),
+                                            color = WarmWhite
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        LinearProgressIndicator(
+                            progress = { progressFraction },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(7.dp)
+                                .clip(RoundedCornerShape(50)),
+                            color = GoldAccent,
+                            trackColor = DarkGraySurface,
+                            strokeCap = StrokeCap.Round
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            LegendItem("آماده", GoldLight)
+                            LegendItem("در حال پخش", GoldAccent)
+                            LegendItem("تکمیل‌شده", SuccessGreen)
+                            LegendItem("تلاش مجدد", ErrorRed)
+                        }
+                    }
+
+                    LuxuryHairlineDivider(useGoldAccent = true)
                 }
             }
-        }
 
-        // Active Announcement Banner at top of page (Before main grid content)
-        if (announcement != null && announcement.isActive) {
-            HomeAnnouncementBanner(
-                announcement = announcement,
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
-            )
-        }
+            if (announcement != null && announcement.isActive) {
+                HomeAnnouncementBanner(
+                    announcement = announcement,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
 
-        // Error message banner (e.g. Tapsell ad fill, network, or VPN error)
-        if (!errorMessage.isNullOrBlank()) {
-            Surface(
+            if (!errorMessage.isNullOrBlank()) {
+                LuxuryFeedbackBanner(
+                    message = errorMessage,
+                    tone = FeedbackTone.ERROR,
+                    onDismiss = onDismissError,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                )
+            }
+
+            // Responsive 100-Squares Grid (5 columns on phone, 8 on wider tablet viewports)
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 6.dp),
-                shape = RoundedCornerShape(14.dp),
-                color = Color(0xFF2A1215),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE53935).copy(alpha = 0.6f))
+                    .weight(1f)
+                    .navigationBarsPadding()
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Default.Refresh,
-                        contentDescription = null,
-                        tint = Color(0xFFFF6B6B),
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = errorMessage,
-                        color = Color(0xFFFFD1D1),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        lineHeight = 18.sp,
-                        modifier = Modifier.weight(1f)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "بستن",
-                        color = GoldAccent,
-                        fontSize = 11.5.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .clickable { onDismissError() }
-                            .padding(horizontal = 6.dp, vertical = 4.dp)
-                    )
-                }
-            }
-        }
+                val columns = if (maxWidth >= 600.dp) 8 else 5
 
-        // 100 Squares Professional Grid (Luxury Dark Cards)
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(5),
-            contentPadding = PaddingValues(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 100.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = Modifier
-                .fillMaxSize()
-                .weight(1f)
-                .testTag("grid_100_squares")
-        ) {
-            items(displaySquares, key = { it.squareNumber }) { square ->
-                SquareCard(
-                    square = square,
-                    onClick = {
-                        activity?.let { onSquareClick(it, square) }
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(columns),
+                    contentPadding = PaddingValues(start = 14.dp, top = 12.dp, end = 14.dp, bottom = 108.dp),
+                    horizontalArrangement = Arrangement.spacedBy(9.dp),
+                    verticalArrangement = Arrangement.spacedBy(9.dp),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .testTag("grid_100_squares")
+                ) {
+                    items(displaySquares, key = { it.squareNumber }) { square ->
+                        SquareCard(
+                            square = square,
+                            onClick = {
+                                activity?.let { onSquareClick(it, square) }
+                            }
+                        )
                     }
-                )
+                }
             }
         }
     }
 }
 
 @Composable
-fun LegendItem(label: String, bgColor: Color, textColor: Color) {
+fun LegendItem(label: String, dotColor: Color) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
             modifier = Modifier
-                .size(9.dp)
+                .size(8.dp)
                 .clip(CircleShape)
-                .background(textColor)
+                .background(dotColor)
         )
-        Spacer(modifier = Modifier.width(4.dp))
-        Text(text = label, fontSize = 10.sp, color = Color(0xFFB0B7C3), fontWeight = FontWeight.Medium)
+        Spacer(modifier = Modifier.width(5.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = TextSecondary
+        )
     }
 }
 
@@ -286,39 +270,55 @@ fun SquareCard(
     square: AdSquare,
     onClick: () -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
     val isCompleted = square.status == SquareStatus.COMPLETED
     val isLoading = square.status == SquareStatus.LOADING
     val isPlaying = square.status == SquareStatus.PLAYING
     val isFailed = square.status == SquareStatus.FAILED
+    val isClickable = !isCompleted && !isLoading && !isPlaying
+
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed && isClickable) 0.94f else 1f,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+        label = "square_press_scale"
+    )
 
     val cardBackground = when {
-        isCompleted -> Color(0xFF0F261E)
-        isLoading || isPlaying -> Color(0xFF282310)
-        isFailed -> Color(0xFF2B161A)
-        else -> CardSurface
+        isCompleted -> Color(0xFF0E1D17)
+        isLoading || isPlaying -> Color(0xFF1F1A0F)
+        isFailed -> Color(0xFF1E1213)
+        else -> CharcoalSurface
     }
 
     val borderColor = when {
-        isCompleted -> SuccessGreen
+        isCompleted -> SuccessGreen.copy(alpha = 0.65f)
         isLoading || isPlaying -> GoldAccent
-        isFailed -> ErrorRed
-        else -> Color(0x33D4AF37)
+        isFailed -> ErrorRed.copy(alpha = 0.65f)
+        else -> LuxuryBorder
     }
 
     Surface(
         modifier = Modifier
             .aspectRatio(1f)
-            .shadow(
-                elevation = if (isCompleted) 3.dp else 6.dp,
-                shape = RoundedCornerShape(16.dp),
-                spotColor = borderColor
-            )
-            .clip(RoundedCornerShape(16.dp))
-            .border(1.5.dp, borderColor, RoundedCornerShape(16.dp))
-            .clickable(enabled = !isCompleted && !isLoading && !isPlaying) { onClick() }
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clip(RoundedCornerShape(14.dp))
+            .clickable(
+                enabled = isClickable,
+                interactionSource = interactionSource,
+                indication = androidx.compose.material3.ripple(color = GoldLight)
+            ) {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onClick()
+            }
             .testTag("square_item_${square.squareNumber}"),
         color = cardBackground,
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, borderColor)
     ) {
         Column(
             modifier = Modifier
@@ -327,52 +327,51 @@ fun SquareCard(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // Status Icon / Animation
             when {
                 isLoading -> {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        strokeWidth = 2.5.dp,
+                        modifier = Modifier.size(18.dp),
+                        strokeWidth = 2.dp,
                         color = GoldLight
                     )
                 }
                 isPlaying -> {
                     Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = null,
+                        imageVector = Icons.Rounded.PlayArrow,
+                        contentDescription = "در حال پخش",
                         tint = GoldLight,
-                        modifier = Modifier.size(22.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
                 isCompleted -> {
                     Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = null,
+                        imageVector = Icons.Rounded.CheckCircle,
+                        contentDescription = "تکمیل‌شده",
                         tint = SuccessGreen,
-                        modifier = Modifier.size(22.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
                 isFailed -> {
                     Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = null,
+                        imageVector = Icons.Rounded.Refresh,
+                        contentDescription = "تلاش مجدد",
                         tint = ErrorRed,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                 }
                 else -> {
                     Box(
                         modifier = Modifier
-                            .size(26.dp)
+                            .size(22.dp)
                             .clip(CircleShape)
-                            .background(Color(0x1AD4AF37)),
+                            .background(GoldAccent.copy(alpha = 0.14f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.PlayArrow,
+                            imageVector = Icons.Rounded.PlayArrow,
                             contentDescription = null,
                             tint = GoldLight,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(14.dp)
                         )
                     }
                 }
@@ -380,26 +379,28 @@ fun SquareCard(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // Square Name and Number
             Text(
-                text = "مربع ${square.squareNumber.toPersianDigits()}",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = if (isCompleted) SuccessGreen else WarmWhite,
+                text = square.squareNumber.toPersianDigits(),
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 12.sp
+                ),
+                color = if (isCompleted) Color(0xFF6EE7B7) else WarmWhite,
                 textAlign = TextAlign.Center
             )
 
-            // Subtitle Badge
             Text(
                 text = when {
-                    isCompleted -> "+۱ امتیاز"
-                    isLoading -> "بارگذاری"
-                    isPlaying -> "در حال پخش"
-                    isFailed -> "تلاش مجدد"
-                    else -> "۱ امتیاز"
+                    isCompleted -> "تکمیل"
+                    isLoading -> "صبر..."
+                    isPlaying -> "پخش"
+                    isFailed -> "تلاش"
+                    else -> "+۱"
                 },
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold
+                ),
                 color = when {
                     isCompleted -> SuccessGreen
                     isLoading || isPlaying -> GoldLight

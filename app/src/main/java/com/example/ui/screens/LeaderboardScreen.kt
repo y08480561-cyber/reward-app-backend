@@ -1,7 +1,7 @@
 package com.example.ui.screens
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -10,14 +10,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.EmojiEvents
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Stars
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.rounded.Clear
+import androidx.compose.material.icons.rounded.EmojiEvents
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Stars
+import androidx.compose.material.icons.rounded.WarningAmber
+import androidx.compose.material.icons.rounded.WorkspacePremium
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,14 +29,23 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.model.LeaderboardEntry
-import com.example.ui.theme.*
+import com.example.ui.components.LuxuryBadge
+import com.example.ui.components.LuxuryBadgeTone
+import com.example.ui.components.LuxuryCard
+import com.example.ui.components.LuxuryEmptyState
+import com.example.ui.components.LuxuryHighlightCard
+import com.example.ui.components.LuxuryLoadingState
+import com.example.ui.components.LuxuryPrimaryButton
+import com.example.ui.components.LuxuryScreenCanvas
+import com.example.ui.components.LuxuryTopBar
+import com.example.ui.components.formatNumberPersian
 import com.example.ui.components.toPersianDigits
+import com.example.ui.theme.*
 import com.example.viewmodel.MainUiState
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LeaderboardScreen(
     uiState: MainUiState,
@@ -65,383 +73,285 @@ fun LeaderboardScreen(
         uiState.leaderboard.firstOrNull { it.isCurrentUser }
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(LuxuryBlack, NavyPrimary, LuxuryBlack)
-                )
-            )
-    ) {
-        // --- Top Bar ---
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .shadow(8.dp),
-            color = NavyPrimary,
-            border = androidx.compose.foundation.BorderStroke(
-                1.dp,
-                Brush.verticalGradient(listOf(Color(0x33D4AF37), Color(0x11D4AF37)))
-            )
-        ) {
-            Column(modifier = Modifier.statusBarsPadding()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(
-                        onClick = onBack,
-                        modifier = Modifier.testTag("leaderboard_back_button")
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(Color(0x1AD4AF37)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "بازگشت",
-                                tint = GoldLight,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "جدول رتبه‌بندی مسابقه",
-                            color = WarmWhite,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp
-                        )
-                        Text(
-                            text = "برترین شرکت‌کنندگان و امتیازات کل",
-                            color = GoldLight.copy(alpha = 0.8f),
-                            fontSize = 12.sp
-                        )
-                    }
-
+    LuxuryScreenCanvas {
+        Column(modifier = Modifier.fillMaxSize()) {
+            LuxuryTopBar(
+                title = "جدول رتبه‌بندی مسابقه",
+                subtitle = "برترین شرکت‌کنندگان و امتیازات دوره جاری",
+                onBack = onBack,
+                backTestTag = "leaderboard_back_button",
+                trailingContent = {
                     IconButton(
                         onClick = onRefresh,
                         enabled = !uiState.isLeaderboardLoading,
-                        modifier = Modifier.testTag("leaderboard_refresh_button")
+                        modifier = Modifier
+                            .size(48.dp)
+                            .testTag("leaderboard_refresh_button")
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "تازه‌سازی",
-                            tint = if (uiState.isLeaderboardLoading) TextMuted else GoldAccent
+                            imageVector = Icons.Rounded.Refresh,
+                            contentDescription = "به‌روزرسانی رتبه‌بندی",
+                            tint = if (uiState.isLeaderboardLoading) TextMuted else GoldLight,
+                            modifier = Modifier.size(21.dp)
                         )
                     }
                 }
-            }
-        }
+            )
 
-        // --- Current User Floating Highlight Card (Luxury VIP Trim) ---
-        if (currentUserEntry != null && !uiState.isLeaderboardLoading) {
-            Card(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .testTag("current_user_rank_card"),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = CardSurface),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-                border = androidx.compose.foundation.BorderStroke(
-                    1.5.dp,
-                    Brush.horizontalGradient(
-                        listOf(GoldAccent, GoldLight, GoldAccent)
-                    )
-                )
+                    .weight(1f)
+                    .navigationBarsPadding(),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(Color(0xFF1B2332), Color(0xFF121722))
-                            )
-                        )
-                        .padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(46.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    Brush.linearGradient(
-                                        listOf(GoldLight, GoldAccent, GoldDark)
-                                    )
-                                )
-                                .border(1.dp, Color.White.copy(alpha = 0.6f), CircleShape)
-                                .shadow(8.dp, CircleShape),
-                            contentAlignment = Alignment.Center
+                // Current User Highlight Card
+                if (currentUserEntry != null && !uiState.isLeaderboardLoading) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    LuxuryHighlightCard(
+                        modifier = Modifier
+                            .padding(horizontal = 16.dp)
+                            .testTag("current_user_rank_card"),
+                        contentPadding = PaddingValues(16.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Text(
-                                text = "#${currentUserEntry.rank.toPersianDigits()}",
-                                color = LuxuryBlack,
-                                fontWeight = FontWeight.Black,
-                                fontSize = 16.sp
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = currentUserEntry.displayName,
-                                    color = WarmWhite,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 15.sp
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Surface(
-                                    shape = RoundedCornerShape(6.dp),
-                                    color = GoldAccent.copy(alpha = 0.2f),
-                                    border = androidx.compose.foundation.BorderStroke(1.dp, GoldAccent.copy(alpha = 0.5f))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(46.dp)
+                                        .shadow(8.dp, CircleShape, spotColor = GoldAccent)
+                                        .clip(CircleShape)
+                                        .background(GoldGradientBrush)
+                                        .border(1.dp, GoldLight, CircleShape),
+                                    contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        text = "شما",
-                                        color = GoldLight,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        text = "#${currentUserEntry.rank.toPersianDigits()}",
+                                        color = ObsidianBlack,
+                                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.ExtraBold)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = currentUserEntry.displayName,
+                                            color = WarmWhite,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        LuxuryBadge(
+                                            text = "شما",
+                                            tone = LuxuryBadgeTone.GOLD
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = "جایگاه فعلی شما در رقابت",
+                                        color = TextSecondary,
+                                        style = MaterialTheme.typography.labelSmall
                                     )
                                 }
                             }
-                            Text(
-                                text = "وضعیت رتبه شما در مسابقه جاری",
-                                color = Color(0xFFB0B7C3),
-                                fontSize = 12.sp
-                            )
-                        }
-                    }
 
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = Color(0xFF131722),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x66D4AF37))
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Stars,
-                                contentDescription = null,
-                                tint = GoldLight,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "${currentUserEntry.totalScore.toPersianDigits()} امتیاز",
-                                color = GoldLight,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
-                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = ObsidianBlack.copy(alpha = 0.65f),
+                                border = BorderStroke(1.dp, LuxuryBorderStrong)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Stars,
+                                        contentDescription = null,
+                                        tint = GoldLight,
+                                        modifier = Modifier.size(15.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(5.dp))
+                                    Text(
+                                        text = "${formatNumberPersian(currentUserEntry.totalScore)} امتیاز",
+                                        color = GoldLight,
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                                    )
+                                }
+                            }
                         }
                     }
                 }
-            }
-        }
 
-        // --- Search Bar (Luxury Obsidian Input) ---
-        if (uiState.leaderboard.isNotEmpty() && !uiState.isLeaderboardLoading) {
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp)
-                    .testTag("leaderboard_search_input"),
-                placeholder = {
-                    Text("جستجوی شرکت‌کننده بر اساس نام...", fontSize = 13.sp, color = TextMuted)
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = "جستجو",
-                        tint = GoldLight
-                    )
-                },
-                trailingIcon = {
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }) {
-                            Icon(
-                                imageVector = Icons.Default.Clear,
-                                contentDescription = "پاک کردن",
-                                tint = TextMuted
-                            )
-                        }
-                    }
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = WarmWhite,
-                    unfocusedTextColor = WarmWhite,
-                    focusedBorderColor = GoldAccent,
-                    unfocusedBorderColor = Color(0x33D4AF37),
-                    focusedContainerColor = CardSurface,
-                    unfocusedContainerColor = CardSurface
-                )
-            )
-        }
-
-        // --- Content Area ---
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = 88.dp) // Clearance for floating Bottom Navigation
-        ) {
-            when {
-                // 1. Loading State
-                uiState.isLeaderboardLoading -> {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(24.dp),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        CircularProgressIndicator(
-                            color = GoldAccent,
-                            modifier = Modifier.size(48.dp)
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "در حال دریافت آخرین رتبه‌بندی مسابقه...",
-                            color = GoldLight,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-
-                // 2. Error State
-                uiState.leaderboardErrorMessage != null -> {
-                    Card(
+                // Search Field
+                if (uiState.leaderboard.isNotEmpty() && !uiState.isLeaderboardLoading) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { searchQuery = it },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(24.dp)
-                            .align(Alignment.Center)
-                            .testTag("leaderboard_error_card"),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = CardSurface),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x44EF4444)),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
+                            .widthIn(max = 600.dp)
+                            .padding(horizontal = 16.dp)
+                            .testTag("leaderboard_search_input"),
+                        placeholder = {
+                            Text(
+                                text = "جستجوی شرکت‌کننده بر اساس نام…",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextMuted
+                            )
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Rounded.Search,
+                                contentDescription = "جستجو",
+                                tint = GoldLight,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        trailingIcon = {
+                            if (searchQuery.isNotEmpty()) {
+                                IconButton(
+                                    onClick = { searchQuery = "" },
+                                    modifier = Modifier.size(48.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Rounded.Clear,
+                                        contentDescription = "پاک کردن جستجو",
+                                        tint = TextSecondary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        },
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(color = WarmWhite),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = WarmWhite,
+                            unfocusedTextColor = WarmWhite,
+                            focusedBorderColor = GoldAccent,
+                            unfocusedBorderColor = CharcoalBorder,
+                            focusedContainerColor = CharcoalSurface,
+                            unfocusedContainerColor = CharcoalSurface,
+                            cursorColor = GoldAccent
+                        )
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(bottom = 88.dp)
+                ) {
+                    when {
+                        uiState.isLeaderboardLoading -> {
+                            LuxuryLoadingState(message = "در حال دریافت رتبه‌بندی زنده مسابقه…")
+                        }
+
+                        uiState.leaderboardErrorMessage != null -> {
                             Box(
                                 modifier = Modifier
-                                    .size(56.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(0x2AEF4444)),
+                                    .fillMaxSize()
+                                    .padding(24.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Warning,
-                                    contentDescription = null,
-                                    tint = ErrorRed,
-                                    modifier = Modifier.size(28.dp)
-                                )
+                                LuxuryCard(
+                                    borderColor = ErrorRed.copy(alpha = 0.45f),
+                                    modifier = Modifier.testTag("leaderboard_error_card")
+                                ) {
+                                    Column(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(56.dp)
+                                                .clip(CircleShape)
+                                                .background(ErrorRedLight)
+                                                .border(1.dp, ErrorRed.copy(alpha = 0.4f), CircleShape),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Rounded.WarningAmber,
+                                                contentDescription = null,
+                                                tint = ErrorRed,
+                                                modifier = Modifier.size(26.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.height(14.dp))
+                                        Text(
+                                            text = if (uiState.leaderboardErrorCode != null) {
+                                                "خطا در دریافت اطلاعات (کد ${uiState.leaderboardErrorCode.toPersianDigits()})"
+                                            } else {
+                                                "اختلال در دریافت جدول رتبه‌بندی"
+                                            },
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = WarmWhite,
+                                            textAlign = TextAlign.Center
+                                        )
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text(
+                                            text = uiState.leaderboardErrorMessage ?: "اتصال به سرور برقرار نشد. لطفاً وضعیت اینترنت را بررسی کرده و دوباره تلاش کنید.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = TextSecondary,
+                                            textAlign = TextAlign.Center
+                                        )
+                                        Spacer(modifier = Modifier.height(18.dp))
+                                        LuxuryPrimaryButton(
+                                            text = "تلاش مجدد",
+                                            icon = Icons.Rounded.Refresh,
+                                            onClick = onRefresh,
+                                            modifier = Modifier.testTag("leaderboard_retry_button")
+                                        )
+                                    }
+                                }
                             }
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = if (uiState.leaderboardErrorCode != null) {
-                                    "خطای سرور (کد وضعیت ${uiState.leaderboardErrorCode})"
+                        }
+
+                        filteredList.isEmpty() -> {
+                            LuxuryEmptyState(
+                                icon = Icons.Rounded.EmojiEvents,
+                                title = if (searchQuery.isNotEmpty()) {
+                                    "نتیجه‌ای یافت نشد"
                                 } else {
-                                    "خطا در دریافت جدول رتبه‌بندی"
+                                    "رتبه‌بندی هنوز ثبت نشده است"
                                 },
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp,
-                                color = WarmWhite
+                                description = if (searchQuery.isNotEmpty()) {
+                                    "شرکت‌کننده‌ای با نام «$searchQuery» در فهرست فعلی پیدا نشد."
+                                } else {
+                                    "با تکمیل نخستین مربع‌ها در جدول ۱۰۰ مربع، رتبه‌های این دوره نمایش داده می‌شوند."
+                                }
                             )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = uiState.leaderboardErrorMessage ?: "امکان برقراری ارتباط با سرور فراهم نشد.",
-                                color = Color(0xFFB0B7C3),
-                                fontSize = 13.sp,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(modifier = Modifier.height(20.dp))
-                            Button(
-                                onClick = onRefresh,
-                                modifier = Modifier.testTag("leaderboard_retry_button"),
-                                colors = ButtonDefaults.buttonColors(containerColor = GoldAccent),
-                                shape = RoundedCornerShape(10.dp)
+                        }
+
+                        else -> {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Refresh,
-                                    contentDescription = null,
-                                    tint = LuxuryBlack,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("تلاش مجدد", color = LuxuryBlack, fontWeight = FontWeight.Bold)
+                                if (searchQuery.isBlank() && filteredList.size >= 3) {
+                                    item {
+                                        TopThreePodiumSection(topThree = filteredList.take(3))
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                    }
+                                }
+
+                                items(filteredList, key = { it.rank }) { entry ->
+                                    LeaderboardItemRow(entry = entry)
+                                }
                             }
-                        }
-                    }
-                }
-
-                // 3. Empty Search or Empty Leaderboard
-                filteredList.isEmpty() -> {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(24.dp),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.EmojiEvents,
-                            contentDescription = null,
-                            tint = Color(0x44D4AF37),
-                            modifier = Modifier.size(56.dp)
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = if (searchQuery.isNotEmpty()) {
-                                "شرکت‌کننده‌ای با این نام یافت نشد."
-                            } else {
-                                "هنوز رتبه‌بندی در مسابقه ثبت نشده است."
-                            },
-                            color = Color(0xFFB0B7C3),
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 14.sp
-                        )
-                    }
-                }
-
-                // 4. Success List
-                else -> {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        // Top 3 Podium Cards if full list
-                        if (searchQuery.isBlank() && filteredList.size >= 3) {
-                            item {
-                                TopThreePodiumSection(topThree = filteredList.take(3))
-                                Spacer(modifier = Modifier.height(8.dp))
-                            }
-                        }
-
-                        // List of Entries
-                        items(filteredList, key = { it.rank }) { entry ->
-                            LeaderboardItemRow(entry = entry)
                         }
                     }
                 }
@@ -452,25 +362,17 @@ fun LeaderboardScreen(
 
 @Composable
 private fun TopThreePodiumSection(topThree: List<LeaderboardEntry>) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag("leaderboard_podium_card"),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = CardSurface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x33D4AF37)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+    LuxuryHighlightCard(
+        modifier = Modifier.testTag("leaderboard_podium_card"),
+        contentPadding = PaddingValues(18.dp)
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "سکوهای برتر دوره مسابقه",
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
+                text = "سکوهای برتر دوره جاری",
+                style = MaterialTheme.typography.titleSmall,
                 color = GoldLight
             )
             Spacer(modifier = Modifier.height(16.dp))
@@ -480,36 +382,30 @@ private fun TopThreePodiumSection(topThree: List<LeaderboardEntry>) {
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.Bottom
             ) {
-                // 2nd Place (Silver)
                 if (topThree.size > 1) {
                     PodiumPillar(
                         entry = topThree[1],
                         rankColor = SilverAccent,
-                        borderColor = Color(0x66C0C0C0),
-                        pillarHeight = 70.dp,
-                        trophyIcon = "🥈"
+                        pillarHeight = 68.dp,
+                        isCrown = false
                     )
                 }
 
-                // 1st Place (Gold)
                 if (topThree.isNotEmpty()) {
                     PodiumPillar(
                         entry = topThree[0],
                         rankColor = GoldAccent,
-                        borderColor = GoldAccent,
-                        pillarHeight = 95.dp,
-                        trophyIcon = "🥇"
+                        pillarHeight = 92.dp,
+                        isCrown = true
                     )
                 }
 
-                // 3rd Place (Bronze)
                 if (topThree.size > 2) {
                     PodiumPillar(
                         entry = topThree[2],
                         rankColor = BronzeTrophy,
-                        borderColor = Color(0x66CD7F32),
-                        pillarHeight = 55.dp,
-                        trophyIcon = "🥉"
+                        pillarHeight = 54.dp,
+                        isCrown = false
                     )
                 }
             }
@@ -521,30 +417,42 @@ private fun TopThreePodiumSection(topThree: List<LeaderboardEntry>) {
 private fun PodiumPillar(
     entry: LeaderboardEntry,
     rankColor: Color,
-    borderColor: Color,
-    pillarHeight: androidx.compose.ui.unit.Dp,
-    trophyIcon: String
+    pillarHeight: Dp,
+    isCrown: Boolean
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.width(96.dp)
     ) {
-        Text(text = trophyIcon, fontSize = 24.sp)
-        Spacer(modifier = Modifier.height(4.dp))
+        Box(
+            modifier = Modifier
+                .size(if (isCrown) 40.dp else 34.dp)
+                .clip(CircleShape)
+                .background(rankColor.copy(alpha = 0.16f))
+                .border(1.dp, rankColor.copy(alpha = 0.6f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = if (isCrown) Icons.Rounded.WorkspacePremium else Icons.Rounded.EmojiEvents,
+                contentDescription = "رتبه ${entry.rank.toPersianDigits()}",
+                tint = rankColor,
+                modifier = Modifier.size(if (isCrown) 22.dp else 18.dp)
+            )
+        }
+        Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = entry.displayName,
-            fontWeight = FontWeight.Bold,
-            fontSize = 12.sp,
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
             color = WarmWhite,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center
         )
         Text(
-            text = "${entry.totalScore.toPersianDigits()} امتیاز",
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = rankColor
+            text = "${formatNumberPersian(entry.totalScore)} امتیاز",
+            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+            color = rankColor,
+            maxLines = 1
         )
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -553,14 +461,21 @@ private fun PodiumPillar(
                 .fillMaxWidth()
                 .height(pillarHeight)
                 .clip(RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp))
-                .background(rankColor.copy(alpha = 0.15f))
-                .border(1.5.dp, borderColor, RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)),
+                .background(
+                    Brush.verticalGradient(
+                        listOf(rankColor.copy(alpha = 0.2f), ObsidianBlack.copy(alpha = 0.5f))
+                    )
+                )
+                .border(
+                    1.dp,
+                    rankColor.copy(alpha = 0.5f),
+                    RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)
+                ),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = "#${entry.rank.toPersianDigits()}",
-                fontWeight = FontWeight.Black,
-                fontSize = 18.sp,
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.ExtraBold),
                 color = rankColor
             )
         }
@@ -574,95 +489,76 @@ private fun LeaderboardItemRow(entry: LeaderboardEntry) {
         1 -> GoldAccent
         2 -> SilverAccent
         3 -> BronzeTrophy
-        else -> Color(0xFF8E98A8)
+        else -> TextSecondary
     }
 
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag("leaderboard_row_${entry.rank}"),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (entry.isCurrentUser) Color(0xFF1B2332) else CardSurface
-        ),
-        border = if (entry.isCurrentUser) {
-            androidx.compose.foundation.BorderStroke(1.5.dp, GoldAccent)
-        } else {
-            androidx.compose.foundation.BorderStroke(1.dp, Color(0x22D4AF37))
-        },
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    LuxuryCard(
+        modifier = Modifier.testTag("leaderboard_row_${entry.rank}"),
+        shape = RoundedCornerShape(14.dp),
+        containerColor = if (entry.isCurrentUser) DarkGraySurface else CharcoalSurface,
+        borderColor = if (entry.isCurrentUser) GoldAccent else CharcoalBorder,
+        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Rank Badge
             Box(
                 modifier = Modifier
                     .size(34.dp)
                     .clip(CircleShape)
-                    .background(rankBadgeColor.copy(alpha = if (isTop3) 0.25f else 0.15f))
-                    .border(1.dp, rankBadgeColor.copy(alpha = 0.4f), CircleShape),
+                    .background(rankBadgeColor.copy(alpha = if (isTop3) 0.18f else 0.1f))
+                    .border(1.dp, rankBadgeColor.copy(alpha = 0.45f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "${entry.rank.toPersianDigits()}",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
+                    text = entry.rank.toPersianDigits(),
+                    style = MaterialTheme.typography.labelLarge,
                     color = rankBadgeColor
                 )
             }
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            // Display Name (Masked for privacy)
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = entry.displayName,
-                        fontWeight = if (entry.isCurrentUser || isTop3) FontWeight.Bold else FontWeight.Medium,
-                        fontSize = 14.sp,
-                        color = WarmWhite,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = entry.displayName,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = if (entry.isCurrentUser || isTop3) FontWeight.Bold else FontWeight.Medium
+                    ),
+                    color = WarmWhite,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (entry.isCurrentUser) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    LuxuryBadge(
+                        text = "شما",
+                        tone = LuxuryBadgeTone.GOLD
                     )
-                    if (entry.isCurrentUser) {
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Surface(
-                            shape = RoundedCornerShape(4.dp),
-                            color = GoldAccent.copy(alpha = 0.2f),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, GoldAccent.copy(alpha = 0.5f))
-                        ) {
-                            Text(
-                                text = "شما",
-                                color = GoldLight,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                            )
-                        }
-                    }
                 }
             }
 
-            // Score Badge
+            Spacer(modifier = Modifier.width(8.dp))
+
             Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = if (isTop3) GoldAccent.copy(alpha = 0.2f) else Color(0xFF1F2634),
-                border = androidx.compose.foundation.BorderStroke(
+                shape = RoundedCornerShape(10.dp),
+                color = if (isTop3) GoldAccent.copy(alpha = 0.14f) else ObsidianBlack.copy(alpha = 0.6f),
+                border = BorderStroke(
                     1.dp,
-                    if (isTop3) GoldAccent.copy(alpha = 0.5f) else Color(0x22FFFFFF)
+                    if (isTop3) LuxuryBorderStrong else CharcoalBorder
                 )
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     if (isTop3) {
                         Icon(
-                            imageVector = Icons.Default.EmojiEvents,
+                            imageVector = Icons.Rounded.EmojiEvents,
                             contentDescription = null,
                             tint = GoldLight,
                             modifier = Modifier.size(14.dp)
@@ -670,10 +566,9 @@ private fun LeaderboardItemRow(entry: LeaderboardEntry) {
                         Spacer(modifier = Modifier.width(4.dp))
                     }
                     Text(
-                        text = "${entry.totalScore.toPersianDigits()} امتیاز",
+                        text = "${formatNumberPersian(entry.totalScore)} امتیاز",
                         color = if (isTop3) GoldLight else WarmWhite,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
                     )
                 }
             }

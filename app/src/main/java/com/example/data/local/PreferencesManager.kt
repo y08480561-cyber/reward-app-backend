@@ -29,7 +29,7 @@ class PreferencesManager(context: Context) {
         // Official Tapsell Plus Developer / Testing Credentials (Fallback if unconfigured)
         const val DEFAULT_TAPSELL_KEY = "alsoatsrtrotpqacegkehkaiieckldhrgsbspqtgqnbrrfccrtbdomgjtahflchkqtqosa"
         const val DEFAULT_REWARDED_ZONE = "5cfaa802e8d17f0001ffb28e"
-        const val DEFAULT_SERVER_URL = "https://reward-app-backend-1.onrender.com"
+        const val DEFAULT_SERVER_URL = com.example.data.remote.ApiConfig.BASE_URL
         const val DEFAULT_ADMIN_PIN = ""
         const val DEFAULT_SUPABASE_URL = ""
         const val DEFAULT_SUPABASE_ANON_KEY = ""
@@ -87,24 +87,16 @@ class PreferencesManager(context: Context) {
 
     var serverUrl: String
         get() {
-            var raw = prefs.getString(KEY_SERVER_URL, DEFAULT_SERVER_URL) ?: DEFAULT_SERVER_URL
-            // If stored URL is empty, points to broken cPanel domain, or is invalid, update to active Render URL
-            if (raw.isBlank() || !raw.startsWith("http") || raw.contains("api.kalametgame.ir")) {
-                raw = DEFAULT_SERVER_URL
-                prefs.edit().putString(KEY_SERVER_URL, raw).apply()
+            val raw = prefs.getString(KEY_SERVER_URL, DEFAULT_SERVER_URL) ?: DEFAULT_SERVER_URL
+            val normalized = com.example.data.remote.ApiConfig.normalizeBaseUrl(raw)
+            if (normalized != raw.trimEnd('/')) {
+                prefs.edit().putString(KEY_SERVER_URL, normalized).apply()
             }
-            var clean = raw.trimEnd('/')
-            if (clean.endsWith("/api")) {
-                clean = clean.substringBeforeLast("/api").trimEnd('/')
-            }
-            return clean
+            return normalized
         }
         set(value) {
-            var clean = value.trimEnd('/')
-            if (clean.endsWith("/api")) {
-                clean = clean.substringBeforeLast("/api").trimEnd('/')
-            }
-            prefs.edit().putString(KEY_SERVER_URL, clean).apply()
+            val normalized = com.example.data.remote.ApiConfig.normalizeBaseUrl(value)
+            prefs.edit().putString(KEY_SERVER_URL, normalized).apply()
         }
 
     var adminPin: String
@@ -185,6 +177,34 @@ class PreferencesManager(context: Context) {
         get() = prefs.getString("cached_login_notification_json", "") ?: ""
         set(value) = prefs.edit().putString("cached_login_notification_json", value).apply()
 
+    var notificationsEnabled: Boolean
+        get() = prefs.getBoolean("notifications_enabled", true)
+        set(value) = prefs.edit().putBoolean("notifications_enabled", value).apply()
+
+    var lastAppForegroundAtMs: Long
+        get() = prefs.getLong("last_app_foreground_at_ms", 0L)
+        set(value) = prefs.edit().putLong("last_app_foreground_at_ms", value).apply()
+
+    var lastAppBackgroundAtMs: Long
+        get() = prefs.getLong("last_app_background_at_ms", 0L)
+        set(value) = prefs.edit().putLong("last_app_background_at_ms", value).apply()
+
+    var wasOfflineSinceLastVisit: Boolean
+        get() = prefs.getBoolean("was_offline_since_last_visit", false)
+        set(value) = prefs.edit().putBoolean("was_offline_since_last_visit", value).apply()
+
+    var lastReminderShownAtMs: Long
+        get() = prefs.getLong("last_reminder_shown_at_ms", 0L)
+        set(value) = prefs.edit().putLong("last_reminder_shown_at_ms", value).apply()
+
+    var lastReminderMessageIndex: Int
+        get() = prefs.getInt("last_reminder_message_index", -1)
+        set(value) = prefs.edit().putInt("last_reminder_message_index", value).apply()
+
+    var networkPendingIntentRegisteredAtMs: Long
+        get() = prefs.getLong("network_pending_intent_registered_at_ms", 0L)
+        set(value) = prefs.edit().putLong("network_pending_intent_registered_at_ms", value).apply()
+
     fun clearSession() {
         prefs.edit()
             .putBoolean(KEY_IS_LOGGED_IN, false)
@@ -196,6 +216,9 @@ class PreferencesManager(context: Context) {
             .putInt(KEY_TOTAL_SCORE, 0)
             .putBoolean(KEY_FEEDBACK_SHOWN, false)
             .putBoolean(KEY_FEEDBACK_REWARDED, false)
+            .putBoolean("notifications_enabled", true)
+            .putBoolean("was_offline_since_last_visit", false)
+            .putLong("last_reminder_shown_at_ms", 0L)
             .putString("panel_type", "free")
             .putInt("multiplier", 1)
             .apply()

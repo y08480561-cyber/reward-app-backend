@@ -92,7 +92,7 @@ class BackendRepository(
                             serverStatus = serverStatus,
                             uptimeSeconds = uptime,
                             errorCategory = null,
-                            message = "اتصال به سرور Render با موفقیت برقرار است (تاخیر: ${latencyMs}ms).",
+                            message = "اتصال به سرور api.kalametgame.ir با موفقیت برقرار است (تاخیر: ${latencyMs}ms).",
                             tip = "سرور آنلاین است و درخواست‌ها بدون اختلال پردازش می‌شوند."
                         )
                     } else {
@@ -102,7 +102,7 @@ class BackendRepository(
                             latencyMs = latencyMs,
                             errorCategory = "HTTP_${response.code}",
                             message = "سرور کد وضعیت ${response.code} برگرداند.",
-                            tip = if (response.code in 502..504) "سرور ابری Render در حال شروع اولیه (Cold Start) است. لطفاً چند لحظه بعد مجدداً تلاش کنید." else "سرور پاسخ ناموفق ارسال کرد."
+                            tip = if (response.code in 502..504) "سرور موقتاً در حال راه‌اندازی مجدد است. لطفاً چند لحظه بعد مجدداً تلاش کنید." else "سرور پاسخ ناموفق ارسال کرد."
                         )
                     }
                 }
@@ -134,7 +134,7 @@ class BackendRepository(
     }
 
     /**
-     * Request OTP code via Render backend POST /api/auth/otp/request.
+     * Request OTP code via backend POST /api/auth/otp/request.
      */
     suspend fun requestOtp(phoneNumber: String): Result<String> = withContext(Dispatchers.IO) {
         val cleanPhone = phoneNumber.trim()
@@ -175,7 +175,7 @@ class BackendRepository(
 
     /**
      * Direct registration or login using server-side validated credentials (no SMS dependency).
-     * Connects to POST /api/auth/login on Render backend.
+     * Connects to POST /api/auth/login on backend.
      */
     suspend fun loginDirectly(
         firstName: String,
@@ -269,7 +269,7 @@ class BackendRepository(
     ): Result<User> = loginDirectly(firstName, lastName, phoneNumber, "")
 
     /**
-     * Verify SMS OTP and complete user registration or login via Render backend POST /api/auth/otp/verify.
+     * Verify SMS OTP and complete user registration or login via backend POST /api/auth/otp/verify.
      */
     suspend fun verifyOtpAndLogin(
         firstName: String,
@@ -522,7 +522,7 @@ class BackendRepository(
             }
         }
 
-        // Send point registration to Render Backend API with automatic retry and local fallback
+        // Send point registration to Backend API with automatic retry and local fallback
         val url = "${prefs.serverUrl.trimEnd('/')}/api/ads/complete"
         val payload = JSONObject().apply {
             put("userId", userId)
@@ -1253,14 +1253,8 @@ class BackendRepository(
 
     private val baseApiUrl: String
         get() {
-            var s = prefs.serverUrl.trimEnd('/')
-            if (s.isBlank() || s.contains("localhost") || s.contains("10.0.2.2") || s.contains("ais-dev") || s.contains("ais-pre") || !s.startsWith("http")) {
-                s = com.example.data.local.PreferencesManager.DEFAULT_SERVER_URL
-            }
-            if (s.endsWith("/api")) {
-                s = s.substringBeforeLast("/api").trimEnd('/')
-            }
-            return "$s/api"
+            val base = ApiConfig.normalizeBaseUrl(prefs.serverUrl)
+            return "$base/api"
         }
 
     suspend fun fetchRewardCategories(): Result<List<com.example.model.RewardCategoryItem>> = withContext(Dispatchers.IO) {
@@ -1322,18 +1316,10 @@ class BackendRepository(
                         ?: obj.optBoolean("is_active", true)
 
                     val rawUrl = obj.optString("hero_banner_url", "")
-                    val resolvedUrl = when {
-                        rawUrl.isBlank() -> ""
-                        rawUrl.startsWith("http://") || rawUrl.startsWith("https://") -> rawUrl
-                        rawUrl.startsWith("/") -> {
-                            val base = baseApiUrl.substringBeforeLast("/api")
-                            "$base$rawUrl"
-                        }
-                        else -> {
-                            val base = baseApiUrl.substringBeforeLast("/api")
-                            "$base/$rawUrl"
-                        }
-                    }
+                    val resolvedUrl = ApiConfig.resolveBackendAssetUrl(
+                        rawUrl = rawUrl,
+                        baseUrl = baseApiUrl.substringBeforeLast("/api")
+                    )
 
                     val config = com.example.model.RewardAppearanceConfig(
                         id = obj.optString("id", "default"),

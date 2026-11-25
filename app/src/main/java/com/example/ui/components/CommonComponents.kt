@@ -1,13 +1,24 @@
 package com.example.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,65 +27,62 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AdminPanelSettings
+import androidx.compose.material.icons.automirrored.rounded.Launch
 import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Launch
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.StarBorder
-import androidx.compose.material.icons.filled.Storefront
-import androidx.compose.material.icons.filled.SupportAgent
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material.icons.outlined.CardGiftcard
+import androidx.compose.material.icons.outlined.EmojiEvents
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.StarBorder
+import androidx.compose.material.icons.rounded.SupportAgent
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -129,97 +137,81 @@ fun AppHeader(
     onProfileClick: () -> Unit
 ) {
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .shadow(8.dp),
-        color = NavyPrimary,
-        border = BorderStroke(1.dp, Brush.verticalGradient(listOf(Color(0x33D4AF37), Color(0x11D4AF37))))
+        modifier = Modifier.fillMaxWidth(),
+        color = ObsidianBlack.copy(alpha = 0.95f)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            // Profile icon
-            IconButton(
-                onClick = onProfileClick,
-                modifier = Modifier.testTag("btn_header_profile")
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(Color(0x1AD4AF37))
-                        .border(1.dp, Color(0x44D4AF37), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = "پروفایل",
-                        tint = GoldLight,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-
-            // Title
-            Text(
-                text = title,
-                color = WarmWhite,
-                fontWeight = FontWeight.Bold,
-                fontSize = 17.sp,
-                textAlign = TextAlign.Center
-            )
-
-            // Luxury Score Pill Badge
-            Box(
+        Column(modifier = Modifier.statusBarsPadding()) {
+            Row(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(Color(0xFFD4AF37), Color(0xFFF5D77A), Color(0xFFAA8010))
-                        )
-                    )
-                    .border(1.dp, Color(0x88FFFFFF), RoundedCornerShape(20.dp))
-                    .clickable { onProfileClick() }
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Star,
-                        contentDescription = null,
-                        tint = LuxuryBlack,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "${totalScore.toPersianDigits()} امتیاز",
-                        color = LuxuryBlack,
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 13.sp
-                    )
+                IconButton(
+                    onClick = onProfileClick,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .testTag("btn_header_profile")
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(DarkGraySurface)
+                            .border(1.dp, LuxuryBorderStrong, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Person,
+                            contentDescription = "پروفایل کاربری",
+                            tint = GoldLight,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
+
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = WarmWhite,
+                    textAlign = TextAlign.Center
+                )
+
+                LuxuryScorePill(
+                    score = totalScore,
+                    onClick = onProfileClick
+                )
             }
+            LuxuryHairlineDivider(useGoldAccent = true)
         }
     }
 }
+
+private data class NavTabSpec(
+    val screen: AppScreen,
+    val label: String,
+    val selectedIcon: ImageVector,
+    val unselectedIcon: ImageVector
+)
 
 @Composable
 fun AppBottomNavigation(
     currentScreen: AppScreen,
     onScreenSelected: (AppScreen) -> Unit
 ) {
-    val leftItems = listOf(
-        Triple(AppScreen.PROFILE, "پروفایل", Icons.Default.Person),
-        Triple(AppScreen.STORE, "فروشگاه", Icons.Default.Storefront)
-    )
-    val rightItems = listOf(
-        Triple(AppScreen.PRIZES, "جوایز", Icons.Default.CardGiftcard),
-        Triple(AppScreen.LEADERBOARD, "رتبه‌بندی", Icons.Default.EmojiEvents)
-    )
+    val startItems = remember {
+        listOf(
+            NavTabSpec(AppScreen.HOME, "خانه", Icons.Filled.Home, Icons.Outlined.Home),
+            NavTabSpec(AppScreen.PRIZES, "جوایز", Icons.Filled.CardGiftcard, Icons.Outlined.CardGiftcard)
+        )
+    }
+    val endItems = remember {
+        listOf(
+            NavTabSpec(AppScreen.LEADERBOARD, "رتبه‌بندی", Icons.Filled.EmojiEvents, Icons.Outlined.EmojiEvents),
+            NavTabSpec(AppScreen.PROFILE, "پروفایل", Icons.Filled.Person, Icons.Outlined.Person)
+        )
+    }
 
     var visible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
@@ -236,87 +228,86 @@ fun AppBottomNavigation(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(horizontal = 8.dp, vertical = 8.dp),
+                .padding(horizontal = 12.dp, vertical = 10.dp),
             contentAlignment = Alignment.BottomCenter
         ) {
-            // Protrusion background bump for central logo
+            // Protrusion cradle behind central 100 Squares emblem
             Surface(
                 modifier = Modifier
-                    .offset(y = (-18).dp)
-                    .size(80.dp),
+                    .offset(y = (-16).dp)
+                    .size(76.dp),
                 shape = CircleShape,
-                color = Color(0xF2121722),
-                tonalElevation = 14.dp,
-                shadowElevation = 14.dp,
-                border = BorderStroke(1.dp, Color(0x44D4AF37))
+                color = DockSurfaceColor,
+                shadowElevation = 16.dp,
+                border = BorderStroke(1.dp, LuxuryBorderStrong)
             ) {}
 
-            // Main Navigation Luxury Capsule
+            // Floating Obsidian Dock
             Surface(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .widthIn(max = 560.dp)
                     .height(64.dp)
-                    .shadow(20.dp, RoundedCornerShape(32.dp)),
-                color = Color(0xF2121722),
-                shape = RoundedCornerShape(32.dp),
+                    .shadow(20.dp, RoundedCornerShape(30.dp), spotColor = Color.Black),
+                color = DockSurfaceColor,
+                shape = RoundedCornerShape(30.dp),
                 border = BorderStroke(
                     1.dp,
                     Brush.verticalGradient(
-                        listOf(
-                            Color(0x66D4AF37),
-                            Color(0x22D4AF37)
-                        )
+                        listOf(GoldAccent.copy(alpha = 0.42f), CharcoalBorder)
                     )
                 )
             ) {
                 Row(
-                    modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Left items
                     Row(
                         modifier = Modifier.weight(1f),
-                        horizontalArrangement = Arrangement.SpaceAround,
+                        horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        leftItems.forEach { (screen, label, icon) ->
+                        startItems.forEach { tab ->
+                            val isSelected = currentScreen == tab.screen
                             BottomNavItem(
-                                selected = currentScreen == screen,
-                                icon = icon,
-                                label = label,
-                                onClick = { onScreenSelected(screen) },
-                                modifier = Modifier.testTag("btn_nav_${screen.name.lowercase()}")
+                                selected = isSelected,
+                                icon = if (isSelected) tab.selectedIcon else tab.unselectedIcon,
+                                label = tab.label,
+                                onClick = { onScreenSelected(tab.screen) },
+                                modifier = Modifier.testTag("btn_nav_${tab.screen.name.lowercase()}")
                             )
                         }
                     }
 
-                    // Space for the central logo button
-                    Spacer(modifier = Modifier.width(76.dp))
+                    Spacer(modifier = Modifier.width(74.dp))
 
-                    // Right items
                     Row(
                         modifier = Modifier.weight(1f),
-                        horizontalArrangement = Arrangement.SpaceAround,
+                        horizontalArrangement = Arrangement.SpaceEvenly,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        rightItems.forEach { (screen, label, icon) ->
+                        endItems.forEach { tab ->
+                            val isSelected = currentScreen == tab.screen ||
+                                (tab.screen == AppScreen.PROFILE &&
+                                    (currentScreen == AppScreen.STORE || currentScreen == AppScreen.MEMBERSHIP || currentScreen == AppScreen.SUPPORT))
                             BottomNavItem(
-                                selected = currentScreen == screen,
-                                icon = icon,
-                                label = label,
-                                onClick = { onScreenSelected(screen) },
-                                modifier = Modifier.testTag("btn_nav_${screen.name.lowercase()}")
+                                selected = isSelected,
+                                icon = if (isSelected) tab.selectedIcon else tab.unselectedIcon,
+                                label = tab.label,
+                                onClick = { onScreenSelected(tab.screen) },
+                                modifier = Modifier.testTag("btn_nav_${tab.screen.name.lowercase()}")
                             )
                         }
                     }
                 }
             }
 
-            // Floating Central Luxury Logo Button (100 Squares)
             CentralLogoButton(
                 selected = currentScreen == AppScreen.SQUARES,
                 label = "۱۰۰ مربع",
-                icon = Icons.Default.GridView,
+                icon = Icons.Filled.GridView,
                 onClick = { onScreenSelected(AppScreen.SQUARES) },
                 modifier = Modifier.testTag("btn_nav_squares")
             )
@@ -332,34 +323,43 @@ fun BottomNavItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val scale by animateFloatAsState(if (selected) 1.15f else 1.0f)
+    val haptic = LocalHapticFeedback.current
+    val scale by animateFloatAsState(
+        targetValue = if (selected) 1.08f else 1.0f,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium),
+        label = "nav_item_scale"
+    )
     val interactionSource = remember { MutableInteractionSource() }
 
     Column(
         modifier = modifier
+            .heightIn(min = 48.dp)
+            .widthIn(min = 52.dp)
+            .clip(RoundedCornerShape(14.dp))
             .clickable(
                 interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick
+                indication = androidx.compose.material3.ripple(bounded = true, color = GoldAccent),
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onClick()
+                }
             )
-            .padding(4.dp),
+            .padding(horizontal = 6.dp, vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Box(
             modifier = Modifier
-                .size(40.dp)
+                .size(28.dp)
                 .graphicsLayer(scaleX = scale, scaleY = scale),
             contentAlignment = Alignment.Center
         ) {
             if (selected) {
                 Box(
                     modifier = Modifier
-                        .size(34.dp)
+                        .size(28.dp)
                         .background(
-                            Brush.radialGradient(
-                                listOf(Color(0x33D4AF37), Color.Transparent)
-                            ),
+                            Brush.radialGradient(listOf(GoldAccent.copy(alpha = 0.22f), Color.Transparent)),
                             CircleShape
                         )
                 )
@@ -367,15 +367,20 @@ fun BottomNavItem(
             Icon(
                 imageVector = icon,
                 contentDescription = label,
-                tint = if (selected) GoldLight else Color(0xFF8E98A8),
-                modifier = Modifier.size(24.dp)
+                tint = if (selected) GoldLight else TextSecondary,
+                modifier = Modifier.size(21.dp)
             )
         }
+        Spacer(modifier = Modifier.height(2.dp))
         Text(
             text = label,
-            fontSize = 10.sp,
-            fontWeight = if (selected) FontWeight.ExtraBold else FontWeight.Medium,
-            color = if (selected) GoldLight else Color(0xFF8E98A8)
+            style = MaterialTheme.typography.labelSmall.copy(
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                fontSize = 10.sp
+            ),
+            color = if (selected) GoldLight else TextSecondary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
@@ -388,35 +393,40 @@ fun CentralLogoButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val scale by animateFloatAsState(if (selected) 1.15f else 1.0f)
-    val infiniteTransition = rememberInfiniteTransition()
+    val haptic = LocalHapticFeedback.current
+    val scale by animateFloatAsState(
+        targetValue = if (selected) 1.08f else 1.0f,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "center_nav_scale"
+    )
+    val infiniteTransition = rememberInfiniteTransition(label = "center_float")
     val floatOffset by infiniteTransition.animateFloat(
         initialValue = 0f,
-        targetValue = -4f,
+        targetValue = -2.5f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = LinearEasing),
+            animation = tween(2200, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
-        )
+        ),
+        label = "center_float_offset"
     )
 
     Box(
         modifier = modifier
-            .offset(y = (-20).dp)
-            .size(72.dp)
-            .shadow(16.dp, CircleShape)
-            .background(
-                Brush.verticalGradient(
-                    listOf(Color(0xFFF5D77A), Color(0xFFD4AF37), Color(0xFFAA8010))
-                ),
-                CircleShape
-            )
+            .offset(y = (-18).dp)
+            .size(68.dp)
+            .graphicsLayer(scaleX = scale, scaleY = scale)
+            .shadow(14.dp, CircleShape, spotColor = GoldAccent.copy(alpha = 0.45f))
+            .clip(CircleShape)
+            .background(GoldGradientBrush, CircleShape)
             .border(
-                width = 2.dp,
-                brush = Brush.linearGradient(listOf(Color.White, Color(0xFFF5D77A))),
+                width = 1.5.dp,
+                brush = Brush.linearGradient(listOf(GoldLight, GoldAccent, GoldDark)),
                 shape = CircleShape
             )
-            .clickable(onClick = onClick)
-            .graphicsLayer(scaleX = scale, scaleY = scale),
+            .clickable {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onClick()
+            },
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -426,17 +436,19 @@ fun CentralLogoButton(
         ) {
             Icon(
                 imageVector = icon,
-                contentDescription = null,
-                tint = LuxuryBlack,
-                modifier = Modifier.size(28.dp)
+                contentDescription = label ?: "۱۰۰ مربع",
+                tint = ObsidianBlack,
+                modifier = Modifier.size(25.dp)
             )
             if (label != null) {
                 Text(
                     text = label,
-                    color = LuxuryBlack,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    modifier = Modifier.padding(top = 2.dp)
+                    color = ObsidianBlack,
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    ),
+                    modifier = Modifier.padding(top = 1.dp)
                 )
             }
         }
@@ -452,65 +464,55 @@ fun MetricCard(
     accentColor: Color = GoldAccent,
     modifier: Modifier = Modifier
 ) {
-    Surface(
-        modifier = modifier
-            .shadow(6.dp, RoundedCornerShape(16.dp))
-            .clip(RoundedCornerShape(16.dp)),
-        color = CardSurface,
-        border = BorderStroke(1.dp, Color(0x26D4AF37))
+    LuxuryCard(
+        modifier = modifier,
+        borderColor = LuxuryBorder
     ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.Center
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(accentColor.copy(alpha = 0.14f))
+                    .border(1.dp, accentColor.copy(alpha = 0.35f), CircleShape),
+                contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(accentColor.copy(alpha = 0.15f))
-                        .border(1.dp, accentColor.copy(alpha = 0.3f), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        tint = accentColor,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                Text(
-                    text = title,
-                    fontSize = 12.sp,
-                    color = Color(0xFFB0B7C3),
-                    fontWeight = FontWeight.Medium
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = accentColor,
+                    modifier = Modifier.size(19.dp)
                 )
             }
-            Spacer(modifier = Modifier.height(10.dp))
             Text(
-                text = value,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = WarmWhite
+                text = title,
+                style = MaterialTheme.typography.labelMedium,
+                color = TextSecondary
             )
-            if (subValue != null) {
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = subValue,
-                    fontSize = 11.sp,
-                    color = Color(0xFF8E98A8)
-                )
-            }
+        }
+        Spacer(modifier = Modifier.height(10.dp))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleLarge,
+            color = WarmWhite
+        )
+        if (subValue != null) {
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = subValue,
+                style = MaterialTheme.typography.bodySmall,
+                color = TextMuted
+            )
         }
     }
 }
 
 /**
- * Celebratory Modal when +1 point is awarded from completing an ad
+ * Celebratory Modal when points are awarded from completing a rewarded video
  */
 @Composable
 fun RewardCelebrationModal(
@@ -518,81 +520,73 @@ fun RewardCelebrationModal(
     onDismiss: () -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss) {
-        Box(
+        Surface(
             modifier = Modifier
-                .clip(RoundedCornerShape(24.dp))
-                .background(
-                    Brush.verticalGradient(
-                        listOf(LuxuryBlack, NavyPrimary)
-                    )
-                )
-                .border(1.5.dp, GoldAccent, RoundedCornerShape(24.dp))
-                .padding(24.dp),
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .widthIn(max = 420.dp),
+            shape = RoundedCornerShape(24.dp),
+            color = CharcoalSurface,
+            border = BorderStroke(1.2.dp, LuxuryBorderStrong),
+            shadowElevation = 20.dp
         ) {
             Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(LuxuryElevatedCardGradient)
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Trophy badge
                 Box(
                     modifier = Modifier
                         .size(72.dp)
                         .clip(CircleShape)
-                        .background(
-                            Brush.linearGradient(
-                                listOf(Color(0xFFF5D77A), Color(0xFFD4AF37), Color(0xFFAA8010))
-                            )
-                        )
-                        .shadow(12.dp, CircleShape),
+                        .background(GoldGradientBrush)
+                        .border(1.5.dp, GoldLight.copy(alpha = 0.7f), CircleShape)
+                        .shadow(12.dp, CircleShape, spotColor = GoldAccent),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Default.EmojiEvents,
+                        imageVector = Icons.Filled.EmojiEvents,
                         contentDescription = null,
-                        tint = LuxuryBlack,
-                        modifier = Modifier.size(44.dp)
+                        tint = ObsidianBlack,
+                        modifier = Modifier.size(38.dp)
                     )
                 }
-                Spacer(modifier = Modifier.height(16.dp))
+
+                Spacer(modifier = Modifier.height(18.dp))
+
                 Text(
-                    text = "تبریک! امتیاز جدید ثبت شد",
+                    text = "امتیاز جدید ثبت شد",
+                    style = MaterialTheme.typography.headlineSmall,
                     color = GoldLight,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp,
                     textAlign = TextAlign.Center
                 )
+
                 Spacer(modifier = Modifier.height(8.dp))
+
                 Text(
-                    text = "+${pointsAwarded.toPersianDigits()} امتیاز معتبر تپسل",
+                    text = "+${formatNumberPersian(pointsAwarded)} امتیاز",
+                    style = MaterialTheme.typography.displaySmall,
                     color = WarmWhite,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 24.sp,
                     textAlign = TextAlign.Center
                 )
+
                 Spacer(modifier = Modifier.height(8.dp))
+
                 Text(
-                    text = "تبلیغ به طور کامل مشاهده شد و امتیاز شما در سرور مسابقه ثبت گردید.",
-                    color = Color(0xFFCBD5E1),
-                    fontSize = 13.sp,
+                    text = "مشاهده ویدیو با موفقیت تأیید شد و امتیاز این مربع به مجموع امتیازهای شما افزوده گردید.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary,
                     textAlign = TextAlign.Center
                 )
-                Spacer(modifier = Modifier.height(20.dp))
-                Button(
+
+                Spacer(modifier = Modifier.height(22.dp))
+
+                LuxuryPrimaryButton(
+                    text = "ادامه رقابت",
                     onClick = onDismiss,
-                    colors = ButtonDefaults.buttonColors(containerColor = GoldAccent),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("btn_dismiss_celebration")
-                ) {
-                    Text(
-                        text = "ادامه رقابت",
-                        color = LuxuryBlack,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp
-                    )
-                }
+                    modifier = Modifier.testTag("btn_dismiss_celebration")
+                )
             }
         }
     }
@@ -608,104 +602,107 @@ fun ExperienceFeedbackDialog(
     onSubmitInternal: (rating: Int, comment: String) -> Unit,
     onOpenMyket: () -> Unit
 ) {
-    var rating by remember { mutableStateOf(5) }
+    var rating by remember { mutableIntStateOf(5) }
     var comment by remember { mutableStateOf("") }
     var isInternalView by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = RoundedCornerShape(24.dp),
-            color = CardSurface,
-            border = BorderStroke(1.dp, Color(0x33D4AF37)),
+            color = CharcoalSurface,
+            border = BorderStroke(1.dp, LuxuryBorderStrong),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 20.dp)
+                .widthIn(max = 440.dp)
+                .padding(vertical = 16.dp)
         ) {
             Column(
-                modifier = Modifier.padding(24.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(LuxuryElevatedCardGradient)
+                    .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Header
                 Box(
                     modifier = Modifier
-                        .size(64.dp)
+                        .size(62.dp)
                         .clip(CircleShape)
-                        .background(GoldAccent.copy(alpha = 0.15f))
-                        .border(1.dp, GoldAccent.copy(alpha = 0.3f), CircleShape),
+                        .background(GoldAccent.copy(alpha = 0.14f))
+                        .border(1.dp, LuxuryBorderStrong, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = if (isInternalView) Icons.Default.SupportAgent else Icons.Default.Star,
+                        imageVector = if (isInternalView) Icons.Rounded.SupportAgent else Icons.Rounded.Star,
                         contentDescription = null,
                         tint = GoldAccent,
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(32.dp)
                     )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
-                    text = if (isInternalView) "ثبت بازخورد مستقیم" else "تجربه شما برای ما مهم است!",
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 18.sp,
+                    text = if (isInternalView) "ثبت دیدگاه مستقیم" else "دیدگاه شما ارزشمند است",
+                    style = MaterialTheme.typography.headlineSmall,
                     color = WarmWhite,
                     textAlign = TextAlign.Center
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 Text(
-                    text = if (isInternalView) 
-                        "با ارسال نظر صادقانه خود (مثبت یا منفی)، ما را در بهبود اپلیکیشن یاری کنید و ۲ امتیاز هدیه بگیرید."
-                        else "از اینکه همراه ما هستید خوشحالیم. لطفاً با ثبت امتیاز در مایکت یا ارسال بازخورد مستقیم، ما را حمایت کنید.",
-                    fontSize = 13.sp,
-                    color = Color(0xFFB0B7C3),
-                    textAlign = TextAlign.Center,
-                    lineHeight = 22.sp
+                    text = if (isInternalView)
+                        "با ثبت نظر سازنده خود، ما را در ارتقای کیفیت برنامه یاری کنید و ۲ امتیاز هدیه دریافت نمایید."
+                    else
+                        "خوشحالیم که همراه باشگاه رقابت هستید. با ثبت امتیاز در مایکت یا ارسال دیدگاه مستقیم، از تیم توسعه حمایت کنید.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary,
+                    textAlign = TextAlign.Center
                 )
 
                 Spacer(modifier = Modifier.height(20.dp))
 
                 if (!isInternalView) {
-                    // Main View: Options
-                    Button(
+                    LuxuryPrimaryButton(
+                        text = "ثبت امتیاز در مایکت",
+                        icon = Icons.AutoMirrored.Rounded.Launch,
                         onClick = onOpenMyket,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(50.dp)
-                            .testTag("btn_myket_review"),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = GoldAccent)
-                    ) {
-                        Icon(imageVector = Icons.Default.Launch, contentDescription = null, modifier = Modifier.size(18.dp), tint = LuxuryBlack)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("ثبت نظر در مایکت", fontWeight = FontWeight.Bold, color = LuxuryBlack)
-                    }
+                        modifier = Modifier.testTag("btn_myket_review")
+                    )
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     OutlinedButton(
                         onClick = { isInternalView = true },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(50.dp)
+                            .heightIn(min = 48.dp)
                             .testTag("btn_feedback_internal"),
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, Color(0x66D4AF37))
+                        shape = RoundedCornerShape(14.dp),
+                        border = BorderStroke(1.dp, LuxuryBorderStrong)
                     ) {
-                        Text("ثبت بازخورد و دریافت ۲ امتیاز", color = GoldLight, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "ارسال دیدگاه و دریافت ۲ امتیاز",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = GoldLight
+                        )
                     }
-                    
-                    Spacer(modifier = Modifier.height(12.dp))
-                    
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     TextButton(
                         onClick = onDismiss,
-                        modifier = Modifier.testTag("btn_dismiss_feedback")
+                        modifier = Modifier
+                            .heightIn(min = 48.dp)
+                            .testTag("btn_dismiss_feedback")
                     ) {
-                        Text("فعلاً نه", color = Color(0xFF94A3B8), fontSize = 13.sp)
+                        Text(
+                            text = "فعلاً نه",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = TextSecondary
+                        )
                     }
                 } else {
-                    // Internal Feedback View: Form
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.Center
@@ -713,44 +710,68 @@ fun ExperienceFeedbackDialog(
                         repeat(5) { index ->
                             val starIndex = index + 1
                             val isSelected = starIndex <= rating
-                            Icon(
-                                imageVector = if (isSelected) Icons.Default.Star else Icons.Default.StarBorder,
-                                contentDescription = null,
-                                tint = if (isSelected) GoldAccent else Color(0xFFCBD5E1),
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clickable { rating = starIndex }
-                            )
+                            IconButton(
+                                onClick = { rating = starIndex },
+                                modifier = Modifier.size(48.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (isSelected) Icons.Rounded.Star else Icons.Rounded.StarBorder,
+                                    contentDescription = "امتیاز ${starIndex.toPersianDigits()}",
+                                    tint = if (isSelected) GoldAccent else TextMuted,
+                                    modifier = Modifier.size(30.dp)
+                                )
+                            }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
-                    androidx.compose.material3.OutlinedTextField(
+                    OutlinedTextField(
                         value = comment,
                         onValueChange = { comment = it },
-                        modifier = Modifier.fillMaxWidth().height(100.dp),
-                        placeholder = { Text("متن پیام شما (اختیاری)", fontSize = 13.sp) },
-                        shape = RoundedCornerShape(12.dp),
-                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(104.dp),
+                        placeholder = {
+                            Text(
+                                text = "دیدگاه یا پیشنهاد خود را بنویسید (اختیاری)…",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = TextMuted
+                            )
+                        },
+                        shape = RoundedCornerShape(14.dp),
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(color = WarmWhite),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = WarmWhite,
+                            unfocusedTextColor = WarmWhite,
+                            focusedBorderColor = GoldAccent,
+                            unfocusedBorderColor = CharcoalBorder,
+                            focusedContainerColor = ObsidianBlack,
+                            unfocusedContainerColor = ObsidianBlack
+                        )
                     )
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(18.dp))
 
                     if (isSubmitting) {
-                        androidx.compose.material3.CircularProgressIndicator(color = GoldAccent, modifier = Modifier.size(24.dp))
+                        CircularProgressIndicator(color = GoldAccent, modifier = Modifier.size(28.dp))
                     } else {
-                        Button(
-                            onClick = { onSubmitInternal(rating, comment) },
-                            modifier = Modifier.fillMaxWidth().height(50.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen)
+                        LuxuryPrimaryButton(
+                            text = "ثبت دیدگاه و دریافت ۲ امتیاز",
+                            onClick = { onSubmitInternal(rating, comment) }
+                        )
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        TextButton(
+                            onClick = { isInternalView = false },
+                            modifier = Modifier.heightIn(min = 48.dp)
                         ) {
-                            Text("ارسال و دریافت امتیاز", fontWeight = FontWeight.Bold)
-                        }
-                        
-                        TextButton(onClick = { isInternalView = false }) {
-                            Text("بازگشت", color = Color(0xFF94A3B8), fontSize = 12.sp)
+                            Text(
+                                text = "بازگشت",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = TextSecondary
+                            )
                         }
                     }
                 }
