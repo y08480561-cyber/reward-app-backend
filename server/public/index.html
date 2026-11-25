@@ -591,6 +591,34 @@
       backdrop-filter: blur(2px);
     }
 
+    /* Modal Layering & Responsive Resilience */
+    .modal-backdrop {
+      z-index: 1050;
+    }
+    .modal-backdrop.show {
+      opacity: 0.68;
+    }
+    .modal {
+      z-index: 1055;
+    }
+    #adBannerModal .modal-content {
+      background-color: #12253B;
+      border: 1px solid var(--border-color);
+      color: #F8FAFC;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65);
+    }
+    #adBannerModal .modal-dialog {
+      max-width: 980px;
+    }
+    @media (max-width: 767.98px) {
+      #adBannerModal .modal-dialog {
+        margin: 0.65rem;
+      }
+      #adBannerModal .modal-body {
+        padding: 14px;
+      }
+    }
+
     /* Responsive */
     @media (max-width: 991.98px) {
       .admin-sidebar {
@@ -1866,6 +1894,8 @@
         </div>
       </div>
     </div>
+  </div>
+
   <!-- Modal: Add/Edit Store Product -->
   <div class="modal fade modal-dark" id="storeProductModal" tabindex="-1" aria-labelledby="storeProductModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -2041,6 +2071,8 @@
         </form>
       </div>
     </div>
+  </div>
+
   <!-- Modal: Admin Key Authentication Dialog -->
   <div class="modal fade modal-dark" id="adminAuthModal" tabindex="-1" aria-labelledby="adminAuthModalLabel" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
@@ -2088,13 +2120,13 @@
 
   <!-- Modal: Create / Edit Promotional Ad Banner -->
   <div class="modal fade modal-dark" id="adBannerModal" tabindex="-1" aria-labelledby="adBannerModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-xl">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-xl">
       <div class="modal-content" style="background-color: #12253B; border: 1px solid var(--border-color); color: #fff;">
         <div class="modal-header border-secondary">
           <h5 class="modal-title gold-text fw-bold" id="adBannerModalLabel">
             <i class="bi bi-badge-ad-fill text-warning me-2"></i> ایجاد / ویرایش بنر تبلیغاتی
           </h5>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="بستن"></button>
+          <button type="button" id="adBannerCloseXBtn" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="بستن"></button>
         </div>
         <form id="adBannerForm" onsubmit="submitAdBannerForm(event)">
           <div class="modal-body">
@@ -2223,7 +2255,7 @@
           </div>
 
           <div class="modal-footer border-secondary">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">انصراف</button>
+            <button type="button" id="adBannerCancelBtn" class="btn btn-secondary" data-bs-dismiss="modal">انصراف</button>
             <button type="submit" id="saveAdBannerBtn" class="btn btn-gold fw-bold px-4">
               <span id="saveAdBannerSpinner" class="spinner-border spinner-border-sm d-none me-1" role="status"></span>
               <i class="bi bi-check2-circle me-1"></i> ذخیره بنر تبلیغاتی
@@ -2342,18 +2374,20 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-      // Modals Initialization
-      const sModalEl = document.getElementById('startCompModal');
-      if (sModalEl) bootstrapStartModal = new bootstrap.Modal(sModalEl);
+      // Modals Initialization (guarded in case CDN scripts are delayed or unavailable)
+      if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+        const sModalEl = document.getElementById('startCompModal');
+        if (sModalEl) bootstrapStartModal = new bootstrap.Modal(sModalEl);
 
-      const aModalEl = document.getElementById('viewArchiveModal');
-      if (aModalEl) bootstrapArchiveModal = new bootstrap.Modal(aModalEl);
+        const aModalEl = document.getElementById('viewArchiveModal');
+        if (aModalEl) bootstrapArchiveModal = new bootstrap.Modal(aModalEl);
 
-      const annModalEl = document.getElementById('announcementModal');
-      if (annModalEl) bootstrapAnnModal = new bootstrap.Modal(annModalEl);
+        const annModalEl = document.getElementById('announcementModal');
+        if (annModalEl) bootstrapAnnModal = new bootstrap.Modal(annModalEl);
 
-      const tModalEl = document.getElementById('ticketConversationModal');
-      if (tModalEl) bootstrapTicketModal = new bootstrap.Modal(tModalEl);
+        const tModalEl = document.getElementById('ticketConversationModal');
+        if (tModalEl) bootstrapTicketModal = new bootstrap.Modal(tModalEl);
+      }
 
       // Handle Initial Navigation from Hash
       const initialHash = window.location.hash.replace('#', '');
@@ -4958,6 +4992,8 @@
     let cachedAdBanners = [];
     let bootstrapAdBannerModal = null;
     let isUploadingAdBannerImage = false;
+    let adBannerModalLifecycleBound = false;
+    let adBannerFallbackBackdrop = null;
 
     function showAdBannerSectionAlert(msg, type = 'success') {
       const box = document.getElementById('adBannerAlertBox');
@@ -4966,7 +5002,18 @@
       box.className = `alert ${cls} py-2 px-3 small mb-3`;
       box.textContent = msg;
       box.classList.remove('d-none');
-      setTimeout(() => box.classList.add('d-none'), 5000);
+      clearTimeout(box._hideTimer);
+      box._hideTimer = setTimeout(() => box.classList.add('d-none'), 6000);
+    }
+
+    async function parseJsonResponseSafely(res) {
+      const text = await res.text();
+      if (!text) return {};
+      try {
+        return JSON.parse(text);
+      } catch (_e) {
+        return { success: false, message: `پاسخ نامعتبر از سرور دریافت شد (کد ${res.status})` };
+      }
     }
 
     function isValidHttpUrlFrontend(rawUrl) {
@@ -4979,6 +5026,14 @@
       } catch (_e) {
         return false;
       }
+    }
+
+    function isSafeBannerImageUrl(rawUrl) {
+      if (!rawUrl || typeof rawUrl !== 'string') return false;
+      const trimmed = rawUrl.trim();
+      if (!trimmed || /\s/.test(trimmed)) return false;
+      if (trimmed.startsWith('/uploads/')) return true;
+      return isValidHttpUrlFrontend(trimmed);
     }
 
     function toDatetimeLocalValue(isoOrDate) {
@@ -5003,9 +5058,76 @@
       }
     }
 
+    function cleanupStaleAdBannerModalState() {
+      isUploadingAdBannerImage = false;
+      if (adBannerFallbackBackdrop && adBannerFallbackBackdrop.parentNode) {
+        adBannerFallbackBackdrop.parentNode.removeChild(adBannerFallbackBackdrop);
+        adBannerFallbackBackdrop = null;
+      }
+      const anyOpenModal = document.querySelector('.modal.show');
+      if (!anyOpenModal) {
+        document.querySelectorAll('.modal-backdrop').forEach((el) => el.remove());
+        document.body.classList.remove('modal-open');
+        document.body.style.removeProperty('overflow');
+        document.body.style.removeProperty('padding-right');
+      }
+    }
+
+    function hideAdBannerModalSafely() {
+      const modalEl = document.getElementById('adBannerModal');
+      if (modalEl && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+        const instance = bootstrap.Modal.getInstance(modalEl) || bootstrapAdBannerModal;
+        if (instance) {
+          instance.hide();
+          return;
+        }
+      }
+      if (modalEl) {
+        modalEl.classList.remove('show');
+        modalEl.style.display = 'none';
+        modalEl.setAttribute('aria-hidden', 'true');
+        modalEl.removeAttribute('aria-modal');
+        modalEl.removeAttribute('role');
+      }
+      cleanupStaleAdBannerModalState();
+    }
+
+    function bindAdBannerModalLifecycle(modalEl) {
+      if (!modalEl || adBannerModalLifecycleBound) return;
+      adBannerModalLifecycleBound = true;
+
+      modalEl.addEventListener('hidden.bs.modal', () => {
+        cleanupStaleAdBannerModalState();
+      });
+
+      // Fallback dismiss behavior only if Bootstrap JS is unavailable
+      modalEl.querySelectorAll('[data-bs-dismiss="modal"]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          if (typeof bootstrap === 'undefined' || !bootstrap.Modal) {
+            hideAdBannerModalSafely();
+          }
+        });
+      });
+
+      modalEl.addEventListener('click', (e) => {
+        if ((typeof bootstrap === 'undefined' || !bootstrap.Modal) && e.target === modalEl) {
+          hideAdBannerModalSafely();
+        }
+      });
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && (typeof bootstrap === 'undefined' || !bootstrap.Modal)) {
+          if (modalEl.classList.contains('show')) {
+            hideAdBannerModalSafely();
+          }
+        }
+      });
+    }
+
     async function loadAdBanners() {
       const key = getAdminKey();
       const tbody = document.getElementById('adBannersTbody');
+      const countEl = document.getElementById('adBannersFilterCount');
       if (tbody && cachedAdBanners.length === 0) {
         tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-secondary">در حال دریافت بنرهای تبلیغاتی...</td></tr>';
       }
@@ -5014,9 +5136,21 @@
         const res = await fetch('/api/admin/ad-banners', {
           headers: { 'x-admin-key': key }
         });
-        const data = await res.json();
+        const data = await parseJsonResponseSafely(res);
         if (!res.ok || !data.success) {
-          if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-danger">${escapeHtml(data.message || data.error || 'خطا در دریافت بنرها')}</td></tr>`;
+          const errMsg = data.message || data.error || `خطا در دریافت بنرها (کد ${res.status})`;
+          if (res.status === 401) {
+            showAdBannerSectionAlert('کلید امنیتی مدیریت معتبر نیست. می‌توانید کلید را اصلاح کنید یا پس از ورود مجدد لیست را بازخوانی کنید.', 'warning');
+          } else {
+            showAdBannerSectionAlert(errMsg, 'error');
+          }
+          if (countEl) countEl.textContent = 'خطا در دریافت اطلاعات';
+          if (tbody) {
+            const authBtnHtml = res.status === 401
+              ? '<button type="button" class="btn btn-outline-warning btn-sm ms-2" onclick="openAdminAuthModal()"><i class="bi bi-key me-1"></i> ورود کلید مدیریت</button>'
+              : '';
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-danger">${escapeHtml(errMsg)}<div class="mt-2"><button type="button" class="btn btn-outline-warning btn-sm" onclick="loadAdBanners()"><i class="bi bi-arrow-clockwise me-1"></i> تلاش مجدد</button>${authBtnHtml}</div></td></tr>`;
+          }
           return;
         }
 
@@ -5040,7 +5174,13 @@
 
         renderAdBannersTable();
       } catch (err) {
-        if (tbody) tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-danger">خطای ارتباط: ${escapeHtml(err.message)}</td></tr>`;
+        console.error('[AdBanners] loadAdBanners failed:', err);
+        const errMsg = 'خطای ارتباط با سرور: ' + (err?.message || 'نامشخص');
+        showAdBannerSectionAlert(errMsg, 'error');
+        if (countEl) countEl.textContent = 'عدم دسترسی موقت به سرور';
+        if (tbody) {
+          tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-danger">${escapeHtml(errMsg)}<div class="mt-2"><button type="button" class="btn btn-outline-warning btn-sm" onclick="loadAdBanners()"><i class="bi bi-arrow-clockwise me-1"></i> تلاش مجدد</button></div></td></tr>`;
+        }
       }
     }
 
@@ -5083,6 +5223,7 @@
           : '<span class="badge bg-dark border border-warning text-warning" style="font-size: 11px;">مرورگر خارجی</span>';
 
         const safeUrl = isValidHttpUrlFrontend(b.target_url) ? b.target_url : '';
+        const safeImgUrl = isSafeBannerImageUrl(b.image_url) ? b.image_url : '';
 
         return `
           <tr>
@@ -5100,7 +5241,9 @@
               </div>
             </td>
             <td>
-              <img src="${escapeHtml(b.image_url)}" alt="${escapeHtml(b.title)}" class="rounded border border-secondary" style="width: 116px; height: 60px; object-fit: cover; background: #0B192C;">
+              ${safeImgUrl
+                ? `<img src="${escapeHtml(safeImgUrl)}" alt="${escapeHtml(b.title)}" class="rounded border border-secondary" style="width: 116px; height: 60px; object-fit: cover; background: #0B192C;" onerror="this.style.opacity='0.35'; this.alt='تصویر در دسترس نیست';">`
+                : '<span class="badge bg-secondary">بدون تصویر</span>'}
             </td>
             <td>
               <div class="fw-bold text-white mb-1">${escapeHtml(b.title)}</div>
@@ -5131,7 +5274,7 @@
                 <button type="button" class="btn btn-sm btn-outline-warning" onclick="openAdBannerModal('${escapeHtml(b.id)}')" title="ویرایش">
                   <i class="bi bi-pencil-fill"></i> ویرایش
                 </button>
-                <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteAdBanner('${escapeHtml(b.id)}', '${escapeHtml(b.title)}')" title="حذف">
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteAdBanner('${escapeHtml(b.id)}')" title="حذف">
                   <i class="bi bi-trash-fill"></i>
                 </button>
               </div>
@@ -5142,50 +5285,91 @@
     }
 
     function openAdBannerModal(bannerId = null) {
-      const modalAlert = document.getElementById('adBannerModalAlert');
-      if (modalAlert) modalAlert.classList.add('d-none');
+      try {
+        const modalEl = document.getElementById('adBannerModal');
+        if (!modalEl) {
+          console.error('[AdBanners] #adBannerModal element missing from DOM');
+          showAdBannerSectionAlert('خطای داخلی: فرم ایجاد بنر تبلیغاتی در صفحه یافت نشد.', 'error');
+          return;
+        }
 
-      const fileInput = document.getElementById('adBannerImageFileInput');
-      if (fileInput) fileInput.value = '';
+        // Guarantee #adBannerModal is mounted directly under <body> so no parent container can hide or clip it
+        if (modalEl.parentElement !== document.body) {
+          document.body.appendChild(modalEl);
+        }
 
-      if (bannerId) {
-        const b = cachedAdBanners.find((item) => item.id === bannerId);
-        if (!b) return;
-        document.getElementById('adBannerModalLabel').innerHTML = '<i class="bi bi-pencil-square text-warning me-2"></i> ویرایش بنر تبلیغاتی';
-        document.getElementById('adBannerEditId').value = b.id;
-        document.getElementById('adBannerTitleInput').value = b.title || '';
-        document.getElementById('adBannerOrderInput').value = b.display_order ?? 0;
-        document.getElementById('adBannerImageUrlInput').value = b.image_url || '';
-        document.getElementById('adBannerTargetUrlInput').value = b.target_url || '';
-        document.getElementById('adBannerStatusSelect').value = b.is_active ? 'true' : 'false';
-        document.getElementById('adBannerLinkModeSelect').value = b.link_open_mode === 'internal' ? 'internal' : 'external';
-        document.getElementById('adBannerStartAtInput').value = toDatetimeLocalValue(b.start_at);
-        document.getElementById('adBannerEndAtInput').value = toDatetimeLocalValue(b.end_at);
-        document.getElementById('adBannerUploadStatus').textContent = 'تصویر فعلی بارگذاری شده است (برای تغییر فایل جدید انتخاب کنید)';
-        document.getElementById('adBannerUploadStatus').className = 'small text-info';
-      } else {
-        document.getElementById('adBannerModalLabel').innerHTML = '<i class="bi bi-plus-circle-fill text-warning me-2"></i> ایجاد بنر تبلیغاتی جدید';
-        document.getElementById('adBannerEditId').value = '';
-        document.getElementById('adBannerTitleInput').value = '';
-        const nextOrder = cachedAdBanners.length > 0
-          ? Math.max(...cachedAdBanners.map((x) => Number(x.display_order || 0))) + 1
-          : 1;
-        document.getElementById('adBannerOrderInput').value = nextOrder;
-        document.getElementById('adBannerImageUrlInput').value = '';
-        document.getElementById('adBannerTargetUrlInput').value = '';
-        document.getElementById('adBannerStatusSelect').value = 'true';
-        document.getElementById('adBannerLinkModeSelect').value = 'external';
-        document.getElementById('adBannerStartAtInput').value = '';
-        document.getElementById('adBannerEndAtInput').value = '';
-        document.getElementById('adBannerUploadStatus').textContent = 'تصویری انتخاب نشده است';
-        document.getElementById('adBannerUploadStatus').className = 'small text-secondary';
+        closeSidebar();
+        bindAdBannerModalLifecycle(modalEl);
+
+        const modalAlert = document.getElementById('adBannerModalAlert');
+        if (modalAlert) modalAlert.classList.add('d-none');
+
+        const fileInput = document.getElementById('adBannerImageFileInput');
+        if (fileInput) fileInput.value = '';
+        isUploadingAdBannerImage = false;
+
+        if (bannerId) {
+          const b = cachedAdBanners.find((item) => item.id === bannerId);
+          if (!b) {
+            showAdBannerSectionAlert('اطلاعات این بنر در لیست فعلی یافت نشد. لطفاً لیست را به‌روزرسانی کنید.', 'warning');
+            return;
+          }
+          document.getElementById('adBannerModalLabel').innerHTML = '<i class="bi bi-pencil-square text-warning me-2"></i> ویرایش بنر تبلیغاتی';
+          document.getElementById('adBannerEditId').value = b.id;
+          document.getElementById('adBannerTitleInput').value = b.title || '';
+          document.getElementById('adBannerOrderInput').value = b.display_order ?? 0;
+          document.getElementById('adBannerImageUrlInput').value = b.image_url || '';
+          document.getElementById('adBannerTargetUrlInput').value = b.target_url || '';
+          document.getElementById('adBannerStatusSelect').value = b.is_active ? 'true' : 'false';
+          document.getElementById('adBannerLinkModeSelect').value = b.link_open_mode === 'internal' ? 'internal' : 'external';
+          document.getElementById('adBannerStartAtInput').value = toDatetimeLocalValue(b.start_at);
+          document.getElementById('adBannerEndAtInput').value = toDatetimeLocalValue(b.end_at);
+          document.getElementById('adBannerUploadStatus').textContent = 'تصویر فعلی بارگذاری شده است (برای تغییر فایل جدید انتخاب کنید)';
+          document.getElementById('adBannerUploadStatus').className = 'small text-info';
+        } else {
+          document.getElementById('adBannerModalLabel').innerHTML = '<i class="bi bi-plus-circle-fill text-warning me-2"></i> ایجاد بنر تبلیغاتی جدید';
+          document.getElementById('adBannerEditId').value = '';
+          document.getElementById('adBannerTitleInput').value = '';
+          const nextOrder = cachedAdBanners.length > 0
+            ? Math.max(...cachedAdBanners.map((x) => Number(x.display_order || 0))) + 1
+            : 1;
+          document.getElementById('adBannerOrderInput').value = nextOrder;
+          document.getElementById('adBannerImageUrlInput').value = '';
+          document.getElementById('adBannerTargetUrlInput').value = '';
+          document.getElementById('adBannerStatusSelect').value = 'true';
+          document.getElementById('adBannerLinkModeSelect').value = 'external';
+          document.getElementById('adBannerStartAtInput').value = '';
+          document.getElementById('adBannerEndAtInput').value = '';
+          document.getElementById('adBannerUploadStatus').textContent = 'تصویری انتخاب نشده است';
+          document.getElementById('adBannerUploadStatus').className = 'small text-secondary';
+        }
+
+        updateAdBannerPreview();
+
+        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+          bootstrapAdBannerModal = bootstrap.Modal.getOrCreateInstance(modalEl, {
+            backdrop: true,
+            keyboard: true
+          });
+          bootstrapAdBannerModal.show();
+        } else {
+          // Graceful fallback if Bootstrap CDN script failed to load
+          cleanupStaleAdBannerModalState();
+          adBannerFallbackBackdrop = document.createElement('div');
+          adBannerFallbackBackdrop.className = 'modal-backdrop fade show';
+          document.body.appendChild(adBannerFallbackBackdrop);
+          document.body.classList.add('modal-open');
+          modalEl.style.display = 'block';
+          modalEl.classList.add('show');
+          modalEl.setAttribute('aria-modal', 'true');
+          modalEl.setAttribute('role', 'dialog');
+          modalEl.removeAttribute('aria-hidden');
+        }
+      } catch (err) {
+        console.error('[AdBanners] openAdBannerModal error:', err);
+        cleanupStaleAdBannerModalState();
+        showAdBannerSectionAlert('خطا در باز کردن فرم تبلیغ: ' + (err?.message || 'خطای غیرمنتظره'), 'error');
       }
-
-      updateAdBannerPreview();
-      if (!bootstrapAdBannerModal) {
-        bootstrapAdBannerModal = new bootstrap.Modal(document.getElementById('adBannerModal'));
-      }
-      bootstrapAdBannerModal.show();
     }
 
     function setAdBannerQuickEndDays(days) {
@@ -5224,9 +5408,9 @@
           headers: { 'x-admin-key': getAdminKey() },
           body: formData
         });
-        const data = await res.json();
+        const data = await parseJsonResponseSafely(res);
         if (!res.ok || !data.success || !data.url) {
-          statusEl.textContent = data.message || 'خطا در آپلود تصویر';
+          statusEl.textContent = data.message || `خطا در آپلود تصویر (کد ${res.status})`;
           statusEl.className = 'small text-danger';
           return;
         }
@@ -5236,7 +5420,8 @@
         statusEl.className = 'small text-success';
         updateAdBannerPreview();
       } catch (err) {
-        statusEl.textContent = 'خطا در آپلود تصویر: ' + err.message;
+        console.error('[AdBanners] upload failed:', err);
+        statusEl.textContent = 'خطا در آپلود تصویر: ' + (err?.message || 'نامشخص');
         statusEl.className = 'small text-danger';
       } finally {
         isUploadingAdBannerImage = false;
@@ -5254,11 +5439,16 @@
       const imgEl = document.getElementById('adBannerPreviewImg');
       const placeholderEl = document.getElementById('adBannerPreviewPlaceholder');
       if (imgEl && placeholderEl) {
-        if (imageUrl) {
+        if (isSafeBannerImageUrl(imageUrl)) {
+          imgEl.onerror = () => {
+            imgEl.style.display = 'none';
+            placeholderEl.style.display = 'block';
+          };
           imgEl.src = imageUrl;
           imgEl.style.display = 'block';
           placeholderEl.style.display = 'none';
         } else {
+          imgEl.onerror = null;
           imgEl.src = '';
           imgEl.style.display = 'none';
           placeholderEl.style.display = 'block';
@@ -5387,17 +5577,18 @@
             end_at
           })
         });
-        const data = await res.json();
+        const data = await parseJsonResponseSafely(res);
         if (!res.ok || !data.success) {
-          showModalErr(data.message || data.error || 'خطا در ذخیره بنر تبلیغاتی');
+          showModalErr(data.message || data.error || `خطا در ذخیره بنر تبلیغاتی (کد ${res.status})`);
           return;
         }
 
-        if (bootstrapAdBannerModal) bootstrapAdBannerModal.hide();
+        hideAdBannerModalSafely();
         showAdBannerSectionAlert(data.message || 'بنر تبلیغاتی با موفقیت ذخیره شد.', 'success');
         await loadAdBanners();
       } catch (err) {
-        showModalErr('خطای ارتباط با سرور: ' + err.message);
+        console.error('[AdBanners] submitAdBannerForm failed:', err);
+        showModalErr('خطای ارتباط با سرور: ' + (err?.message || 'نامشخص'));
       } finally {
         if (spinner) spinner.classList.add('d-none');
         if (saveBtn) saveBtn.disabled = false;
@@ -5410,7 +5601,7 @@
           method: 'PATCH',
           headers: { 'x-admin-key': getAdminKey() }
         });
-        const data = await res.json();
+        const data = await parseJsonResponseSafely(res);
         if (!res.ok || !data.success) {
           showAdBannerSectionAlert(data.message || 'تغییر وضعیت انجام نشد.', 'error');
         } else {
@@ -5418,7 +5609,8 @@
         }
         await loadAdBanners();
       } catch (err) {
-        showAdBannerSectionAlert('خطا در تغییر وضعیت: ' + err.message, 'error');
+        console.error('[AdBanners] toggleAdBannerStatus failed:', err);
+        showAdBannerSectionAlert('خطا در تغییر وضعیت: ' + (err?.message || 'نامشخص'), 'error');
       }
     }
 
@@ -5443,25 +5635,28 @@
           },
           body: JSON.stringify({ items })
         });
-        const data = await res.json();
+        const data = await parseJsonResponseSafely(res);
         if (!res.ok || !data.success) {
           showAdBannerSectionAlert(data.message || 'تغییر ترتیب انجام نشد.', 'error');
           return;
         }
         await loadAdBanners();
       } catch (err) {
-        showAdBannerSectionAlert('خطا در تغییر ترتیب نمایش: ' + err.message, 'error');
+        console.error('[AdBanners] moveAdBannerOrder failed:', err);
+        showAdBannerSectionAlert('خطا در تغییر ترتیب نمایش: ' + (err?.message || 'نامشخص'), 'error');
       }
     }
 
-    async function deleteAdBanner(bannerId, title) {
+    async function deleteAdBanner(bannerId) {
+      const targetBanner = cachedAdBanners.find((b) => b.id === bannerId);
+      const title = targetBanner?.title || 'این تبلیغ';
       if (!confirm(`آیا از حذف بنر تبلیغاتی «${title}» اطمینان دارید؟`)) return;
       try {
         const res = await fetch(`/api/admin/ad-banners/${encodeURIComponent(bannerId)}`, {
           method: 'DELETE',
           headers: { 'x-admin-key': getAdminKey() }
         });
-        const data = await res.json();
+        const data = await parseJsonResponseSafely(res);
         if (!res.ok || !data.success) {
           showAdBannerSectionAlert(data.message || 'حذف تبلیغ ناموفق بود.', 'error');
           return;
@@ -5469,7 +5664,8 @@
         showAdBannerSectionAlert('بنر تبلیغاتی با موفقیت حذف شد.', 'success');
         await loadAdBanners();
       } catch (err) {
-        showAdBannerSectionAlert('خطا در حذف بنر: ' + err.message, 'error');
+        console.error('[AdBanners] deleteAdBanner failed:', err);
+        showAdBannerSectionAlert('خطا در حذف بنر: ' + (err?.message || 'نامشخص'), 'error');
       }
     }
 
