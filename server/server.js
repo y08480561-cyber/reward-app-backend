@@ -16,7 +16,12 @@ app.use(cors());
 // Worker-safe lightweight JSON body parser (bypasses body-parser / iconv-lite stream issues in Workers)
 app.use((req, res, next) => {
   if (req.body !== undefined) return next();
-  if (req.method === 'GET' || req.method === 'DELETE') {
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'DELETE') {
+    req.body = {};
+    return next();
+  }
+  const contentType = String(req.headers['content-type'] || '').toLowerCase();
+  if (contentType.includes('multipart/form-data')) {
     req.body = {};
     return next();
   }
@@ -36,16 +41,62 @@ app.use((req, res, next) => {
     next();
   });
 });
-app.use(express.static(path.join(__dirname, 'public')));
+
+// Root health endpoint (completely independent of database)
+app.get('/', (req, res) => {
+  const isWorker =
+    process.env.WORKER_RUNTIME === 'cloudflare-workers' ||
+    (typeof navigator !== 'undefined' && navigator.userAgent === 'Cloudflare-Workers');
+
+  res.status(200).json({
+    success: true,
+    status: 'ok',
+    service: 'reward-app-backend',
+    message: 'Reqabat Backend API is running.',
+    runtime: isWorker ? 'cloudflare-workers' : 'nodejs',
+    endpoints: {
+      health: '/api/health',
+      d1Health: '/api/health/d1'
+    },
+    timestamp: Date.now()
+  });
+});
+
+try {
+  const publicDir = path.join(__dirname, 'public');
+  if (fs.existsSync(publicDir)) {
+    app.use(express.static(publicDir));
+  }
+} catch (_err) {
+  // Ignore static middleware setup when local filesystem assets are absent (e.g., Cloudflare Workers)
+}
 
 // Standalone Admin Users Page (Pure users table)
 app.get(['/admin/users', '/admin/users/'], (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'users.html'));
+  const filePath = path.join(__dirname, 'public', 'users.html');
+  try {
+    if (fs.existsSync(filePath)) {
+      return res.sendFile(filePath);
+    }
+  } catch (_err) {}
+  return res.status(404).json({
+    success: false,
+    error: 'صفحه پنل کاربری استاتیک در این محیط در دسترس نیست.'
+  });
 });
 
 // Admin Dashboard Alias
 app.get(['/admin', '/admin/dashboard'], (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  const filePath = path.join(__dirname, 'public', 'index.html');
+  try {
+    if (fs.existsSync(filePath)) {
+      return res.sendFile(filePath);
+    }
+  } catch (_err) {}
+  return res.status(404).json({
+    success: false,
+    error: 'داشبورد استاتیک در این محیط در دسترس نیست.'
+  });
 });
 
 // ====================================================================
@@ -111,40 +162,31 @@ if (activeDbUrl) {
     console.error('[PostgreSQL Pool Unexpected Error]', err.message);
     isDbConnected = false;
   });
-
-  // Share pool with rewards service if already loaded
-  try {
-    const rewardsPath = path.join(__dirname, 'rewards-service/server.js');
-    if (fs.existsSync(rewardsPath)) {
-      const rewardsModule = require(rewardsPath);
-      if (rewardsModule && rewardsModule.setPool) {
-        rewardsModule.setPool(pool);
-        console.log('[PostgreSQL] Database pool shared with Rewards Microservice.');
-      }
-    }
-  } catch (err) {
-    // Ignore early share errors
-  }
 } else {
-  console.warn('[PostgreSQL Init] DATABASE_URL is not set in environment variables. Database operations will return HTTP 503 until configured in cPanel.');
+  console.warn('[Database Init] DATABASE_URL is not set in environment variables. Waiting for D1 binding or pool injection.');
 }
 
-// Mount Independent Rewards Microservice Router
+let mountedRewardsModule = null;
+
+// Mount Independent Rewards Microservice Router using static require for esbuild/Workers bundling
 try {
-  const rewardsModule = require(path.join(__dirname, 'rewards-service/server.js'));
-  if (rewardsModule && rewardsModule.rewardsRouter) {
-    if (pool && rewardsModule.setPool) {
-      rewardsModule.setPool(pool);
+  mountedRewardsModule = require('./rewards-service/server.js');
+  if (mountedRewardsModule && mountedRewardsModule.rewardsRouter) {
+    if (pool && mountedRewardsModule.setPool) {
+      mountedRewardsModule.setPool(pool);
       console.log('[Rewards Microservice] Shared database pool linked.');
     }
-    app.use(['/api/rewards', '/api/prizes'], rewardsModule.rewardsRouter);
+    app.use(['/api/rewards', '/api/prizes'], mountedRewardsModule.rewardsRouter);
     console.log('[Rewards Microservice] Successfully mounted /api/rewards and /api/prizes routes.');
   } else {
     throw new Error('rewardsRouter export not found');
   }
 } catch (e) {
-  console.error('[CRITICAL ERROR] Failed to mount rewards microservice:', e.message);
-  process.exit(1);
+  console.error('[CRITICAL ERROR] Failed to mount rewards microservice:', e && e.stack ? e.stack : e);
+  if (require.main === module) {
+    process.exit(1);
+  }
+  throw e;
 }
 
 // Database Connection Test and Schema Initialization
@@ -969,30 +1011,98 @@ function ensureDatabaseReady(req, res, next) {
   next();
 }
 
-// Health check endpoint (Available at /health and /api/health)
+// Health check endpoint (Worker / server execution & summary DB status)
 app.get(['/health', '/api/health'], async (req, res) => {
+  const isWorker =
+    process.env.WORKER_RUNTIME === 'cloudflare-workers' ||
+    (typeof navigator !== 'undefined' && navigator.userAgent === 'Cloudflare-Workers');
+  const isD1 = Boolean(pool && pool.isD1);
   let dbStatus = 'disconnected';
+  let dbError = null;
+
   if (pool) {
     try {
-      await pool.query('SELECT 1');
+      await pool.query('SELECT 1 AS ok');
       dbStatus = 'connected';
       isDbConnected = true;
     } catch (e) {
       dbStatus = 'disconnected';
+      dbError = e && e.message ? e.message : 'Database check failed';
       isDbConnected = false;
+      console.error('[Health Check DB Error]', e && e.stack ? e.stack : e);
     }
   }
+
+  let uptimeSeconds = null;
+  try {
+    if (typeof process !== 'undefined' && typeof process.uptime === 'function') {
+      uptimeSeconds = process.uptime();
+    }
+  } catch (_err) {
+    uptimeSeconds = null;
+  }
+
   res.status(200).json({
+    success: true,
     status: 'ok',
-    uptime: process.uptime(),
+    service: 'reward-app-backend',
+    runtime: isWorker ? 'cloudflare-workers' : 'nodejs',
+    uptime: uptimeSeconds,
     timestamp: Date.now(),
-    server: 'Reqabat Backend (cPanel)',
+    server: isD1 ? 'Reqabat Backend (Cloudflare Workers / D1)' : 'Reqabat Backend',
     database: {
+      type: isD1 ? 'cloudflare-d1' : (DATABASE_URL ? 'postgresql' : 'unconfigured'),
       status: dbStatus,
-      configured: Boolean(DATABASE_URL),
-      target: DATABASE_URL ? getSanitizedDbUrl(DATABASE_URL) : 'NOT_SET'
+      configured: Boolean(pool || DATABASE_URL),
+      target: isD1 ? 'env.DB (reward-app-db)' : (DATABASE_URL ? getSanitizedDbUrl(DATABASE_URL) : 'NOT_SET'),
+      ...(dbError ? { error: dbError } : {})
     }
   });
+});
+
+// Dedicated Cloudflare D1 Connectivity Check Endpoint (runs SELECT 1)
+app.get(['/health/d1', '/api/health/d1'], async (req, res) => {
+  if (!pool) {
+    return res.status(503).json({
+      success: false,
+      status: 'error',
+      d1Connected: false,
+      binding: 'DB',
+      error: 'Database pool / D1 binding (env.DB) is not initialized.',
+      timestamp: Date.now()
+    });
+  }
+
+  const startedAt = Date.now();
+  try {
+    const result = await pool.query('SELECT 1 AS ok');
+    isDbConnected = true;
+    return res.status(200).json({
+      success: true,
+      status: 'ok',
+      d1Connected: true,
+      adapter: pool.isD1 ? 'cloudflare-d1' : 'sql-pool',
+      binding: 'DB',
+      databaseName: 'reward-app-db',
+      query: 'SELECT 1 AS ok',
+      result: result && Array.isArray(result.rows) && result.rows.length > 0 ? result.rows[0] : { ok: 1 },
+      latencyMs: Date.now() - startedAt,
+      timestamp: Date.now()
+    });
+  } catch (err) {
+    isDbConnected = false;
+    console.error('[D1 Health Check Error]', err && err.stack ? err.stack : err);
+    return res.status(503).json({
+      success: false,
+      status: 'error',
+      d1Connected: false,
+      adapter: pool.isD1 ? 'cloudflare-d1' : 'sql-pool',
+      binding: 'DB',
+      error: err && err.message ? err.message : 'D1 query failed',
+      latencyMs: Date.now() - startedAt,
+      timestamp: Date.now()
+    });
+  }
 });
 
 // Admin Authentication Middleware (Strict header-based, no query string credentials, no hardcoded secrets)
@@ -4783,26 +4893,59 @@ app.post('/api/ad-banners/:id/impression', async (req, res) => {
   }
 
   try {
-    const updateRes = await pool.query(
-      `UPDATE public.ad_banners
-       SET impression_count = impression_count + 1,
-           placement_stats = CASE
-             WHEN $2::text IS NOT NULL THEN
-               jsonb_set(
-                 COALESCE(placement_stats, '{}'::jsonb),
-                 ARRAY[$2::text, 'impressions'],
-                 to_jsonb(COALESCE((placement_stats->$2::text->>'impressions')::int, 0) + 1),
-                 true
-               )
-             ELSE COALESCE(placement_stats, '{}'::jsonb)
-           END
-       WHERE id = $1
-         AND is_active = true
-         AND (start_at IS NULL OR start_at <= NOW())
-         AND (end_at IS NULL OR end_at > NOW())
-       RETURNING id`,
-      [id, placement]
-    );
+    let updateRes;
+    if (pool.isD1) {
+      const existing = await pool.query(
+        `SELECT id, placement_stats FROM public.ad_banners
+         WHERE id = $1
+           AND is_active = 1
+           AND (start_at IS NULL OR start_at <= CURRENT_TIMESTAMP)
+           AND (end_at IS NULL OR end_at > CURRENT_TIMESTAMP)`,
+        [id]
+      );
+      if (existing.rows.length === 0) {
+        return res.status(404).json({ success: false, recorded: false, message: 'بنر فعال یافت نشد.' });
+      }
+      let stats = {};
+      try {
+        stats = existing.rows[0].placement_stats
+          ? (typeof existing.rows[0].placement_stats === 'string' ? JSON.parse(existing.rows[0].placement_stats) : existing.rows[0].placement_stats)
+          : {};
+      } catch (_e) { stats = {}; }
+      if (placement) {
+        stats[placement] = stats[placement] || {};
+        stats[placement].impressions = (Number(stats[placement].impressions) || 0) + 1;
+      }
+      updateRes = await pool.query(
+        `UPDATE public.ad_banners
+         SET impression_count = impression_count + 1,
+             placement_stats = $2
+         WHERE id = $1
+         RETURNING id`,
+        [id, JSON.stringify(stats)]
+      );
+    } else {
+      updateRes = await pool.query(
+        `UPDATE public.ad_banners
+         SET impression_count = impression_count + 1,
+             placement_stats = CASE
+               WHEN $2::text IS NOT NULL THEN
+                 jsonb_set(
+                   COALESCE(placement_stats, '{}'::jsonb),
+                   ARRAY[$2::text, 'impressions'],
+                   to_jsonb(COALESCE((placement_stats->$2::text->>'impressions')::int, 0) + 1),
+                   true
+                 )
+               ELSE COALESCE(placement_stats, '{}'::jsonb)
+             END
+         WHERE id = $1
+           AND is_active = true
+           AND (start_at IS NULL OR start_at <= NOW())
+           AND (end_at IS NULL OR end_at > NOW())
+         RETURNING id`,
+        [id, placement]
+      );
+    }
     if (updateRes.rows.length === 0) {
       return res.status(404).json({ success: false, recorded: false, message: 'بنر فعال یافت نشد.' });
     }
@@ -4836,26 +4979,59 @@ app.post('/api/ad-banners/:id/click', async (req, res) => {
   }
 
   try {
-    const updateRes = await pool.query(
-      `UPDATE public.ad_banners
-       SET click_count = click_count + 1,
-           placement_stats = CASE
-             WHEN $2::text IS NOT NULL THEN
-               jsonb_set(
-                 COALESCE(placement_stats, '{}'::jsonb),
-                 ARRAY[$2::text, 'clicks'],
-                 to_jsonb(COALESCE((placement_stats->$2::text->>'clicks')::int, 0) + 1),
-                 true
-               )
-             ELSE COALESCE(placement_stats, '{}'::jsonb)
-           END
-       WHERE id = $1
-         AND is_active = true
-         AND (start_at IS NULL OR start_at <= NOW())
-         AND (end_at IS NULL OR end_at > NOW())
-       RETURNING id`,
-      [id, placement]
-    );
+    let updateRes;
+    if (pool.isD1) {
+      const existing = await pool.query(
+        `SELECT id, placement_stats FROM public.ad_banners
+         WHERE id = $1
+           AND is_active = 1
+           AND (start_at IS NULL OR start_at <= CURRENT_TIMESTAMP)
+           AND (end_at IS NULL OR end_at > CURRENT_TIMESTAMP)`,
+        [id]
+      );
+      if (existing.rows.length === 0) {
+        return res.status(404).json({ success: false, recorded: false, message: 'بنر فعال یافت نشد.' });
+      }
+      let stats = {};
+      try {
+        stats = existing.rows[0].placement_stats
+          ? (typeof existing.rows[0].placement_stats === 'string' ? JSON.parse(existing.rows[0].placement_stats) : existing.rows[0].placement_stats)
+          : {};
+      } catch (_e) { stats = {}; }
+      if (placement) {
+        stats[placement] = stats[placement] || {};
+        stats[placement].clicks = (Number(stats[placement].clicks) || 0) + 1;
+      }
+      updateRes = await pool.query(
+        `UPDATE public.ad_banners
+         SET click_count = click_count + 1,
+             placement_stats = $2
+         WHERE id = $1
+         RETURNING id`,
+        [id, JSON.stringify(stats)]
+      );
+    } else {
+      updateRes = await pool.query(
+        `UPDATE public.ad_banners
+         SET click_count = click_count + 1,
+             placement_stats = CASE
+               WHEN $2::text IS NOT NULL THEN
+                 jsonb_set(
+                   COALESCE(placement_stats, '{}'::jsonb),
+                   ARRAY[$2::text, 'clicks'],
+                   to_jsonb(COALESCE((placement_stats->$2::text->>'clicks')::int, 0) + 1),
+                   true
+                 )
+               ELSE COALESCE(placement_stats, '{}'::jsonb)
+             END
+         WHERE id = $1
+           AND is_active = true
+           AND (start_at IS NULL OR start_at <= NOW())
+           AND (end_at IS NULL OR end_at > NOW())
+         RETURNING id`,
+        [id, placement]
+      );
+    }
     if (updateRes.rows.length === 0) {
       return res.status(404).json({ success: false, recorded: false, message: 'بنر فعال یافت نشد.' });
     }
@@ -4873,12 +5049,27 @@ app.use('/api', (req, res) => {
 
 // Global Error Handler
 app.use((err, req, res, next) => {
-  console.error('[Global Error]', err);
-  res.status(500).json({ success: false, error: 'خطای داخلی سرور رخ داد.' });
+  console.error(`[Express Global Error] ${req.method} ${req.originalUrl}:`, err && err.stack ? err.stack : err);
+  if (res.headersSent) {
+    return next(err);
+  }
+  const status = Number(err && (err.statusCode || err.status)) || 500;
+  res.status(status).json({
+    success: false,
+    error: 'خطای داخلی سرور رخ داد.',
+    message: err && err.message ? err.message : 'Internal Server Error'
+  });
 });
 
 // Export Express App, Pool accessor, and Test Pool setter for testing and modular usage
 function setTestPool(customPool) {
+  if (pool === customPool) {
+    isDbConnected = Boolean(customPool);
+    if (mountedRewardsModule && typeof mountedRewardsModule.setPool === 'function') {
+      mountedRewardsModule.setPool(customPool);
+    }
+    return;
+  }
   if (pool && pool !== customPool) {
     try {
       pool.end().catch((err) => {
@@ -4889,7 +5080,10 @@ function setTestPool(customPool) {
     }
   }
   pool = customPool;
-  isDbConnected = true;
+  isDbConnected = Boolean(customPool);
+  if (mountedRewardsModule && typeof mountedRewardsModule.setPool === 'function') {
+    mountedRewardsModule.setPool(customPool);
+  }
 }
 
 module.exports = app;
@@ -4897,13 +5091,15 @@ module.exports.app = app;
 module.exports.getPool = () => pool;
 module.exports.setTestPool = setTestPool;
 
-// Global process error handlers for stable execution on shared Node.js hosting
-process.on('uncaughtException', (err) => {
-  console.error('[Reqabat Server CRITICAL] Uncaught Exception:', err);
-});
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('[Reqabat Server CRITICAL] Unhandled Rejection at:', promise, 'reason:', reason);
-});
+// Global process error handlers for stable execution
+if (typeof process !== 'undefined' && typeof process.on === 'function') {
+  process.on('uncaughtException', (err) => {
+    console.error('[Reqabat Server CRITICAL] Uncaught Exception:', err && err.stack ? err.stack : err);
+  });
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('[Reqabat Server CRITICAL] Unhandled Rejection at:', promise, 'reason:', reason && reason.stack ? reason.stack : reason);
+  });
+}
 
 // Startup Server with PostgreSQL Verification if run directly
 if (require.main === module) {

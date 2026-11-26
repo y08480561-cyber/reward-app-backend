@@ -10,7 +10,12 @@ const rewardsRouter = express.Router();
 rewardsRouter.use(cors());
 rewardsRouter.use((req, res, next) => {
   if (req.body !== undefined) return next();
-  if (req.method === 'GET' || req.method === 'DELETE') {
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'DELETE') {
+    req.body = {};
+    return next();
+  }
+  const contentType = String(req.headers['content-type'] || '').toLowerCase();
+  if (contentType.includes('multipart/form-data')) {
     req.body = {};
     return next();
   }
@@ -641,7 +646,12 @@ const app = express();
 app.use(cors());
 app.use((req, res, next) => {
   if (req.body !== undefined) return next();
-  if (req.method === 'GET' || req.method === 'DELETE') {
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'DELETE') {
+    req.body = {};
+    return next();
+  }
+  const contentType = String(req.headers['content-type'] || '').toLowerCase();
+  if (contentType.includes('multipart/form-data')) {
     req.body = {};
     return next();
   }

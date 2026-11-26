@@ -15,4 +15,6 @@
 .cxx
 local.properties
 .env
+.dev.vars
+.wrangler/
 debug.keystore
