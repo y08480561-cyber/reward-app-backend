@@ -13,7 +13,29 @@ const ADMIN_API_KEY = process.env.ADMIN_KEY;
 const DATABASE_URL = process.env.DATABASE_URL;
 
 app.use(cors());
-app.use(express.json());
+// Worker-safe lightweight JSON body parser (bypasses body-parser / iconv-lite stream issues in Workers)
+app.use((req, res, next) => {
+  if (req.body !== undefined) return next();
+  if (req.method === 'GET' || req.method === 'DELETE') {
+    req.body = {};
+    return next();
+  }
+  let data = '';
+  req.on('data', chunk => { data += chunk; });
+  req.on('error', () => { req.body = {}; next(); });
+  req.on('end', () => {
+    if (data) {
+      try {
+        req.body = JSON.parse(data);
+      } catch (e) {
+        req.body = {};
+      }
+    } else {
+      req.body = {};
+    }
+    next();
+  });
+});
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Standalone Admin Users Page (Pure users table)

@@ -8,7 +8,28 @@ require('dotenv').config();
 
 const rewardsRouter = express.Router();
 rewardsRouter.use(cors());
-rewardsRouter.use(express.json());
+rewardsRouter.use((req, res, next) => {
+  if (req.body !== undefined) return next();
+  if (req.method === 'GET' || req.method === 'DELETE') {
+    req.body = {};
+    return next();
+  }
+  let data = '';
+  req.on('data', chunk => { data += chunk; });
+  req.on('error', () => { req.body = {}; next(); });
+  req.on('end', () => {
+    if (data) {
+      try {
+        req.body = JSON.parse(data);
+      } catch (e) {
+        req.body = {};
+      }
+    } else {
+      req.body = {};
+    }
+    next();
+  });
+});
 
 const ADMIN_KEY = process.env.ADMIN_KEY;
 const connectionString = process.env.DATABASE_URL || process.env.SUPABASE_DB_URL;
@@ -618,7 +639,28 @@ function setPool(newPool) {
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use((req, res, next) => {
+  if (req.body !== undefined) return next();
+  if (req.method === 'GET' || req.method === 'DELETE') {
+    req.body = {};
+    return next();
+  }
+  let data = '';
+  req.on('data', chunk => { data += chunk; });
+  req.on('error', () => { req.body = {}; next(); });
+  req.on('end', () => {
+    if (data) {
+      try {
+        req.body = JSON.parse(data);
+      } catch (e) {
+        req.body = {};
+      }
+    } else {
+      req.body = {};
+    }
+    next();
+  });
+});
 app.use('/api/rewards', rewardsRouter);
 
 module.exports = { app, rewardsRouter, pool, setPool };
