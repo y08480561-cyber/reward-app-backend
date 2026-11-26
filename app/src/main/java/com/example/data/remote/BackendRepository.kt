@@ -508,12 +508,94 @@ class BackendRepository(
     }
 
     /**
-     * Get all 100 squares for current active cycle
+     * Get all 100 squares for current active cycle from server API with local Room fallback
      */
     suspend fun getSquares(userId: String): List<AdSquare> = withContext(Dispatchers.IO) {
+        val url = "${prefs.serverUrl.trimEnd('/')}/api/squares"
+        try {
+            val reqBuilder = Request.Builder().url(url).header("x-user-id", userId).get()
+            if (prefs.authToken.isNotBlank()) {
+                reqBuilder.header("Authorization", "Bearer ${prefs.authToken}")
+                reqBuilder.header("x-auth-token", prefs.authToken)
+            }
+            client.newCall(reqBuilder.build()).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (response.isSuccessful) {
+                    val json = JSONObject(body)
+                    val cycleObj = json.optJSONObject("cycle")
+                    val squaresArray = json.optJSONArray("squares") ?: org.json.JSONArray()
+
+                    val cycleId = cycleObj?.optString("cycleId") ?: "CYC_DEFAULT"
+                    val startTime = cycleObj?.optLong("startTime") ?: System.currentTimeMillis()
+                    val endTime = cycleObj?.optLong("endTime") ?: (startTime + 24 * 3600 * 1000L)
+
+                    val cycleEntity = CycleEntity(
+                        cycleId = cycleId,
+                        userId = userId,
+                        startTimeMs = startTime,
+                        endTimeMs = endTime,
+                        completedSquares = 0
+                    )
+                    cycleDao.saveCycle(cycleEntity)
+
+                    val entities = mutableListOf<SquareEntity>()
+                    val domainSquares = mutableListOf<AdSquare>()
+                    for (i in 0 until squaresArray.length()) {
+                        val sqObj = squaresArray.getJSONObject(i)
+                        val num = sqObj.optInt("squareNumber")
+                        val statusStr = sqObj.optString("status", "READY")
+                        val completedAt = sqObj.optLong("completedAt", 0L).takeIf { it > 0L }
+
+                        entities.add(SquareEntity(squareNumber = num, status = statusStr, completedAt = completedAt, cycleId = cycleId))
+                        domainSquares.add(
+                            AdSquare(
+                                squareNumber = num,
+                                status = try { SquareStatus.valueOf(statusStr) } catch (_: Exception) { SquareStatus.READY },
+                                completedAt = completedAt,
+                                cycleId = cycleId
+                            )
+                        )
+                    }
+                    if (entities.isNotEmpty()) {
+                        squareDao.insertOrUpdateSquares(entities)
+                    }
+                    return@withContext domainSquares
+                }
+            }
+        } catch (_: Exception) {
+        }
         ensureActiveCycle(userId)
         val entities = squareDao.getAllSquares()
         entities.map { it.toDomain() }
+    }
+
+    suspend fun instantUnlockSquare(userId: String, squareNumber: Int): Result<JSONObject> = withContext(Dispatchers.IO) {
+        val url = "${prefs.serverUrl.trimEnd('/')}/api/squares/instant-unlock"
+        val payload = JSONObject().apply {
+            put("squareNumber", squareNumber)
+        }
+        try {
+            val reqBuilder = Request.Builder()
+                .url(url)
+                .header("x-user-id", userId)
+                .header("Content-Type", "application/json")
+            if (prefs.authToken.isNotBlank()) {
+                reqBuilder.header("Authorization", "Bearer ${prefs.authToken}")
+                reqBuilder.header("x-auth-token", prefs.authToken)
+            }
+            val request = reqBuilder.post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType())).build()
+            client.newCall(request).execute().use { response ->
+                val body = response.body?.string().orEmpty()
+                if (response.isSuccessful) {
+                    Result.Success(JSONObject(body))
+                } else {
+                    val errJson = try { JSONObject(body) } catch (_: Exception) { null }
+                    Result.Error(errJson?.optString("error") ?: "خطا در بازگشایی آنی مربع")
+                }
+            }
+        } catch (e: Exception) {
+            Result.Error("خطای شبکه در ارتباط با سرور: ${e.message}")
+        }
     }
 
     /**

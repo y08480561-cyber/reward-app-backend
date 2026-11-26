@@ -371,7 +371,7 @@ export async function handleRewardsRoutes(request, env, url, pathname) {
 
     if (normalizedNewStatus === 'REJECTED' && normalizedOldStatus !== 'REJECTED') {
       // Refund guarded by oldClaim.status != 'REJECTED' in WHERE clause
-      batch.push(
+      const batchRes = await env.DB.batch([
         env.DB.prepare(
           `UPDATE reward_claims
            SET status = ?1, admin_notes = ?2, tracking_number = ?3, updated_at = ?4
@@ -389,8 +389,10 @@ export async function handleRewardsRoutes(request, env, url, pathname) {
           .bind(oldClaim.cost_points, nowIso, oldClaim.user_id),
         env.DB.prepare(`UPDATE rewards SET stock_quantity = stock_quantity + 1, updated_at = ?1 WHERE id = ?2`)
           .bind(nowIso, oldClaim.reward_id)
-      );
-      await env.DB.batch(batch);
+      ]);
+      if (Number(batchRes?.[0]?.meta?.changes || 0) === 0) {
+        return jsonResponse({ success: false, message: 'این درخواست قبلاً رد شده یا امتیاز آن بازگردانده شده است.' }, 409);
+      }
     } else if (normalizedOldStatus === 'REJECTED' && status && normalizedNewStatus !== 'REJECTED') {
       const scoreRow = await env.DB.prepare(`SELECT total_score FROM user_scores WHERE user_id = ?1 LIMIT 1`).bind(oldClaim.user_id).first();
       const currentScore = scoreRow ? Number(scoreRow.total_score || 0) : 0;

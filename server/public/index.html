@@ -1270,6 +1270,7 @@
                     <tbody id="rewardClaimsTbody"></tbody>
                   </table>
                 </div>
+                <div id="rewardClaimsPagination" class="d-flex justify-content-between align-items-center mt-3 px-2"></div>
               </div>
             </div>
           </div>
@@ -4800,19 +4801,24 @@
       }
     }
 
-    async function loadRewardClaims() {
+    let currentClaimsPage = 1;
+    const claimsPageLimit = 25;
+
+    async function loadRewardClaims(page = 1) {
+      currentClaimsPage = page;
       const tbody = document.getElementById('rewardClaimsTbody');
       const key = getAdminKey();
       try {
-        const res = await fetch('/api/rewards/admin/claims', { headers: { 'x-admin-key': key } });
+        const offset = (page - 1) * claimsPageLimit;
+        const res = await fetch(`/api/rewards/admin/claims?limit=${claimsPageLimit}&offset=${offset}`, { headers: { 'x-admin-key': key } });
         if (!res.ok) throw new Error('خطا در دریافت لیست درخواست‌ها');
         const data = await res.json();
         cachedClaims = data.claims || [];
+        const serverPendingCount = typeof data.pendingCount === 'number' ? data.pendingCount : cachedClaims.filter(c => c.status === 'PENDING').length;
 
         // Sidebar claims count badge
-        const pendingCount = cachedClaims.filter(c => c.status === 'PENDING').length;
         const badge = document.getElementById('sidebarClaimsBadge');
-        if (badge) badge.innerText = pendingCount.toString();
+        if (badge) badge.innerText = serverPendingCount.toString();
 
         if (!tbody) return;
         if (cachedClaims.length === 0) {
@@ -4852,6 +4858,18 @@
             </tr>
           `;
         }).join('');
+
+        const paginationEl = document.getElementById('rewardClaimsPagination');
+        if (paginationEl && data.pagination) {
+          const p = data.pagination;
+          paginationEl.innerHTML = `
+            <span class="small text-secondary">صفحه ${p.page} از ${p.totalPages} (مجموع: ${p.total})</span>
+            <div class="btn-group btn-group-sm">
+              <button class="btn btn-outline-secondary" ${p.page <= 1 ? 'disabled' : ''} onclick="loadRewardClaims(${p.page - 1})">قبلی</button>
+              <button class="btn btn-outline-secondary" ${!p.hasMore ? 'disabled' : ''} onclick="loadRewardClaims(${p.page + 1})">بعدی</button>
+            </div>
+          `;
+        }
       } catch (err) {
         if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4">خطا: ${escapeHtml(err.message)}</td></tr>`;
       }

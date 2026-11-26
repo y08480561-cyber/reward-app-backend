@@ -501,6 +501,15 @@ export async function handleAdminAndCompetitionRoutes(request, env, url, pathnam
       }, 400);
     }
 
+    let competitionEndDate = null;
+    if (endDate) {
+      const parsedDate = new Date(endDate);
+      if (Number.isNaN(parsedDate.getTime())) {
+        return jsonResponse({ success: false, error: 'فرمت تاریخ پایان مسابقه نامعتبر است.' }, 400);
+      }
+      competitionEndDate = parsedDate.toISOString();
+    }
+
     const nowMs = Date.now();
     const staleThreshold = nowMs - 120000;
     const lockRes = await env.DB.prepare(
@@ -571,11 +580,9 @@ export async function handleAdminAndCompetitionRoutes(request, env, url, pathnam
         await env.DB.prepare(`UPDATE competition_locks SET locked_at = ?1 WHERE id = 'active'`).bind(Date.now()).run();
       }
 
-      // Phase 2: Fixed-size atomic cutover (archive close + new competition + score reset + square reset + announcement + log)
       const nextNumber = prevNumber + 1;
       const newCompId = `COMP_${nextNumber}_${nowMs}`;
       const competitionTitle = newTitle && String(newTitle).trim() ? String(newTitle).trim() : `مسابقه شماره ${nextNumber}`;
-      const competitionEndDate = endDate ? new Date(endDate).toISOString() : null;
 
       const newAnnId = `ANN_${nowMs}_${generateSecureHex(3)}`;
       const annTitle = announcementTitle && String(announcementTitle).trim()

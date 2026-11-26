@@ -522,6 +522,46 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun instantUnlockSquare(squareNumber: Int) {
+        val user = _uiState.value.currentUser ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            when (val result = backendRepository.instantUnlockSquare(user.id, squareNumber)) {
+                is Result.Success -> {
+                    val json = result.data
+                    val newScore = json.optInt("newScore", prefs.totalScore + 1)
+                    val remainingCredits = json.optInt("remainingCredits", 0)
+                    val updatedUser = user.copy(totalScore = newScore)
+
+                    val squares = backendRepository.getSquares(user.id)
+                    val cycle = backendRepository.ensureActiveCycle(user.id)
+                    val entitlements = backendRepository.fetchUserEntitlements(user.id)
+
+                    _uiState.update {
+                        it.copy(
+                            currentUser = updatedUser,
+                            squares = squares,
+                            dailyCycle = cycle,
+                            userEntitlements = if (entitlements is Result.Success) entitlements.data else it.userEntitlements.copy(instantUnlockCredits = remainingCredits),
+                            isLoading = false,
+                            awardedPointsModal = json.optInt("awardedPoints", 1),
+                            infoMessage = json.optString("message", "مربع با موفقیت باز شد.")
+                        )
+                    }
+                    loadLeaderboard()
+                }
+                is Result.Error -> {
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = result.message
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     /**
      * User closed ad before completion
      */
