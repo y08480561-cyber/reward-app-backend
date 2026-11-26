@@ -31,40 +31,52 @@ class ApiConfigTest {
     }
 
     @Test
-    fun `default serverUrl is strictly production custom domain`() {
+    fun `default serverUrl uses Cloudflare test API while preserving production BASE_URL`() {
         assertEquals("https://api.kalametgame.ir", ApiConfig.BASE_URL)
-        assertEquals("https://api.kalametgame.ir", prefs.serverUrl)
+        assertEquals("https://api-test.kalametgame.ir", ApiConfig.CLOUDFLARE_TEST_BASE_URL)
+        assertEquals("https://api-test.kalametgame.ir", ApiConfig.ACTIVE_BASE_URL)
+        assertEquals("https://api-test.kalametgame.ir", prefs.serverUrl)
     }
 
     @Test
-    fun `legacy Render and cleartext URLs migrate automatically to api_kalametgame_ir`() {
+    fun `legacy Render, cleartext, and prod URLs route cleanly while preserving localhost`() {
         val sp = context.getSharedPreferences("reqabat_preferences", Context.MODE_PRIVATE)
 
         sp.edit().putString("server_api_url", "https://reward-app-backend-1.onrender.com").commit()
-        assertEquals("https://api.kalametgame.ir", prefs.serverUrl)
+        assertEquals(ApiConfig.ACTIVE_BASE_URL, prefs.serverUrl)
 
         sp.edit().putString("server_api_url", "https://reward-app-backend-a9ze.onrender.com/api").commit()
-        assertEquals("https://api.kalametgame.ir", prefs.serverUrl)
+        assertEquals(ApiConfig.ACTIVE_BASE_URL, prefs.serverUrl)
 
-        sp.edit().putString("server_api_url", "http://api.kalametgame.ir").commit()
-        assertEquals("https://api.kalametgame.ir", prefs.serverUrl)
+        sp.edit().putString("server_api_url", "http://api-test.kalametgame.ir").commit()
+        assertEquals(ApiConfig.ACTIVE_BASE_URL, prefs.serverUrl)
+
+        sp.edit().putString("server_api_url", "https://api.kalametgame.ir").commit()
+        assertEquals(ApiConfig.ACTIVE_BASE_URL, prefs.serverUrl)
 
         prefs.serverUrl = "https://reward-app-backend-1.onrender.com/"
-        assertEquals("https://api.kalametgame.ir", prefs.serverUrl)
+        assertEquals(ApiConfig.ACTIVE_BASE_URL, prefs.serverUrl)
+
+        prefs.serverUrl = "http://127.0.0.1:8080/"
+        assertEquals("http://127.0.0.1:8080", prefs.serverUrl)
     }
 
     @Test
-    fun `asset url resolution migrates legacy backend hosts while preserving third-party CDNs`() {
+    fun `asset url resolution resolves relative paths against active base and explicit BASE_URL`() {
         assertEquals(
-            "https://api.kalametgame.ir/uploads/gift.jpg",
+            "https://api-test.kalametgame.ir/uploads/gift.jpg",
             ApiConfig.resolveBackendAssetUrl("/uploads/gift.jpg")
         )
         assertEquals(
             "https://api.kalametgame.ir/uploads/gift.jpg",
+            ApiConfig.resolveBackendAssetUrl("/uploads/gift.jpg", ApiConfig.BASE_URL)
+        )
+        assertEquals(
+            "https://api-test.kalametgame.ir/uploads/gift.jpg",
             ApiConfig.resolveBackendAssetUrl("uploads/gift.jpg")
         )
         assertEquals(
-            "https://api.kalametgame.ir/uploads/gift.jpg?v=2",
+            "https://api-test.kalametgame.ir/uploads/gift.jpg?v=2",
             ApiConfig.resolveBackendAssetUrl("https://reward-app-backend-1.onrender.com/uploads/gift.jpg?v=2")
         )
         assertEquals(
@@ -80,7 +92,7 @@ class ApiConfigTest {
     @Test
     fun `okHttp client rejects non-local cleartext http traffic`() {
         val client = NetworkClientProvider.createResilientClient()
-        val req = Request.Builder().url("http://api.kalametgame.ir/health").build()
+        val req = Request.Builder().url("http://api-test.kalametgame.ir/api/health").build()
         try {
             client.newCall(req).execute()
             fail("Expected SSLHandshakeException for cleartext HTTP request")

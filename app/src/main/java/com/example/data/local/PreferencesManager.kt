@@ -29,7 +29,8 @@ class PreferencesManager(context: Context) {
         // Official Tapsell Plus Developer / Testing Credentials (Fallback if unconfigured)
         const val DEFAULT_TAPSELL_KEY = "alsoatsrtrotpqacegkehkaiieckldhrgsbspqtgqnbrrfccrtbdomgjtahflchkqtqosa"
         const val DEFAULT_REWARDED_ZONE = "5cfaa802e8d17f0001ffb28e"
-        const val DEFAULT_SERVER_URL = com.example.data.remote.ApiConfig.BASE_URL
+        val DEFAULT_SERVER_URL: String
+            get() = com.example.data.remote.ApiConfig.ACTIVE_BASE_URL
         const val DEFAULT_ADMIN_PIN = ""
         const val DEFAULT_SUPABASE_URL = ""
         const val DEFAULT_SUPABASE_ANON_KEY = ""
@@ -88,14 +89,14 @@ class PreferencesManager(context: Context) {
     var serverUrl: String
         get() {
             val raw = prefs.getString(KEY_SERVER_URL, DEFAULT_SERVER_URL) ?: DEFAULT_SERVER_URL
-            val normalized = com.example.data.remote.ApiConfig.normalizeBaseUrl(raw)
+            val normalized = com.example.data.remote.ApiConfig.normalizeConfiguredServerUrl(raw)
             if (normalized != raw.trimEnd('/')) {
                 prefs.edit().putString(KEY_SERVER_URL, normalized).apply()
             }
             return normalized
         }
         set(value) {
-            val normalized = com.example.data.remote.ApiConfig.normalizeBaseUrl(value)
+            val normalized = com.example.data.remote.ApiConfig.normalizeConfiguredServerUrl(value)
             prefs.edit().putString(KEY_SERVER_URL, normalized).apply()
         }
 

@@ -948,16 +948,26 @@ app.get(['/health', '/api/health'], async (req, res) => {
   });
 });
 
-// Admin Authentication Middleware (Strict header-based, unified with fallback)
+// Admin Authentication Middleware (Strict header-based, no query params or hardcoded fallback)
 function requireAdminAuth(req, res, next) {
-  const configuredKey = (process.env.ADMIN_KEY || '09876poiuyAA').trim();
+  const configuredKey = (process.env.ADMIN_KEY || '').trim();
+  if (!configuredKey) {
+    return res.status(503).json({
+      error: "کلید امنیتی مدیریت (ADMIN_KEY) روی سرور تنظیم نشده است."
+    });
+  }
   const rawKey = req.headers['x-admin-key'] ||
-                 (req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/i, '').trim() : '') ||
-                 req.query.adminKey || '';
-  const adminKey = String(rawKey).trim();
+                 (req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/i, '').trim() : '');
+  const adminKey = String(rawKey || '').trim();
 
-  // Validate against configured environment key or standard fallback key
-  const isValid = (adminKey && (adminKey === configuredKey || adminKey === '09876poiuyAA'));
+  let isValid = false;
+  if (adminKey.length > 0 && adminKey.length === configuredKey.length) {
+    try {
+      isValid = crypto.timingSafeEqual(Buffer.from(adminKey), Buffer.from(configuredKey));
+    } catch (_) {
+      isValid = false;
+    }
+  }
 
   if (!isValid) {
     return res.status(401).json({ 

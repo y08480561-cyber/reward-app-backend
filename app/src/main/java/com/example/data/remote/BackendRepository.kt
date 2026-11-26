@@ -59,11 +59,11 @@ class BackendRepository(
     private val CYCLE_DURATION_MS = 24 * 60 * 60 * 1000L
 
     /**
-     * Test server reachability and diagnostics via GET /health.
+     * Test server reachability and diagnostics via GET /api/health.
      * Retries once on transient timeout or connection drops (safe idempotent check).
      */
     suspend fun checkServerHealth(): HealthCheckResult = withContext(Dispatchers.IO) {
-        val url = "${prefs.serverUrl.trimEnd('/')}/health"
+        val url = "${prefs.serverUrl.trimEnd('/')}/api/health"
         val request = Request.Builder()
             .url(url)
             .get()
@@ -92,7 +92,7 @@ class BackendRepository(
                             serverStatus = serverStatus,
                             uptimeSeconds = uptime,
                             errorCategory = null,
-                            message = "اتصال به سرور api.kalametgame.ir با موفقیت برقرار است (تاخیر: ${latencyMs}ms).",
+                            message = "اتصال به سرور ${ApiConfig.activeHost()} با موفقیت برقرار است (تاخیر: ${latencyMs}ms).",
                             tip = "سرور آنلاین است و درخواست‌ها بدون اختلال پردازش می‌شوند."
                         )
                     } else {
@@ -131,6 +131,69 @@ class BackendRepository(
             message = "${err.category.titlePersian}: ${err.userFacingMessage}",
             tip = err.recommendedAction
         )
+    }
+
+    /**
+     * Test Cloudflare D1 database binding (DB) and schema readiness via GET /api/health/d1.
+     */
+    suspend fun checkD1Health(): HealthCheckResult = withContext(Dispatchers.IO) {
+        val url = "${prefs.serverUrl.trimEnd('/')}/api/health/d1"
+        val request = Request.Builder()
+            .url(url)
+            .get()
+            .build()
+
+        val startTime = System.currentTimeMillis()
+        try {
+            client.newCall(request).execute().use { response ->
+                val latencyMs = System.currentTimeMillis() - startTime
+                val body = response.body?.string().orEmpty()
+                val json = try { JSONObject(body) } catch (e: Exception) { null }
+                val dbObj = json?.optJSONObject("database")
+                val dbStatus = json?.optString("status")?.ifBlank { null }
+                    ?: dbObj?.optString("status")
+                    ?: "unknown"
+                val schemaPresent = json?.optInt("tablesCount", -1)?.takeIf { it >= 0 }
+                    ?: json?.optJSONObject("schema")?.optInt("presentCount", 0)
+                    ?: 0
+                val missingCount = json?.optJSONArray("missingTables")?.length() ?: 0
+                val isSuccess = response.isSuccessful && (dbStatus == "connected" || json?.optBoolean("success") == true)
+
+                if (isSuccess) {
+                    HealthCheckResult(
+                        isSuccessful = true,
+                        httpStatusCode = response.code,
+                        latencyMs = latencyMs,
+                        serverStatus = dbStatus,
+                        errorCategory = null,
+                        message = "اتصال به دیتابیس D1 با موفقیت برقرار است ($schemaPresent جدول فعال).",
+                        tip = "بانک اطلاعاتی D1 آماده پاسخ‌گویی است."
+                    )
+                } else {
+                    HealthCheckResult(
+                        isSuccessful = false,
+                        httpStatusCode = response.code,
+                        latencyMs = latencyMs,
+                        serverStatus = dbStatus,
+                        errorCategory = "D1_${response.code}",
+                        message = json?.optString("message")?.ifBlank { null }
+                            ?: json?.optString("error")?.ifBlank { null }
+                            ?: "اتصال D1 برقرار نشد (تعداد جداول مفقود: $missingCount).",
+                        tip = "لطفاً اتصال D1 binding (DB) و اجرای مایگریشن‌ها را بررسی کنید."
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            val classified = classifyNetworkException(e)
+            HealthCheckResult(
+                isSuccessful = false,
+                httpStatusCode = 0,
+                latencyMs = 0,
+                errorCategory = classified.category.code,
+                message = "${classified.category.titlePersian}: ${classified.userFacingMessage}",
+                tip = classified.recommendedAction
+            )
+        }
     }
 
     /**
@@ -522,7 +585,7 @@ class BackendRepository(
             }
         }
 
-        // Send point registration to Backend API with automatic retry and local fallback
+        // Send point registration to Backend API with authenticated headers and safe retry
         val url = "${prefs.serverUrl.trimEnd('/')}/api/ads/complete"
         val payload = JSONObject().apply {
             put("userId", userId)
@@ -531,12 +594,20 @@ class BackendRepository(
             put("adDurationSeconds", adDurationSeconds)
         }
 
+        var lastErrorMsg = "خطا در ارتباط با سرور برای ثبت امتیاز تبلیغ"
+        var lastErrorCode = -1
+
         for (attempt in 1..3) {
             try {
-                val request = Request.Builder()
+                val requestBuilder = Request.Builder()
                     .url(url)
                     .header("x-user-id", userId)
                     .header("Content-Type", "application/json")
+                if (prefs.authToken.isNotBlank()) {
+                    requestBuilder.header("Authorization", "Bearer ${prefs.authToken}")
+                    requestBuilder.header("x-auth-token", prefs.authToken)
+                }
+                val request = requestBuilder
                     .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
                     .build()
 
@@ -572,29 +643,31 @@ class BackendRepository(
                         return@withContext Result.Success(newScore)
                     } else {
                         val errJson = try { JSONObject(body) } catch (e: Exception) { null }
-                        val msg = errJson?.optString("error") ?: "خطا در تایید تبلیغ توسط سرور"
-                        if (msg.contains("قبلاً") || msg.contains("completed") || response.code == 400) {
+                        val msg = errJson?.optString("error")?.ifBlank { null } ?: "خطا در تایید تبلیغ توسط سرور (کد ${response.code})"
+                        lastErrorMsg = msg
+                        lastErrorCode = response.code
+                        if (response.code == 409 && (msg.contains("قبلاً") || msg.contains("completed"))) {
                             val now = System.currentTimeMillis()
                             squareDao.setSquareStatus(squareNumber, SquareStatus.COMPLETED.name, now)
                             return@withContext Result.Success(prefs.totalScore)
+                        }
+                        if (response.code in 400..499) {
+                            return@withContext Result.Error(msg, response.code)
                         }
                     }
                 }
             } catch (e: Exception) {
                 Log.w("BackendRepository", "Attempt $attempt to complete ad failed: ${e.message}")
+                val classified = classifyNetworkException(e)
+                lastErrorMsg = "${classified.category.titlePersian}: ${classified.userFacingMessage}"
+                lastErrorCode = -1
                 if (attempt < 3) {
                     kotlinx.coroutines.delay(2000L * attempt)
                 }
             }
         }
 
-        // Fallback: If network failed after watching ad completely, complete locally so user isn't penalized by server sleep/drop
-        val now = System.currentTimeMillis()
-        val fallbackScore = prefs.totalScore + 1
-        squareDao.setSquareStatus(squareNumber, SquareStatus.COMPLETED.name, now)
-        userDao.updateScore(userId, fallbackScore)
-        prefs.totalScore = fallbackScore
-        return@withContext Result.Success(fallbackScore)
+        return@withContext Result.Error(lastErrorMsg, lastErrorCode)
     }
 
     /**
@@ -613,11 +686,15 @@ class BackendRepository(
     suspend fun fetchLeaderboard(currentUserId: String): Result<List<LeaderboardEntry>> = withContext(Dispatchers.IO) {
         val url = "${prefs.serverUrl.trimEnd('/')}/api/leaderboard"
         try {
-            val request = Request.Builder()
+            val reqBuilder = Request.Builder()
                 .url(url)
                 .header("x-user-id", currentUserId)
                 .get()
-                .build()
+            if (prefs.authToken.isNotBlank()) {
+                reqBuilder.header("Authorization", "Bearer ${prefs.authToken}")
+                reqBuilder.header("x-auth-token", prefs.authToken)
+            }
+            val request = reqBuilder.build()
 
             client.newCall(request).execute().use { response ->
                 val code = response.code
@@ -780,14 +857,19 @@ class BackendRepository(
     suspend fun getMyMembership(userId: String): Result<JSONObject> = withContext(Dispatchers.IO) {
         val url = "${prefs.serverUrl.trimEnd('/')}/api/panels/me?userId=$userId"
         try {
-            val request = Request.Builder().url(url).header("x-user-id", userId).get().build()
+            val reqBuilder = Request.Builder().url(url).header("x-user-id", userId).get()
+            if (prefs.authToken.isNotBlank()) {
+                reqBuilder.header("Authorization", "Bearer ${prefs.authToken}")
+                reqBuilder.header("x-auth-token", prefs.authToken)
+            }
+            val request = reqBuilder.build()
             client.newCall(request).execute().use { response ->
                 val body = response.body?.string().orEmpty()
                 if (response.isSuccessful) {
                     val json = JSONObject(body)
                     Result.Success(json)
                 } else {
-                    Result.Error("خطا در دریافت وضعیت پنل کاربر")
+                    Result.Error("خطا در دریافت وضعیت پنل کاربر", response.code)
                 }
             }
         } catch (e: Exception) {
@@ -804,10 +886,15 @@ class BackendRepository(
             put("orderId", "MYKET_ORD_" + System.currentTimeMillis())
         }
         try {
-            val request = Request.Builder()
+            val reqBuilder = Request.Builder()
                 .url(url)
                 .header("x-user-id", userId)
                 .header("Content-Type", "application/json")
+            if (prefs.authToken.isNotBlank()) {
+                reqBuilder.header("Authorization", "Bearer ${prefs.authToken}")
+                reqBuilder.header("x-auth-token", prefs.authToken)
+            }
+            val request = reqBuilder
                 .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
                 .build()
             client.newCall(request).execute().use { response ->
@@ -817,7 +904,7 @@ class BackendRepository(
                     Result.Success(json)
                 } else {
                     val errJson = try { JSONObject(body) } catch (e: Exception) { null }
-                    Result.Error(errJson?.optString("error") ?: "خطا در تایید خرید از سرور")
+                    Result.Error(errJson?.optString("error") ?: "خطا در تایید خرید از سرور", response.code)
                 }
             }
         } catch (e: Exception) {
@@ -831,6 +918,10 @@ class BackendRepository(
             val reqBuilder = Request.Builder().url(url).get()
             if (!userId.isNullOrBlank()) {
                 reqBuilder.header("x-user-id", userId)
+            }
+            if (prefs.authToken.isNotBlank()) {
+                reqBuilder.header("Authorization", "Bearer ${prefs.authToken}")
+                reqBuilder.header("x-auth-token", prefs.authToken)
             }
             client.newCall(reqBuilder.build()).execute().use { response ->
                 val body = response.body?.string().orEmpty()
@@ -1282,23 +1373,12 @@ class BackendRepository(
                     }
                     Result.Success(list)
                 } else {
-                    val defaultCats = listOf(
-                        com.example.model.RewardCategoryItem(id = "cat_recharge", name = "کارت شارژ", slug = "recharge-cards", icon = "smartphone", sortOrder = 1),
-                        com.example.model.RewardCategoryItem(id = "cat_internet", name = "بسته‌های اینترنت", slug = "internet-packages", icon = "wifi", sortOrder = 2),
-                        com.example.model.RewardCategoryItem(id = "cat_cash", name = "جوایز نقدی", slug = "cash-gifts", icon = "credit-card", sortOrder = 3),
-                        com.example.model.RewardCategoryItem(id = "cat_digital", name = "گیفت کارت", slug = "digital-giftcards", icon = "gift", sortOrder = 4)
-                    )
-                    Result.Success(defaultCats)
+                    Result.Error("خطا در دریافت دسته‌بندی جوایز از سرور (کد ${response.code})", response.code)
                 }
             }
         } catch (e: Exception) {
-            val defaultCats = listOf(
-                com.example.model.RewardCategoryItem(id = "cat_recharge", name = "کارت شارژ", slug = "recharge-cards", icon = "smartphone", sortOrder = 1),
-                com.example.model.RewardCategoryItem(id = "cat_internet", name = "بسته‌های اینترنت", slug = "internet-packages", icon = "wifi", sortOrder = 2),
-                com.example.model.RewardCategoryItem(id = "cat_cash", name = "جوایز نقدی", slug = "cash-gifts", icon = "credit-card", sortOrder = 3),
-                com.example.model.RewardCategoryItem(id = "cat_digital", name = "گیفت کارت", slug = "digital-giftcards", icon = "gift", sortOrder = 4)
-            )
-            Result.Success(defaultCats)
+            val classified = classifyNetworkException(e)
+            Result.Error("${classified.category.titlePersian}: ${classified.userFacingMessage}")
         }
     }
 
@@ -1433,88 +1513,12 @@ class BackendRepository(
                     }
                     Result.Success(list)
                 } else {
-                    // Fallback rewards showcase list in case of network or server error
-                    val fallback = listOf(
-                        com.example.model.RewardItem(
-                            id = "rew_irancell_10k",
-                            title = "کارت شارژ ۱۰ هزار تومانی ایرانسل",
-                            description = "کد شارژ مستقیم ۱۰,۰۰۰ تومانی برای سیم‌کارت‌های اعتباری ایرانسل.",
-                            categoryId = "cat_recharge",
-                            categoryName = "کارت شارژ",
-                            costPoints = 100,
-                            stockQuantity = 50,
-                            imageUrl = "https://images.unsplash.com/photo-1556742049-0a67568d0d9f?w=600&q=80",
-                            isFeatured = true,
-                            isActive = true
-                        ),
-                        com.example.model.RewardItem(
-                            id = "rew_mci_10k",
-                            title = "کارت شارژ ۱۰ هزار تومانی همراه اول",
-                            description = "کد شارژ مستقیم ۱۰,۰۰۰ تومانی برای سیم‌کارت‌های اعتباری همراه اول.",
-                            categoryId = "cat_recharge",
-                            categoryName = "کارت شارژ",
-                            costPoints = 100,
-                            stockQuantity = 50,
-                            imageUrl = "https://images.unsplash.com/photo-1556742049-0a67568d0d9f?w=600&q=80",
-                            isFeatured = false,
-                            isActive = true
-                        ),
-                        com.example.model.RewardItem(
-                            id = "rew_irancell_net_5gb",
-                            title = "بسته اینترنت ۵ گیگابایت یک‌ماهه",
-                            description = "فعالسازی مستقیم بسته اینترنت ۵ گیگابایت یک‌ماهه بر روی شماره ایرانسل شما.",
-                            categoryId = "cat_internet",
-                            categoryName = "بسته‌های اینترنت",
-                            costPoints = 250,
-                            stockQuantity = 30,
-                            imageUrl = "https://images.unsplash.com/photo-1544717297-fa95b6ee9643?w=600&q=80",
-                            isFeatured = true,
-                            isActive = true
-                        ),
-                        com.example.model.RewardItem(
-                            id = "rew_cash_50k",
-                            title = "جایزه نقدی ۵۰,۰۰۰ تومانی",
-                            description = "واریز پایا مستقیم به کارت بانکی متصل به شماره همراه شما.",
-                            categoryId = "cat_cash",
-                            categoryName = "جوایز نقدی",
-                            costPoints = 500,
-                            stockQuantity = 20,
-                            imageUrl = "https://images.unsplash.com/photo-1580519542036-c47de6196ba5?w=600&q=80",
-                            isFeatured = true,
-                            isActive = true
-                        )
-                    )
-                    Result.Success(fallback)
+                    Result.Error("خطا در دریافت فهرست جوایز از سرور (کد ${response.code})", response.code)
                 }
             }
         } catch (e: Exception) {
-            val fallback = listOf(
-                com.example.model.RewardItem(
-                    id = "rew_irancell_10k",
-                    title = "کارت شارژ ۱۰ هزار تومانی ایرانسل",
-                    description = "کد شارژ مستقیم ۱۰,۰۰۰ تومانی برای سیم‌کارت‌های اعتباری ایرانسل.",
-                    categoryId = "cat_recharge",
-                    categoryName = "کارت شارژ",
-                    costPoints = 100,
-                    stockQuantity = 50,
-                    imageUrl = "https://images.unsplash.com/photo-1556742049-0a67568d0d9f?w=600&q=80",
-                    isFeatured = true,
-                    isActive = true
-                ),
-                com.example.model.RewardItem(
-                    id = "rew_mci_10k",
-                    title = "کارت شارژ ۱۰ هزار تومانی همراه اول",
-                    description = "کد شارژ مستقیم ۱۰,۰۰۰ تومانی برای سیم‌کارت‌های اعتباری همراه اول.",
-                    categoryId = "cat_recharge",
-                    categoryName = "کارت شارژ",
-                    costPoints = 100,
-                    stockQuantity = 50,
-                    imageUrl = "https://images.unsplash.com/photo-1556742049-0a67568d0d9f?w=600&q=80",
-                    isFeatured = false,
-                    isActive = true
-                )
-            )
-            Result.Success(fallback)
+            val classified = classifyNetworkException(e)
+            Result.Error("${classified.category.titlePersian}: ${classified.userFacingMessage}")
         }
     }
 
@@ -1579,7 +1583,12 @@ class BackendRepository(
     suspend fun fetchUserClaimsHistory(userId: String): Result<List<com.example.model.RewardClaimRecord>> = withContext(Dispatchers.IO) {
         val url = "$baseApiUrl/rewards/claims/user/$userId"
         try {
-            val request = Request.Builder().url(url).get().build()
+            val reqBuilder = Request.Builder().url(url).header("x-user-id", userId).get()
+            if (prefs.authToken.isNotBlank()) {
+                reqBuilder.header("Authorization", "Bearer ${prefs.authToken}")
+                reqBuilder.header("x-auth-token", prefs.authToken)
+            }
+            val request = reqBuilder.build()
             client.newCall(request).execute().use { response ->
                 val body = response.body?.string().orEmpty()
                 if (response.isSuccessful) {
@@ -1658,11 +1667,15 @@ class BackendRepository(
     suspend fun fetchUserEntitlements(userId: String): Result<com.example.model.UserEntitlements> = withContext(Dispatchers.IO) {
         val url = "${prefs.serverUrl.trimEnd('/')}/api/store/user-entitlements?userId=$userId"
         try {
-            val request = Request.Builder()
+            val reqBuilder = Request.Builder()
                 .url(url)
                 .header("x-user-id", userId)
                 .get()
-                .build()
+            if (prefs.authToken.isNotBlank()) {
+                reqBuilder.header("Authorization", "Bearer ${prefs.authToken}")
+                reqBuilder.header("x-auth-token", prefs.authToken)
+            }
+            val request = reqBuilder.build()
             client.newCall(request).execute().use { response ->
                 val body = response.body?.string().orEmpty()
                 if (response.isSuccessful) {
@@ -1710,10 +1723,15 @@ class BackendRepository(
             if (!signature.isNullOrBlank()) put("signature", signature)
         }
         try {
-            val request = Request.Builder()
+            val reqBuilder = Request.Builder()
                 .url(url)
                 .header("x-user-id", userId)
                 .header("Content-Type", "application/json")
+            if (prefs.authToken.isNotBlank()) {
+                reqBuilder.header("Authorization", "Bearer ${prefs.authToken}")
+                reqBuilder.header("x-auth-token", prefs.authToken)
+            }
+            val request = reqBuilder
                 .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
                 .build()
             client.newCall(request).execute().use { response ->
