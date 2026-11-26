@@ -146,6 +146,71 @@ function isValidUuid(str) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 }
 
+function isWorkerRuntime() {
+  return (
+    (typeof process !== 'undefined' && process.env && process.env.WORKER_RUNTIME === 'cloudflare-workers') ||
+    (typeof navigator !== 'undefined' && navigator.userAgent === 'Cloudflare-Workers') ||
+    Boolean(pool && pool.isD1)
+  );
+}
+
+function toBool(val, defaultVal = false) {
+  if (val === undefined || val === null) return defaultVal;
+  if (typeof val === 'boolean') return val;
+  if (typeof val === 'number') return val !== 0;
+  if (typeof val === 'string') {
+    const s = val.trim().toLowerCase();
+    if (s === 'true' || s === '1' || s === 't' || s === 'yes') return true;
+    if (s === 'false' || s === '0' || s === 'f' || s === 'no' || s === '') return false;
+  }
+  return Boolean(val);
+}
+
+function parseJsonField(val, fallback) {
+  const cloneFallback = () => (Array.isArray(fallback) ? [...fallback] : (fallback && typeof fallback === 'object' ? { ...fallback } : fallback));
+  if (val === undefined || val === null || val === '') return cloneFallback();
+  if (typeof val === 'object') {
+    if (Array.isArray(fallback)) return Array.isArray(val) ? val : cloneFallback();
+    if (fallback && typeof fallback === 'object') return !Array.isArray(val) ? val : cloneFallback();
+    return val;
+  }
+  if (typeof val === 'string') {
+    try {
+      const parsed = JSON.parse(val);
+      if (parsed === null || parsed === undefined) return cloneFallback();
+      if (Array.isArray(fallback) && !Array.isArray(parsed)) return cloneFallback();
+      if (fallback && typeof fallback === 'object' && !Array.isArray(fallback) && (typeof parsed !== 'object' || Array.isArray(parsed))) {
+        return cloneFallback();
+      }
+      return parsed;
+    } catch (_e) {
+      return cloneFallback();
+    }
+  }
+  return cloneFallback();
+}
+
+function normalizeStoreProductRow(row) {
+  if (!row) return row;
+  return {
+    ...row,
+    units_granted: Number(row.units_granted || 0),
+    price_toman: Number(row.price_toman || 0),
+    sort_order: Number(row.sort_order || 0),
+    is_active: toBool(row.is_active, true),
+    is_ready_in_myket: toBool(row.is_ready_in_myket, false)
+  };
+}
+
+function normalizeLoginNotificationSettings(row) {
+  if (!row) return row;
+  return {
+    ...row,
+    is_visible: toBool(row.is_visible, true),
+    warning_is_visible: toBool(row.warning_is_visible, true)
+  };
+}
+
 const activeDbUrl = DATABASE_URL;
 
 if (activeDbUrl) {
@@ -1239,14 +1304,18 @@ async function generateUniqueTrackingCode() {
 
 
 function getIranMidnightBounds(nowMs = Date.now()) {
-  const d = new Date(nowMs);
-  const tzString = d.toLocaleString('en-US', { timeZone: 'Asia/Tehran' });
-  const tzDate = new Date(tzString);
-  const todayTehran = new Date(tzDate.getFullYear(), tzDate.getMonth(), tzDate.getDate(), 0, 0, 0, 0);
-  const tomorrowTehran = new Date(tzDate.getFullYear(), tzDate.getMonth(), tzDate.getDate() + 1, 0, 0, 0, 0);
+  // Iran Standard Time is fixed UTC+3:30 year-round (timezone-independent across Workers & Node hosts)
   const offsetMs = 3.5 * 3600 * 1000;
-  const startTime = todayTehran.getTime() - offsetMs;
-  const endTime = tomorrowTehran.getTime() - offsetMs;
+  const tehranWallMs = Number(nowMs) + offsetMs;
+  const tehranDate = new Date(tehranWallMs);
+  const startWallMs = Date.UTC(
+    tehranDate.getUTCFullYear(),
+    tehranDate.getUTCMonth(),
+    tehranDate.getUTCDate(),
+    0, 0, 0, 0
+  );
+  const startTime = startWallMs - offsetMs;
+  const endTime = startTime + 24 * 60 * 60 * 1000;
   return { startTime, endTime };
 }
 
@@ -1835,6 +1904,55 @@ app.post('/api/purchases/verify', ensureDatabaseReady, async (req, res) => {
     const cycle = await getOrCreateActiveCycle(userId);
     const purchaseId = orderId || ("PUR_" + crypto.randomBytes(8).toString('hex'));
 
+    if (client.isD1 && typeof client.batch === 'function') {
+      try {
+        await client.batch([
+          {
+            text: `INSERT INTO public.purchases (purchase_id, user_id, product_id, amount, status, purchase_token, created_at)
+                   VALUES ($1, $2, $3, $4, 'SUCCESS', $5, NOW())`,
+            params: [purchaseId, userId, productId, amount, purchaseToken || null]
+          },
+          {
+            text: `INSERT INTO public.user_entitlements (user_id, instant_unlock_credits, is_vip, account_tier, multiplier, total_purchased_toman, updated_at)
+                   VALUES ($1, 0, $2, $3, $4, $5, NOW())
+                   ON CONFLICT (user_id)
+                   DO UPDATE SET
+                     is_vip = $2,
+                     account_tier = $3,
+                     multiplier = $4,
+                     total_purchased_toman = public.user_entitlements.total_purchased_toman + $5,
+                     updated_at = NOW()`,
+            params: [userId, newTier === 'GOLD', newTier, multiplier, amount]
+          },
+          {
+            text: `UPDATE public.users
+                   SET account_tier = $1, panel_type = $2, multiplier = $3, is_vip = $4, updated_at = NOW()
+                   WHERE id = $5`,
+            params: [newTier, newTier.toLowerCase(), multiplier, newTier === 'GOLD', userId]
+          },
+          {
+            text: `INSERT INTO public.user_memberships (user_id, cycle_id, panel_type, multiplier, purchased_at)
+                   VALUES ($1, $2, $3, $4, NOW())
+                   ON CONFLICT (user_id, cycle_id)
+                   DO UPDATE SET panel_type = $3, multiplier = $4, purchased_at = NOW()`,
+            params: [userId, cycle.cycleId, newTier.toLowerCase(), multiplier]
+          }
+        ]);
+      } catch (batchErr) {
+        if (/UNIQUE constraint failed/i.test(String(batchErr && batchErr.message))) {
+          return res.status(409).json({ error: "این توکن یا شناسه خرید قبلاً ثبت شده است (جلوگیری از ثبت تکراری)." });
+        }
+        throw batchErr;
+      }
+
+      console.log(`[Panel Purchase D1] User ${userId} upgraded to ${newTier} (Multiplier: ${multiplier}x)`);
+      return res.json({
+        success: true,
+        message: `ارتقای سطح به ${newTier === 'GOLD' ? 'طلایی (ضریب ۶X)' : 'نقره‌ای (ضریب ۳X)'} با موفقیت ثبت و فعال شد.`,
+        membership: { panelType: newTier.toLowerCase(), accountTier: newTier, multiplier, cycleId: cycle.cycleId }
+      });
+    }
+
     await client.query('BEGIN');
 
     await client.query(
@@ -1882,7 +2000,7 @@ app.post('/api/purchases/verify', ensureDatabaseReady, async (req, res) => {
       membership: { panelType: newTier.toLowerCase(), accountTier: newTier, multiplier, cycleId: cycle.cycleId }
     });
   } catch (err) {
-    await client.query('ROLLBACK');
+    if (!client.isD1) await client.query('ROLLBACK');
     console.error('[Verify Purchase Error]', err);
     return res.status(500).json({ error: "خطا در تایید خرید و فعال‌سازی پنل." });
   } finally {
@@ -1913,8 +2031,8 @@ app.get('/api/store/products', ensureDatabaseReady, async (req, res) => {
       priceToman: Number(row.price_toman),
       myketSku: row.myket_sku,
       badge: row.badge || '',
-      isActive: Boolean(row.is_active),
-      isReadyInMyket: Boolean(row.is_ready_in_myket),
+      isActive: toBool(row.is_active, true),
+      isReadyInMyket: toBool(row.is_ready_in_myket, false),
       sortOrder: Number(row.sort_order)
     }));
 
@@ -1946,7 +2064,7 @@ app.get('/api/store/user-entitlements', ensureDatabaseReady, async (req, res) =>
 
     if (entRes.rows.length > 0) {
       credits = Number(entRes.rows[0].instant_unlock_credits);
-      isVip = Boolean(entRes.rows[0].is_vip);
+      isVip = toBool(entRes.rows[0].is_vip, false);
       totalPurchased = Number(entRes.rows[0].total_purchased_toman);
     } else {
       const uRes = await pool.query(
@@ -1955,7 +2073,7 @@ app.get('/api/store/user-entitlements', ensureDatabaseReady, async (req, res) =>
       );
       if (uRes.rows.length > 0) {
         credits = Number(uRes.rows[0].instant_unlock_credits || 0);
-        isVip = Boolean(uRes.rows[0].is_vip || false);
+        isVip = toBool(uRes.rows[0].is_vip, false);
       }
     }
 
@@ -2051,13 +2169,159 @@ app.post('/api/store/verify-purchase', requireUserAuth, ensureDatabaseReady, asy
     }
 
     const product = prodRes.rows[0];
-    if (!product.is_active) {
+    if (!toBool(product.is_active, false)) {
       return res.status(400).json({ error: "این بسته در حال حاضر غیرفعال است." });
     }
 
     const purchaseId = orderId || ("PUR_" + crypto.randomBytes(8).toString('hex'));
     const unitsGranted = Number(product.units_granted);
     const amountToman = Number(product.price_toman);
+
+    if (client.isD1 && typeof client.batch === 'function') {
+      let updatedCredits = 0;
+      let isVip = false;
+
+      if (product.product_type === 'SQUARE_UNLOCK') {
+        try {
+          const batchRes = await client.batch([
+            {
+              text: `INSERT INTO public.purchases (purchase_id, user_id, product_id, amount, status, purchase_token, myket_order_id, units_granted, verification_source, created_at)
+                     VALUES ($1, $2, $3, $4, 'SUCCESS', $5, $6, $7, 'MYKET_IAB', NOW())`,
+              params: [purchaseId, userId, productId, amountToman, purchaseToken || null, orderId || null, unitsGranted]
+            },
+            {
+              text: `INSERT INTO public.user_entitlements (user_id, instant_unlock_credits, is_vip, account_tier, multiplier, total_purchased_toman, updated_at)
+                     VALUES ($1, $2, 0, 'NORMAL', 1, $3, NOW())
+                     ON CONFLICT (user_id)
+                     DO UPDATE SET
+                       instant_unlock_credits = public.user_entitlements.instant_unlock_credits + $2,
+                       total_purchased_toman = public.user_entitlements.total_purchased_toman + $3,
+                       updated_at = NOW()
+                     RETURNING instant_unlock_credits, is_vip`,
+              params: [userId, unitsGranted, amountToman]
+            },
+            {
+              text: `UPDATE public.users
+                     SET instant_unlock_credits = COALESCE((SELECT instant_unlock_credits FROM public.user_entitlements WHERE user_id = $1), 0),
+                         updated_at = NOW()
+                     WHERE id = $1`,
+              params: [userId]
+            }
+          ]);
+          const entRow = batchRes[1] && batchRes[1].rows ? batchRes[1].rows[0] : null;
+          updatedCredits = entRow ? Number(entRow.instant_unlock_credits) : unitsGranted;
+          isVip = entRow ? toBool(entRow.is_vip, false) : false;
+        } catch (batchErr) {
+          if (/UNIQUE constraint failed/i.test(String(batchErr && batchErr.message))) {
+            return res.status(409).json({
+              error: "این توکن خرید قبلاً در سیستم ثبت و تایید شده است (جلوگیری از ثبت تکراری).",
+              alreadyProcessed: true
+            });
+          }
+          throw batchErr;
+        }
+      } else if (product.product_type === 'ACCOUNT_UPGRADE') {
+        const currentTierInfo = await getUserActiveTierAndMultiplier(client, userId);
+        let newTier = 'NORMAL';
+        let newMultiplier = 1;
+
+        if (productId === 'pkg_upgrade_gold' || productId === 'gold_panel' || productId === 'gold_upgrade' || productId === 'reqabat_upgrade_gold') {
+          newTier = 'GOLD';
+          newMultiplier = 6;
+        } else if (productId === 'pkg_upgrade_silver' || productId === 'silver_panel' || productId === 'reqabat_upgrade_silver') {
+          if (currentTierInfo.tier === 'GOLD') {
+            newTier = 'GOLD';
+            newMultiplier = 6;
+          } else {
+            newTier = 'SILVER';
+            newMultiplier = 3;
+          }
+        }
+
+        const cycle = await getOrCreateActiveCycle(userId);
+        isVip = (newTier === 'GOLD');
+
+        try {
+          const batchRes = await client.batch([
+            {
+              text: `INSERT INTO public.purchases (purchase_id, user_id, product_id, amount, status, purchase_token, myket_order_id, units_granted, verification_source, created_at)
+                     VALUES ($1, $2, $3, $4, 'SUCCESS', $5, $6, $7, 'MYKET_IAB', NOW())`,
+              params: [purchaseId, userId, productId, amountToman, purchaseToken || null, orderId || null, unitsGranted]
+            },
+            {
+              text: `INSERT INTO public.user_entitlements (user_id, instant_unlock_credits, is_vip, account_tier, multiplier, total_purchased_toman, updated_at)
+                     VALUES ($1, 0, $2, $3, $4, $5, NOW())
+                     ON CONFLICT (user_id)
+                     DO UPDATE SET
+                       is_vip = $2,
+                       account_tier = $3,
+                       multiplier = $4,
+                       total_purchased_toman = public.user_entitlements.total_purchased_toman + $5,
+                       updated_at = NOW()
+                     RETURNING instant_unlock_credits, is_vip, account_tier, multiplier`,
+              params: [userId, isVip, newTier, newMultiplier, amountToman]
+            },
+            {
+              text: `UPDATE public.users
+                     SET account_tier = $1, panel_type = $2, multiplier = $3, is_vip = $4, updated_at = NOW()
+                     WHERE id = $5`,
+              params: [newTier, newTier.toLowerCase(), newMultiplier, isVip, userId]
+            },
+            {
+              text: `INSERT INTO public.user_memberships (user_id, cycle_id, panel_type, multiplier, purchased_at)
+                     VALUES ($1, $2, $3, $4, NOW())
+                     ON CONFLICT (user_id, cycle_id)
+                     DO UPDATE SET panel_type = $3, multiplier = $4, purchased_at = NOW()`,
+              params: [userId, cycle.cycleId, newTier.toLowerCase(), newMultiplier]
+            }
+          ]);
+          const entRow = batchRes[1] && batchRes[1].rows ? batchRes[1].rows[0] : null;
+          updatedCredits = entRow ? Number(entRow.instant_unlock_credits) : 0;
+        } catch (batchErr) {
+          if (/UNIQUE constraint failed/i.test(String(batchErr && batchErr.message))) {
+            return res.status(409).json({
+              error: "این توکن خرید قبلاً در سیستم ثبت و تایید شده است (جلوگیری از ثبت تکراری).",
+              alreadyProcessed: true
+            });
+          }
+          throw batchErr;
+        }
+      } else {
+        try {
+          await client.batch([
+            {
+              text: `INSERT INTO public.purchases (purchase_id, user_id, product_id, amount, status, purchase_token, myket_order_id, units_granted, verification_source, created_at)
+                     VALUES ($1, $2, $3, $4, 'SUCCESS', $5, $6, $7, 'MYKET_IAB', NOW())`,
+              params: [purchaseId, userId, productId, amountToman, purchaseToken || null, orderId || null, unitsGranted]
+            }
+          ]);
+        } catch (batchErr) {
+          if (/UNIQUE constraint failed/i.test(String(batchErr && batchErr.message))) {
+            return res.status(409).json({
+              error: "این توکن خرید قبلاً در سیستم ثبت و تایید شده است (جلوگیری از ثبت تکراری).",
+              alreadyProcessed: true
+            });
+          }
+          throw batchErr;
+        }
+      }
+
+      console.log(`[Store Purchase SUCCESS D1] User: ${userId}, Product: ${productId}, Units: ${unitsGranted}, Paid: ${amountToman} Toman`);
+      return res.json({
+        success: true,
+        message: `خرید «${product.title}» با موفقیت تایید و به حساب شما منظور شد.`,
+        product: {
+          id: product.id,
+          title: product.title,
+          productType: product.product_type,
+          unitsGranted
+        },
+        entitlements: {
+          instantUnlockCredits: updatedCredits,
+          isVip
+        }
+      });
+    }
 
     await client.query('BEGIN');
 
@@ -2085,7 +2349,7 @@ app.post('/api/store/verify-purchase', requireUserAuth, ensureDatabaseReady, asy
         [userId, unitsGranted, amountToman]
       );
       updatedCredits = Number(entUpdate.rows[0].instant_unlock_credits);
-      isVip = Boolean(entUpdate.rows[0].is_vip);
+      isVip = toBool(entUpdate.rows[0].is_vip, false);
 
       await client.query(
         `UPDATE public.users SET instant_unlock_credits = $1, updated_at = NOW() WHERE id = $2`,
@@ -2137,7 +2401,7 @@ app.post('/api/store/verify-purchase', requireUserAuth, ensureDatabaseReady, asy
       await client.query(
         `INSERT INTO public.user_memberships (user_id, cycle_id, panel_type, multiplier, purchased_at)
          VALUES ($1, $2, $3, $4, NOW())
-         ON CONFLICT (user_id, cycle_id)
+         ON CONFLICT (user_id, cycle_id) 
          DO UPDATE SET panel_type = $3, multiplier = $4, purchased_at = NOW()`,
         [userId, cycle.cycleId, newTier.toLowerCase(), newMultiplier]
       );
@@ -2162,7 +2426,7 @@ app.post('/api/store/verify-purchase', requireUserAuth, ensureDatabaseReady, asy
       }
     });
   } catch (err) {
-    await client.query('ROLLBACK');
+    if (!client.isD1) await client.query('ROLLBACK');
     console.error('[API Store Verify Purchase Error]', err);
     return res.status(500).json({ error: "خطا در اعتبارسنجی خرید و ثبت تراکنش در سرور." });
   } finally {
@@ -2219,6 +2483,90 @@ app.post('/api/squares/instant-unlock', ensureDatabaseReady, async (req, res) =>
     // Multiplier from verified active account tier (NORMAL=1, SILVER=3, GOLD=6)
     const { tier: activeTier, multiplier: verifiedMultiplier } = await getUserActiveTierAndMultiplier(client, userId);
     const awardedPoints = verifiedMultiplier;
+
+    if (client.isD1 && typeof client.batch === 'function') {
+      try {
+        const batchQueries = [
+          {
+            text: `INSERT OR IGNORE INTO public.user_entitlements (user_id, instant_unlock_credits, is_vip, account_tier, multiplier, total_purchased_toman, updated_at)
+                   SELECT id, instant_unlock_credits, is_vip, account_tier, multiplier, 0, NOW()
+                   FROM public.users WHERE id = $1`,
+            params: [userId]
+          },
+          {
+            text: `INSERT INTO public.square_states (state_key, user_id, cycle_id, square_number, status, completed_at, created_at)
+                   VALUES ($1, $2, $3, $4, 'COMPLETED', $5, NOW())`,
+            params: [squareKey, userId, cycle.cycleId, squareNumber, now]
+          },
+          {
+            text: `INSERT INTO public.user_scores (user_id, total_score, updated_at)
+                   VALUES (
+                     $1,
+                     CASE WHEN COALESCE((SELECT instant_unlock_credits FROM public.user_entitlements WHERE user_id = $1), 0) >= 1 THEN $2 ELSE -1 END,
+                     NOW()
+                   )
+                   ON CONFLICT (user_id)
+                   DO UPDATE SET
+                     total_score = CASE
+                       WHEN COALESCE((SELECT instant_unlock_credits FROM public.user_entitlements WHERE user_id = $1), 0) >= 1 THEN public.user_scores.total_score + $2
+                       ELSE -1
+                     END,
+                     updated_at = NOW()
+                   RETURNING total_score`,
+            params: [userId, awardedPoints]
+          },
+          {
+            text: `UPDATE public.user_entitlements
+                   SET instant_unlock_credits = instant_unlock_credits - 1, updated_at = NOW()
+                   WHERE user_id = $1 AND instant_unlock_credits >= 1
+                   RETURNING instant_unlock_credits`,
+            params: [userId]
+          },
+          {
+            text: `UPDATE public.users
+                   SET instant_unlock_credits = COALESCE((SELECT instant_unlock_credits FROM public.user_entitlements WHERE user_id = $1), 0),
+                       total_score = COALESCE((SELECT total_score FROM public.user_scores WHERE user_id = $1), total_score),
+                       updated_at = NOW()
+                   WHERE id = $1`,
+            params: [userId]
+          },
+          {
+            text: `UPDATE public.competitions
+                   SET total_score = total_score + $1
+                   WHERE status = 'ACTIVE'`,
+            params: [awardedPoints]
+          }
+        ];
+
+        const batchRes = await client.batch(batchQueries);
+        const newScore = batchRes[2] && batchRes[2].rows && batchRes[2].rows[0]
+          ? Number(batchRes[2].rows[0].total_score)
+          : awardedPoints;
+        const remainingCredits = batchRes[3] && batchRes[3].rows && batchRes[3].rows[0]
+          ? Number(batchRes[3].rows[0].instant_unlock_credits)
+          : 0;
+
+        console.log(`[Instant Unlock D1] User ${userId} unlocked square #${squareNumber}. Remaining credits: ${remainingCredits}, Points: +${awardedPoints}`);
+        return res.json({
+          success: true,
+          message: `مربع شماره ${squareNumber} با موفقیت و بدون نیاز به تبلیغ باز شد! (${awardedPoints} امتیاز افزوده شد)`,
+          squareNumber,
+          awardedPoints,
+          newScore,
+          remainingCredits,
+          cycleId: cycle.cycleId
+        });
+      } catch (batchErr) {
+        const msg = String(batchErr && batchErr.message ? batchErr.message : batchErr);
+        if (/UNIQUE constraint failed/i.test(msg)) {
+          return res.status(409).json({ error: "این مربع قبلاً در این دوره ۲۴ ساعته باز و تکمیل شده است." });
+        }
+        if (/CHECK constraint failed/i.test(msg)) {
+          return res.status(403).json({ error: "سهمیه بازگشایی سریع ناکافی است.", noCredits: true });
+        }
+        throw batchErr;
+      }
+    }
 
     await client.query('BEGIN');
 
@@ -2291,7 +2639,7 @@ app.post('/api/squares/instant-unlock', ensureDatabaseReady, async (req, res) =>
       cycleId: cycle.cycleId
     });
   } catch (err) {
-    await client.query('ROLLBACK');
+    if (!client.isD1) await client.query('ROLLBACK');
     console.error('[API Instant Unlock Error]', err);
     return res.status(500).json({ error: "خطا در پردازش بازگشایی سریع مربع." });
   } finally {
@@ -2307,7 +2655,7 @@ app.get('/api/admin/store/products', requireAdminAuth, ensureDatabaseReady, asyn
       FROM public.store_products
       ORDER BY sort_order ASC, created_at ASC
     `);
-    return res.json({ success: true, products: resProducts.rows });
+    return res.json({ success: true, products: resProducts.rows.map(normalizeStoreProductRow) });
   } catch (err) {
     console.error('[Admin Store Products Error]', err);
     return res.status(500).json({ error: "خطا در دریافت لیست محصولات برای پنل مدیریت." });
@@ -2426,6 +2774,67 @@ app.post('/api/ads/complete', ensureDatabaseReady, async (req, res) => {
       return res.status(409).json({ error: "این مربع قبلاً در این دوره ۲۴ ساعته تکمیل شده است." });
     }
 
+    if (client.isD1 && typeof client.batch === 'function') {
+      const compRes = await client.query(`SELECT id FROM public.competitions WHERE status = 'ACTIVE' LIMIT 1`);
+      const activeCompId = compRes.rows.length > 0 ? compRes.rows[0].id : 'COMP_1';
+      const sessionId = "ADS_" + crypto.randomBytes(6).toString('hex');
+
+      const batchQueries = [
+        {
+          text: `INSERT INTO public.square_states (state_key, user_id, cycle_id, square_number, status, completed_at, created_at)
+                 VALUES ($1, $2, $3, $4, 'COMPLETED', $5, NOW())`,
+          params: [squareKey, userId, cycle.cycleId, squareNumber, now]
+        },
+        {
+          text: `INSERT INTO public.ad_sessions (session_id, user_id, square_number, cycle_id, timestamp, ad_duration_seconds, status, token, competition_id, created_at)
+                 VALUES ($1, $2, $3, $4, $5, $6, 'COMPLETED', $7, $8, NOW())`,
+          params: [sessionId, userId, squareNumber, cycle.cycleId, now, adDurationSeconds, rewardNonce || null, activeCompId]
+        },
+        {
+          text: `INSERT INTO public.user_scores (user_id, total_score, updated_at)
+                 VALUES ($1, $2, NOW())
+                 ON CONFLICT (user_id)
+                 DO UPDATE SET total_score = public.user_scores.total_score + $2, updated_at = NOW()
+                 RETURNING total_score`,
+          params: [userId, awardedMultiplier]
+        }
+      ];
+
+      if (schemaInfo.userHasTotalScore) {
+        batchQueries.push({
+          text: `UPDATE public.users
+                 SET total_score = COALESCE((SELECT total_score FROM public.user_scores WHERE user_id = $1), total_score),
+                     updated_at = NOW()
+                 WHERE id = $1`,
+          params: [userId]
+        });
+      }
+
+      try {
+        const batchRes = await client.batch(batchQueries);
+        const newScore = batchRes[2] && batchRes[2].rows && batchRes[2].rows[0]
+          ? Number(batchRes[2].rows[0].total_score)
+          : awardedMultiplier;
+
+        return res.json({
+          success: true,
+          squareNumber,
+          awardedPoints: awardedMultiplier,
+          newTotalScore: newScore,
+          message: `${awardedMultiplier} امتیاز معتبر با موفقیت ثبت شد.`
+        });
+      } catch (batchErr) {
+        const msg = String(batchErr && batchErr.message ? batchErr.message : batchErr);
+        if (/UNIQUE constraint failed/i.test(msg)) {
+          if (/ad_sessions\.token/i.test(msg)) {
+            return res.status(409).json({ error: "این درخواست قبلاً ثبت شده است (توکن تکراری تبلیغ)." });
+          }
+          return res.status(409).json({ error: "این مربع قبلاً در این دوره ۲۴ ساعته تکمیل شده است." });
+        }
+        throw batchErr;
+      }
+    }
+
     // 3. BEGIN ATOMIC TRANSACTION
     await client.query('BEGIN');
 
@@ -2478,7 +2887,7 @@ app.post('/api/ads/complete', ensureDatabaseReady, async (req, res) => {
       message: `${awardedMultiplier} امتیاز معتبر با موفقیت ثبت شد.`
     });
   } catch (err) {
-    await client.query('ROLLBACK');
+    if (!client.isD1) await client.query('ROLLBACK');
     console.error('[Ad Complete Transaction Error]', err);
     return res.status(500).json({ error: "خطا در پردازش اتمیک امتیاز در پایگاه داده." });
   } finally {
@@ -2600,7 +3009,7 @@ app.get('/api/admin/overview', requireAdminAuth, ensureDatabaseReady, async (req
       title: activeAnnRes.rows[0].title,
       content: activeAnnRes.rows[0].content,
       type: activeAnnRes.rows[0].type,
-      isActive: Boolean(activeAnnRes.rows[0].is_active),
+      isActive: toBool(activeAnnRes.rows[0].is_active, true),
       competitionId: activeAnnRes.rows[0].competition_id,
       startsAt: activeAnnRes.rows[0].starts_at ? new Date(activeAnnRes.rows[0].starts_at).getTime() : null,
       endsAt: activeAnnRes.rows[0].ends_at ? new Date(activeAnnRes.rows[0].ends_at).getTime() : null,
@@ -2620,7 +3029,7 @@ app.get('/api/admin/overview', requireAdminAuth, ensureDatabaseReady, async (req
         title: a.title,
         content: a.content,
         type: a.type,
-        isActive: Boolean(a.is_active),
+        isActive: toBool(a.is_active, true),
         competitionId: a.competition_id,
         startsAt: a.starts_at ? new Date(a.starts_at).getTime() : null,
         endsAt: a.ends_at ? new Date(a.ends_at).getTime() : null,
@@ -2789,27 +3198,59 @@ app.post('/api/admin/users/export-selected-excel', requireAdminAuth, ensureDatab
 
     const { buildSelectedUsersExcelBuffer, getIranJalaliDateString } = require('./xlsxExporter');
 
-    const result = await pool.query(
-      `SELECT
-         u.id,
-         u.first_name,
-         u.last_name,
-         u.phone_number,
-         u.created_at
-       FROM public.users u
-       WHERE u.id::text = ANY($1::text[])
-       ORDER BY u.created_at ASC, u.id ASC`,
-      [cleanUserIds]
-    );
+    let matchedRows = [];
+    if (pool.isD1) {
+      // Cloudflare D1 caps bound parameters at 100 per prepared statement -> chunk safely at 80
+      const D1_CHUNK_SIZE = 80;
+      for (let i = 0; i < cleanUserIds.length; i += D1_CHUNK_SIZE) {
+        const chunk = cleanUserIds.slice(i, i + D1_CHUNK_SIZE);
+        const placeholders = chunk.map((_, idx) => `$${idx + 1}`).join(', ');
+        const chunkRes = await pool.query(
+          `SELECT
+             u.id,
+             u.first_name,
+             u.last_name,
+             u.phone_number,
+             u.created_at
+           FROM public.users u
+           WHERE u.id IN (${placeholders})
+           ORDER BY u.created_at ASC, u.id ASC`,
+          chunk
+        );
+        if (chunkRes && Array.isArray(chunkRes.rows)) {
+          matchedRows.push(...chunkRes.rows);
+        }
+      }
+      matchedRows.sort((a, b) => {
+        const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
+        if (ta !== tb) return ta - tb;
+        return String(a.id || '').localeCompare(String(b.id || ''));
+      });
+    } else {
+      const result = await pool.query(
+        `SELECT
+           u.id,
+           u.first_name,
+           u.last_name,
+           u.phone_number,
+           u.created_at
+         FROM public.users u
+         WHERE u.id::text = ANY($1::text[])
+         ORDER BY u.created_at ASC, u.id ASC`,
+        [cleanUserIds]
+      );
+      matchedRows = result && Array.isArray(result.rows) ? result.rows : [];
+    }
 
-    if (!result.rows || result.rows.length === 0) {
+    if (matchedRows.length === 0) {
       return res.status(404).json({
         success: false,
         error: 'هیچ کاربر معتبری مطابق انتخاب شما در پایگاه داده یافت نشد.'
       });
     }
 
-    const rows = result.rows.map(row => ({
+    const rows = matchedRows.map(row => ({
       fullName: `${row.first_name || ''} ${row.last_name || ''}`.trim() || 'بدون نام',
       phoneNumber: row.phone_number != null ? String(row.phone_number).trim() : '',
       registeredAt: row.created_at || null
@@ -3064,6 +3505,188 @@ app.post('/api/admin/competition/start-new', requireAdminAuth, ensureDatabaseRea
   const client = await pool.connect();
 
   try {
+    if (client.isD1 && typeof client.batch === 'function') {
+      const { endDate, announcementTitle, announcementContent } = req.body || {};
+
+      const activeCompRes = await client.query(`SELECT * FROM public.competitions WHERE status = 'ACTIVE' LIMIT 1`);
+      const activeComp = activeCompRes.rows[0];
+      let prevNumber = 1;
+      let prevId = 'COMP_1';
+      let prevTitle = 'مسابقه شماره ۱ (جایزه آیفون و پلی‌استیشن)';
+
+      if (activeComp) {
+        prevNumber = Number(activeComp.competition_number);
+        prevId = activeComp.id;
+        prevTitle = activeComp.title;
+      }
+
+      const usersRes = await client.query(`
+        SELECT 
+          u.id AS user_id,
+          u.first_name,
+          u.last_name,
+          u.phone_number,
+          COALESCE(s.total_score, u.total_score, 0) AS total_score,
+          u.created_at
+        FROM public.users u
+        LEFT JOIN public.user_scores s ON u.id = s.user_id
+        ORDER BY total_score DESC, u.created_at ASC, u.id ASC
+      `);
+
+      let totalScoreArchived = 0;
+      let participantsCount = 0;
+      const batchQueries = [];
+
+      // Ensure previous competition row exists if it wasn't seeded yet before archiving children
+      if (activeComp) {
+        for (let i = 0; i < usersRes.rows.length; i++) {
+          const u = usersRes.rows[i];
+          const finalScore = Number(u.total_score);
+          const rank = i + 1;
+          if (finalScore > 0) participantsCount++;
+          totalScoreArchived += finalScore;
+
+          const archId = `ARCH_${prevId}_${u.user_id}`;
+          batchQueries.push({
+            text: `INSERT INTO public.competition_archives
+                     (id, competition_id, user_id, final_score, final_rank, first_name, last_name, phone_number, archived_at)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+                   ON CONFLICT (id) DO UPDATE SET
+                     final_score = $4, final_rank = $5, first_name = $6, last_name = $7, phone_number = $8, archived_at = NOW()`,
+            params: [archId, prevId, u.user_id, finalScore, rank, u.first_name || '', u.last_name || '', u.phone_number || '']
+          });
+        }
+        batchQueries.push({
+          text: `UPDATE public.competitions
+                 SET status = 'ARCHIVED', ended_at = NOW(), total_participants = $1, total_score = $2
+                 WHERE id = $3`,
+          params: [participantsCount, totalScoreArchived, prevId]
+        });
+      } else {
+        for (let i = 0; i < usersRes.rows.length; i++) {
+          const u = usersRes.rows[i];
+          const finalScore = Number(u.total_score);
+          if (finalScore > 0) participantsCount++;
+          totalScoreArchived += finalScore;
+        }
+        batchQueries.push({
+          text: `INSERT INTO public.competitions (id, competition_number, title, status, started_at, ended_at, total_participants, total_score, created_by, created_at)
+                 VALUES ($1, $2, $3, 'ARCHIVED', NOW(), NOW(), $4, $5, 'admin', NOW())
+                 ON CONFLICT (id) DO NOTHING`,
+          params: [prevId, prevNumber, prevTitle, participantsCount, totalScoreArchived]
+        });
+        for (let i = 0; i < usersRes.rows.length; i++) {
+          const u = usersRes.rows[i];
+          const finalScore = Number(u.total_score);
+          const rank = i + 1;
+          const archId = `ARCH_${prevId}_${u.user_id}`;
+          batchQueries.push({
+            text: `INSERT INTO public.competition_archives
+                     (id, competition_id, user_id, final_score, final_rank, first_name, last_name, phone_number, archived_at)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+                   ON CONFLICT (id) DO UPDATE SET
+                     final_score = $4, final_rank = $5, first_name = $6, last_name = $7, phone_number = $8, archived_at = NOW()`,
+            params: [archId, prevId, u.user_id, finalScore, rank, u.first_name || '', u.last_name || '', u.phone_number || '']
+          });
+        }
+      }
+
+      const nextNumber = prevNumber + 1;
+      const newCompId = `COMP_${nextNumber}_${Date.now()}`;
+      const competitionTitle = (newTitle && newTitle.trim()) ? newTitle.trim() : `مسابقه شماره ${nextNumber}`;
+      const competitionEndDate = endDate ? new Date(endDate) : null;
+
+      batchQueries.push({
+        text: `INSERT INTO public.competitions (id, competition_number, title, status, started_at, ended_at, created_by, created_at)
+               VALUES ($1, $2, $3, 'ACTIVE', NOW(), $4, 'admin', NOW())`,
+        params: [newCompId, nextNumber, competitionTitle, competitionEndDate]
+      });
+
+      batchQueries.push({
+        text: `UPDATE public.user_scores SET total_score = 0, updated_at = NOW()`,
+        params: []
+      });
+      if (schemaInfo.userHasTotalScore) {
+        batchQueries.push({
+          text: `UPDATE public.users SET total_score = 0, updated_at = NOW()`,
+          params: []
+        });
+      }
+      batchQueries.push({
+        text: `DELETE FROM public.square_states`,
+        params: []
+      });
+      batchQueries.push({
+        text: `UPDATE public.home_announcements SET is_active = false`,
+        params: []
+      });
+
+      const newAnnId = `ANN_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+      const annTitle = (announcementTitle && announcementTitle.trim()) ? announcementTitle.trim() : `شروع ${competitionTitle}`;
+      const annBody = (announcementContent && announcementContent.trim())
+        ? announcementContent.trim()
+        : `دوره جدید مسابقه («${competitionTitle}») آغاز شد! با مشاهده تبلیغات و تکمیل ۱۰۰ مربع روزانه امتیاز کسب کرده و برنده جوایز ارزنده شوید.`;
+
+      batchQueries.push({
+        text: `INSERT INTO public.home_announcements
+                 (id, title, content, type, is_active, competition_id, starts_at, ends_at, created_by, created_at, updated_at)
+               VALUES ($1, $2, $3, 'COMPETITION_START', true, $4, NOW(), $5, 'admin', NOW(), NOW())`,
+        params: [newAnnId, annTitle, annBody, newCompId, competitionEndDate]
+      });
+
+      const logId = `CLOG_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+      const rawAdminKey = req.headers['x-admin-key'] || (req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/i, '').trim() : '') || 'ADMIN';
+      const maskedKey = rawAdminKey.length > 4 ? rawAdminKey.substring(0, 4) + '***' : '***';
+
+      batchQueries.push({
+        text: `INSERT INTO public.competition_logs
+                 (log_id, action, admin_key_used, prev_competition_id, new_competition_id, prev_title, new_title, participants_count, total_score_archived, details, created_at)
+               VALUES ($1, 'START_NEW_COMPETITION', $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
+        params: [
+          logId,
+          maskedKey,
+          prevId,
+          newCompId,
+          prevTitle,
+          competitionTitle,
+          participantsCount,
+          totalScoreArchived,
+          `پایان مسابقه شماره ${prevNumber} با ${participantsCount} شرکت‌کننده و آرشیو ${totalScoreArchived} امتیاز. شروع مسابقه جدید «${competitionTitle}» و انتشار اطلاعیه صفحه اصلی.`
+        ]
+      });
+
+      await client.batch(batchQueries);
+
+      console.log(`[Admin Competition D1] Successfully started competition ${nextNumber} ("${competitionTitle}") with announcement "${annTitle}".`);
+      return res.json({
+        success: true,
+        message: `مسابقه قبلی (${prevTitle}) با موفقیت به پایان رسید و نتایج آن در آرشیو دائمی ثبت شد. مسابقه جدید «${competitionTitle}» با امتیاز صفر برای تمام کاربران و اطلاعیه صفحه اصلی منتشر گردید.`,
+        archivedCompetition: {
+          id: prevId,
+          competitionNumber: prevNumber,
+          title: prevTitle,
+          totalParticipants: participantsCount,
+          totalScoreArchived
+        },
+        newCompetition: {
+          id: newCompId,
+          competitionNumber: nextNumber,
+          title: competitionTitle,
+          status: 'ACTIVE',
+          startedAt: Date.now(),
+          endedAt: competitionEndDate ? competitionEndDate.getTime() : null
+        },
+        newAnnouncement: {
+          id: newAnnId,
+          title: annTitle,
+          content: annBody,
+          type: 'COMPETITION_START',
+          isActive: true,
+          endsAt: competitionEndDate ? competitionEndDate.getTime() : null
+        }
+      });
+    }
+
     await client.query('BEGIN');
 
     // 1. Get currently active competition with row lock
@@ -3128,7 +3751,7 @@ app.post('/api/admin/competition/start-new', requireAdminAuth, ensureDatabaseRea
       `, [prevId, prevNumber, prevTitle, participantsCount, totalScoreArchived]);
     }
 
-    const { confirmationPhrase, newTitle, endDate, announcementTitle, announcementContent } = req.body || {};
+    const { endDate, announcementTitle, announcementContent } = req.body || {};
 
     // 4. Create new ACTIVE competition
     const nextNumber = prevNumber + 1;
@@ -3218,7 +3841,7 @@ app.post('/api/admin/competition/start-new', requireAdminAuth, ensureDatabaseRea
     });
 
   } catch (err) {
-    await client.query('ROLLBACK');
+    if (!client.isD1) await client.query('ROLLBACK');
     console.error('[Start New Competition Transaction Error]', err);
     return res.status(500).json({ success: false, error: "خطا در پردازش اتمیک پایان مسابقه و آغاز مسابقه جدید در پایگاه داده." });
   } finally {
@@ -3276,7 +3899,7 @@ app.get('/api/announcement/active', ensureDatabaseReady, async (req, res) => {
         title: r.title,
         content: r.content,
         type: r.type,
-        isActive: Boolean(r.is_active),
+        isActive: toBool(r.is_active, true),
         competitionId: r.competition_id,
         competitionTitle: r.competition_title || null,
         startsAt: r.starts_at ? new Date(r.starts_at).getTime() : null,
@@ -3320,7 +3943,7 @@ app.get('/api/admin/announcements', requireAdminAuth, ensureDatabaseReady, async
       title: r.title,
       content: r.content,
       type: r.type,
-      isActive: Boolean(r.is_active),
+      isActive: toBool(r.is_active, true),
       competitionId: r.competition_id,
       competitionTitle: r.competition_title || null,
       startsAt: r.starts_at ? new Date(r.starts_at).getTime() : null,
@@ -3417,7 +4040,7 @@ app.patch('/api/admin/announcements/:id/toggle', requireAdminAuth, ensureDatabas
       return res.status(404).json({ error: "پیام یافت نشد." });
     }
 
-    const currentStatus = Boolean(checkRes.rows[0].is_active);
+    const currentStatus = toBool(checkRes.rows[0].is_active, false);
     const newStatus = !currentStatus;
 
     if (newStatus) {
@@ -3473,21 +4096,36 @@ app.post('/api/support/tickets', requireUserAuth, ensureDatabaseReady, async (re
     const messageId = "MSG_" + crypto.randomUUID();
     const now = new Date();
 
-    await client.query('BEGIN');
+    if (client.isD1 && typeof client.batch === 'function') {
+      await client.batch([
+        {
+          text: `INSERT INTO public.support_tickets (id, tracking_code, user_id, subject, category, status, created_at, updated_at, last_message_at)
+                 VALUES ($1, $2, $3, $4, $5, 'NEW', $6, $6, $6)`,
+          params: [ticketId, trackingCode, req.user.id, subject.trim(), cleanCategory, now]
+        },
+        {
+          text: `INSERT INTO public.support_messages (id, ticket_id, sender_type, sender_id, sender_name, message_text, created_at)
+                 VALUES ($1, $2, 'USER', $3, $4, $5, $6)`,
+          params: [messageId, ticketId, req.user.id, req.user.fullName, message.trim(), now]
+        }
+      ]);
+    } else {
+      await client.query('BEGIN');
 
-    // Insert Ticket
-    await client.query(`
-      INSERT INTO public.support_tickets (id, tracking_code, user_id, subject, category, status, created_at, updated_at, last_message_at)
-      VALUES ($1, $2, $3, $4, $5, 'NEW', $6, $6, $6)
-    `, [ticketId, trackingCode, req.user.id, subject.trim(), cleanCategory, now]);
+      // Insert Ticket
+      await client.query(`
+        INSERT INTO public.support_tickets (id, tracking_code, user_id, subject, category, status, created_at, updated_at, last_message_at)
+        VALUES ($1, $2, $3, $4, $5, 'NEW', $6, $6, $6)
+      `, [ticketId, trackingCode, req.user.id, subject.trim(), cleanCategory, now]);
 
-    // Insert Initial Message
-    await client.query(`
-      INSERT INTO public.support_messages (id, ticket_id, sender_type, sender_id, sender_name, message_text, created_at)
-      VALUES ($1, $2, 'USER', $3, $4, $5, $6)
-    `, [messageId, ticketId, req.user.id, req.user.fullName, message.trim(), now]);
+      // Insert Initial Message
+      await client.query(`
+        INSERT INTO public.support_messages (id, ticket_id, sender_type, sender_id, sender_name, message_text, created_at)
+        VALUES ($1, $2, 'USER', $3, $4, $5, $6)
+      `, [messageId, ticketId, req.user.id, req.user.fullName, message.trim(), now]);
 
-    await client.query('COMMIT');
+      await client.query('COMMIT');
+    }
 
     console.log(`[Support System] Created ticket ${trackingCode} by user ${req.user.id} (${req.user.fullName})`);
 
@@ -3507,7 +4145,7 @@ app.post('/api/support/tickets', requireUserAuth, ensureDatabaseReady, async (re
       }
     });
   } catch (err) {
-    await client.query('ROLLBACK');
+    if (!client.isD1) await client.query('ROLLBACK');
     console.error('[Support Ticket Create Error]', err);
     return res.status(500).json({ error: "خطا در ثبت درخواست پشتیبانی در پایگاه داده." });
   } finally {
@@ -3646,24 +4284,40 @@ app.post('/api/support/tickets/:id/messages', requireUserAuth, ensureDatabaseRea
 
     const messageId = "MSG_" + crypto.randomUUID();
     const now = new Date();
-
-    await client.query('BEGIN');
-
-    // Insert user message
-    await client.query(`
-      INSERT INTO public.support_messages (id, ticket_id, sender_type, sender_id, sender_name, message_text, created_at)
-      VALUES ($1, $2, 'USER', $3, $4, $5, $6)
-    `, [messageId, ticketId, req.user.id, req.user.fullName, message.trim(), now]);
-
-    // Update ticket to IN_PROGRESS / NEW and update timestamps
     const newStatus = currentTicket.status === 'ANSWERED' ? 'IN_PROGRESS' : currentTicket.status;
-    await client.query(`
-      UPDATE public.support_tickets
-      SET status = $1, updated_at = $2, last_message_at = $2
-      WHERE id = $3
-    `, [newStatus, now, ticketId]);
 
-    await client.query('COMMIT');
+    if (client.isD1 && typeof client.batch === 'function') {
+      await client.batch([
+        {
+          text: `INSERT INTO public.support_messages (id, ticket_id, sender_type, sender_id, sender_name, message_text, created_at)
+                 VALUES ($1, $2, 'USER', $3, $4, $5, $6)`,
+          params: [messageId, ticketId, req.user.id, req.user.fullName, message.trim(), now]
+        },
+        {
+          text: `UPDATE public.support_tickets
+                 SET status = $1, updated_at = $2, last_message_at = $2
+                 WHERE id = $3`,
+          params: [newStatus, now, ticketId]
+        }
+      ]);
+    } else {
+      await client.query('BEGIN');
+
+      // Insert user message
+      await client.query(`
+        INSERT INTO public.support_messages (id, ticket_id, sender_type, sender_id, sender_name, message_text, created_at)
+        VALUES ($1, $2, 'USER', $3, $4, $5, $6)
+      `, [messageId, ticketId, req.user.id, req.user.fullName, message.trim(), now]);
+
+      // Update ticket to IN_PROGRESS / NEW and update timestamps
+      await client.query(`
+        UPDATE public.support_tickets
+        SET status = $1, updated_at = $2, last_message_at = $2
+        WHERE id = $3
+      `, [newStatus, now, ticketId]);
+
+      await client.query('COMMIT');
+    }
 
     return res.status(201).json({
       success: true,
@@ -3679,7 +4333,7 @@ app.post('/api/support/tickets/:id/messages', requireUserAuth, ensureDatabaseRea
       ticketStatus: newStatus
     });
   } catch (err) {
-    await client.query('ROLLBACK');
+    if (!client.isD1) await client.query('ROLLBACK');
     console.error('[Support User Send Message Error]', err);
     return res.status(500).json({ error: "خطا در ارسال پیام در پایگاه داده." });
   } finally {
@@ -3876,22 +4530,38 @@ app.post('/api/admin/support/tickets/:id/messages', requireAdminAuth, ensureData
     const messageId = "MSG_" + crypto.randomUUID();
     const now = new Date();
 
-    await client.query('BEGIN');
+    if (client.isD1 && typeof client.batch === 'function') {
+      await client.batch([
+        {
+          text: `INSERT INTO public.support_messages (id, ticket_id, sender_type, sender_id, sender_name, message_text, created_at)
+                 VALUES ($1, $2, 'ADMIN', 'admin', 'پشتیبانی رقابت', $3, $4)`,
+          params: [messageId, ticketId, message.trim(), now]
+        },
+        {
+          text: `UPDATE public.support_tickets
+                 SET status = $1, updated_at = $2, last_message_at = $2
+                 WHERE id = $3`,
+          params: [updatedStatus, now, ticketId]
+        }
+      ]);
+    } else {
+      await client.query('BEGIN');
 
-    // Insert Admin Message
-    await client.query(`
-      INSERT INTO public.support_messages (id, ticket_id, sender_type, sender_id, sender_name, message_text, created_at)
-      VALUES ($1, $2, 'ADMIN', 'admin', 'پشتیبانی رقابت', $3, $4)
-    `, [messageId, ticketId, message.trim(), now]);
+      // Insert Admin Message
+      await client.query(`
+        INSERT INTO public.support_messages (id, ticket_id, sender_type, sender_id, sender_name, message_text, created_at)
+        VALUES ($1, $2, 'ADMIN', 'admin', 'پشتیبانی رقابت', $3, $4)
+      `, [messageId, ticketId, message.trim(), now]);
 
-    // Update Ticket Status and Timestamp
-    await client.query(`
-      UPDATE public.support_tickets
-      SET status = $1, updated_at = $2, last_message_at = $2
-      WHERE id = $3
-    `, [updatedStatus, now, ticketId]);
+      // Update Ticket Status and Timestamp
+      await client.query(`
+        UPDATE public.support_tickets
+        SET status = $1, updated_at = $2, last_message_at = $2
+        WHERE id = $3
+      `, [updatedStatus, now, ticketId]);
 
-    await client.query('COMMIT');
+      await client.query('COMMIT');
+    }
 
     console.log(`[Support Admin Reply] Replied to ticket ${ticketId} (Status: ${updatedStatus})`);
 
@@ -3909,7 +4579,7 @@ app.post('/api/admin/support/tickets/:id/messages', requireAdminAuth, ensureData
       ticketStatus: updatedStatus
     });
   } catch (err) {
-    await client.query('ROLLBACK');
+    if (!client.isD1) await client.query('ROLLBACK');
     console.error('[Admin Support Reply Error]', err);
     return res.status(500).json({ error: "خطا در ثبت پاسخ مدیریت در پایگاه داده." });
   } finally {
@@ -4019,6 +4689,67 @@ app.post('/api/user/feedback', requireUserAuth, ensureDatabaseReady, async (req,
 
     const REWARD_POINTS = 2;
 
+    if (client.isD1 && typeof client.batch === 'function') {
+      const userCheck = await client.query(
+        `SELECT id, feedback_reward_claimed FROM public.users WHERE id = $1 LIMIT 1`,
+        [userId]
+      );
+      if (userCheck.rows.length === 0) {
+        return res.status(404).json({ error: "کاربر یافت نشد." });
+      }
+      if (toBool(userCheck.rows[0].feedback_reward_claimed, false)) {
+        return res.status(409).json({ error: "پاداش بازخورد قبلاً توسط شما دریافت شده است." });
+      }
+
+      const feedbackId = crypto.randomUUID();
+      const batchRes = await client.batch([
+        {
+          text: `INSERT INTO public.user_feedback (id, user_id, rating, comment, created_at)
+                 SELECT $1, $2, $3, $4, NOW()
+                 FROM public.users
+                 WHERE id = $2 AND feedback_reward_claimed = 0`,
+          params: [feedbackId, userId, rating, comment || null]
+        },
+        {
+          text: `INSERT INTO public.user_scores (user_id, total_score, updated_at)
+                 SELECT $1, $2, NOW()
+                 FROM public.users
+                 WHERE id = $1 AND feedback_reward_claimed = 0
+                 ON CONFLICT (user_id)
+                 DO UPDATE SET total_score = public.user_scores.total_score + $2, updated_at = NOW()`,
+          params: [userId, REWARD_POINTS]
+        },
+        {
+          text: `UPDATE public.users
+                 SET feedback_reward_claimed = 1,
+                     total_score = total_score + $1,
+                     updated_at = NOW()
+                 WHERE id = $2 AND feedback_reward_claimed = 0
+                 RETURNING total_score`,
+          params: [REWARD_POINTS, userId]
+        },
+        {
+          text: `SELECT total_score FROM public.user_scores WHERE user_id = $1 LIMIT 1`,
+          params: [userId]
+        }
+      ]);
+
+      const updatedUserRows = batchRes[2] && Array.isArray(batchRes[2].rows) ? batchRes[2].rows : [];
+      if (updatedUserRows.length === 0) {
+        return res.status(409).json({ error: "پاداش بازخورد قبلاً توسط شما دریافت شده است." });
+      }
+
+      const scoreRows = batchRes[3] && Array.isArray(batchRes[3].rows) ? batchRes[3].rows : [];
+      const finalScore = scoreRows.length > 0 ? Number(scoreRows[0].total_score) : Number(updatedUserRows[0].total_score);
+
+      return res.json({
+        success: true,
+        message: "بازخورد شما با موفقیت ثبت شد و ۲ امتیاز هدیه دریافت کردید.",
+        awardedPoints: REWARD_POINTS,
+        newTotalScore: finalScore
+      });
+    }
+
     // 1. Start atomic transaction
     await client.query('BEGIN');
 
@@ -4075,7 +4806,7 @@ app.post('/api/user/feedback', requireUserAuth, ensureDatabaseReady, async (req,
     });
 
   } catch (err) {
-    await client.query('ROLLBACK');
+    if (!client.isD1) await client.query('ROLLBACK');
     console.error('[User Feedback API Error]', err);
     return res.status(500).json({ error: "خطا در ثبت بازخورد و پرداخت پاداش در پایگاه داده." });
   } finally {
@@ -4113,7 +4844,7 @@ app.get('/api/app/login-notification', async (req, res) => {
     if (result.rows.length === 0) {
       return res.json({ success: true, data: defaultSettings, settings: defaultSettings });
     }
-    const settings = result.rows[0];
+    const settings = normalizeLoginNotificationSettings(result.rows[0]);
     res.json({ success: true, data: settings, settings });
   } catch (err) {
     console.error('[App Login Notif API Error]', err);
@@ -4128,7 +4859,7 @@ app.get('/api/admin/login-notification', requireAdminAuth, ensureDatabaseReady, 
     if (result.rows.length === 0) {
       return res.json({ success: true, data: null, settings: null });
     }
-    const settings = result.rows[0];
+    const settings = normalizeLoginNotificationSettings(result.rows[0]);
     res.json({ success: true, data: settings, settings });
   } catch (err) {
     console.error('[Admin Login Notif API Error]', err);
@@ -4144,6 +4875,9 @@ app.post('/api/admin/login-notification', requireAdminAuth, ensureDatabaseReady,
       warning_is_visible, warning_title, warning_description, warning_icon 
     } = req.body;
 
+    const isVisibleBool = toBool(is_visible, true);
+    const warningVisibleBool = toBool(warning_is_visible, true);
+
     const result = await pool.query(`
       UPDATE public.login_notification_settings 
       SET is_visible = $1, badge_text = $2, badge_icon = $3, main_title = $4, main_description = $5, 
@@ -4152,23 +4886,23 @@ app.post('/api/admin/login-notification', requireAdminAuth, ensureDatabaseReady,
       WHERE id = 'default'
       RETURNING *
     `, [
-      is_visible, badge_text, badge_icon, main_title, main_description, 
-      warning_is_visible, warning_title, warning_description, warning_icon
+      isVisibleBool, badge_text, badge_icon, main_title, main_description, 
+      warningVisibleBool, warning_title, warning_description, warning_icon
     ]);
 
-    if (result.rowCount === 0) {
+    if (result.rowCount === 0 && (!result.rows || result.rows.length === 0)) {
       // Create if not exists (should not happen due to seeding)
       const insertResult = await pool.query(`
         INSERT INTO public.login_notification_settings 
         (id, is_visible, badge_text, badge_icon, main_title, main_description, warning_is_visible, warning_title, warning_description, warning_icon)
         VALUES ('default', $1, $2, $3, $4, $5, $6, $7, $8, $9)
         RETURNING *
-      `, [is_visible, badge_text, badge_icon, main_title, main_description, warning_is_visible, warning_title, warning_description, warning_icon]);
-      const created = insertResult.rows[0];
+      `, [isVisibleBool, badge_text, badge_icon, main_title, main_description, warningVisibleBool, warning_title, warning_description, warning_icon]);
+      const created = normalizeLoginNotificationSettings(insertResult.rows[0]);
       return res.json({ success: true, data: created, settings: created });
     }
 
-    const updated = result.rows[0];
+    const updated = normalizeLoginNotificationSettings(result.rows[0]);
     res.json({ success: true, data: updated, settings: updated });
   } catch (err) {
     console.error('[Admin Update Login Notif API Error]', err);
@@ -4345,7 +5079,7 @@ function normalizePlacements(input) {
 function enrichAdminBannerRow(row, nowMs = Date.now()) {
   const startMs = row.start_at ? new Date(row.start_at).getTime() : null;
   const endMs = row.end_at ? new Date(row.end_at).getTime() : null;
-  const isActive = Boolean(row.is_active);
+  const isActive = toBool(row.is_active, true);
 
   let computedStatus = 'active';
   if (!isActive) {
@@ -4360,14 +5094,7 @@ function enrichAdminBannerRow(row, nowMs = Date.now()) {
   const clicks = Number(row.click_count || 0);
   const ctrPercent = impressions > 0 ? Number(((clicks / impressions) * 100).toFixed(2)) : 0;
 
-  let placementStats = {};
-  if (row.placement_stats) {
-    if (typeof row.placement_stats === 'object') {
-      placementStats = row.placement_stats;
-    } else {
-      try { placementStats = JSON.parse(row.placement_stats); } catch (_) {}
-    }
-  }
+  const placementStats = parseJsonField(row.placement_stats, {});
 
   return {
     id: row.id,
@@ -4397,7 +5124,7 @@ function serializePublicBannerRow(row) {
     imageUrl: row.image_url,
     targetUrl: row.target_url,
     linkOpenMode: row.link_open_mode === 'internal' ? 'internal' : 'external',
-    isActive: Boolean(row.is_active),
+    isActive: toBool(row.is_active, true),
     startAt: row.start_at ? new Date(row.start_at).getTime() : null,
     endAt: row.end_at ? new Date(row.end_at).getTime() : null,
     displayOrder: Number(row.display_order || 0),
@@ -4481,6 +5208,14 @@ app.post('/api/admin/ad-banners/upload-image', requireAdminAuth, (req, res) => {
             console.warn(`[AdBanner Upload] Supabase bucket "${bucketName}" failed:`, supErr.message);
           }
         }
+      }
+
+      if (isWorkerRuntime()) {
+        return res.status(501).json({
+          success: false,
+          storageUnavailable: true,
+          message: 'ذخیره‌سازی محلی فایل در محیط Cloudflare Workers پشتیبانی نمی‌شود. لطفاً از Supabase Storage یا Cloudflare R2 استفاده کنید.'
+        });
       }
 
       const uploadsDir = path.join(__dirname, 'public', 'uploads', 'ad-banners');
@@ -4596,7 +5331,7 @@ app.post('/api/admin/ad-banners', requireAdminAuth, ensureDatabaseReady, async (
     const displayOrder = Number.isFinite(Number(body.display_order))
       ? Math.max(0, Math.floor(Number(body.display_order)))
       : 0;
-    const isActive = body.is_active === undefined ? true : Boolean(body.is_active);
+    const isActive = body.is_active === undefined ? true : toBool(body.is_active, true);
     const id = `ad_${crypto.randomUUID()}`;
     const placementsJson = JSON.stringify(placementsCheck.placements);
 
@@ -4639,6 +5374,22 @@ app.patch('/api/admin/ad-banners/reorder', requireAdminAuth, ensureDatabaseReady
 
   const client = await pool.connect();
   try {
+    if (client.isD1 && typeof client.batch === 'function') {
+      const batchQueries = [];
+      for (const item of items) {
+        if (!item || !item.id) continue;
+        const orderVal = Number.isFinite(Number(item.display_order)) ? Math.max(0, Math.floor(Number(item.display_order))) : 0;
+        batchQueries.push({
+          text: `UPDATE public.ad_banners SET display_order = $1, updated_at = NOW() WHERE id = $2`,
+          params: [orderVal, String(item.id)]
+        });
+      }
+      if (batchQueries.length > 0) {
+        await client.batch(batchQueries);
+      }
+      return res.json({ success: true, message: 'ترتیب نمایش بنرها به‌روزرسانی شد.' });
+    }
+
     await client.query('BEGIN');
     for (const item of items) {
       if (!item || !item.id) continue;
@@ -4651,7 +5402,7 @@ app.patch('/api/admin/ad-banners/reorder', requireAdminAuth, ensureDatabaseReady
     await client.query('COMMIT');
     return res.json({ success: true, message: 'ترتیب نمایش بنرها به‌روزرسانی شد.' });
   } catch (err) {
-    await client.query('ROLLBACK').catch(() => {});
+    if (!client.isD1) await client.query('ROLLBACK').catch(() => {});
     console.error('[Admin Reorder AdBanners Error]', err);
     return res.status(500).json({ success: false, message: 'خطا در تغییر ترتیب نمایش بنرها.' });
   } finally {
@@ -4725,7 +5476,7 @@ app.put('/api/admin/ad-banners/:id', requireAdminAuth, ensureDatabaseReady, asyn
       return res.status(400).json({ success: false, message: 'تاریخ پایان نمایش باید بعد از تاریخ شروع باشد.' });
     }
 
-    const isActive = body.is_active !== undefined ? Boolean(body.is_active) : Boolean(existing.is_active);
+    const isActive = body.is_active !== undefined ? toBool(body.is_active, true) : toBool(existing.is_active, true);
     const displayOrder = body.display_order !== undefined
       ? (Number.isFinite(Number(body.display_order)) ? Math.max(0, Math.floor(Number(body.display_order))) : 0)
       : Number(existing.display_order || 0);
@@ -4784,10 +5535,11 @@ app.patch('/api/admin/ad-banners/:id/toggle', requireAdminAuth, ensureDatabaseRe
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: 'بنر تبلیغاتی مورد نظر یافت نشد.' });
     }
+    const enriched = enrichAdminBannerRow(result.rows[0]);
     return res.json({
       success: true,
-      banner: enrichAdminBannerRow(result.rows[0]),
-      message: result.rows[0].is_active ? 'تبلیغ فعال شد.' : 'تبلیغ غیرفعال شد.'
+      banner: enriched,
+      message: enriched.is_active ? 'تبلیغ فعال شد.' : 'تبلیغ غیرفعال شد.'
     });
   } catch (err) {
     console.error('[Admin Toggle AdBanner Error]', err);
@@ -4808,7 +5560,7 @@ app.delete('/api/admin/ad-banners/:id', requireAdminAuth, ensureDatabaseReady, a
     }
 
     const oldImg = delRes.rows[0].image_url || '';
-    if (oldImg.startsWith('/uploads/ad-banners/')) {
+    if (!isWorkerRuntime() && oldImg.startsWith('/uploads/ad-banners/')) {
       try {
         const refCheck = await pool.query(`SELECT 1 FROM public.ad_banners WHERE image_url = $1 LIMIT 1`, [oldImg]);
         if (refCheck.rows.length === 0) {
@@ -4921,6 +5673,9 @@ app.post('/api/ad-banners/:id/impression', async (req, res) => {
          SET impression_count = impression_count + 1,
              placement_stats = $2
          WHERE id = $1
+           AND is_active = 1
+           AND (start_at IS NULL OR start_at <= CURRENT_TIMESTAMP)
+           AND (end_at IS NULL OR end_at > CURRENT_TIMESTAMP)
          RETURNING id`,
         [id, JSON.stringify(stats)]
       );
@@ -5007,6 +5762,9 @@ app.post('/api/ad-banners/:id/click', async (req, res) => {
          SET click_count = click_count + 1,
              placement_stats = $2
          WHERE id = $1
+           AND is_active = 1
+           AND (start_at IS NULL OR start_at <= CURRENT_TIMESTAMP)
+           AND (end_at IS NULL OR end_at > CURRENT_TIMESTAMP)
          RETURNING id`,
         [id, JSON.stringify(stats)]
       );
@@ -5040,6 +5798,53 @@ app.post('/api/ad-banners/:id/click', async (req, res) => {
   } catch (err) {
     console.error('[AdBanner Click Error]', err.message);
     return res.status(500).json({ success: false, recorded: false });
+  }
+});
+
+// ====================================================================
+// 14. User Notification Settings API
+// ====================================================================
+app.post('/api/user/settings/notifications', requireUserAuth, ensureDatabaseReady, async (req, res) => {
+  try {
+    const headerUserId = req.headers['x-user-id'] ? String(req.headers['x-user-id']).trim() : null;
+    if (headerUserId && headerUserId !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        error: 'شناسه کاربر با توکن احراز هویت مطابقت ندارد.'
+      });
+    }
+
+    const enabled = req.body ? req.body.enabled : undefined;
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({
+        success: false,
+        error: 'مقدار فیلد enabled باید از نوع boolean (true یا false) باشد.'
+      });
+    }
+
+    const userUpdate = await pool.query(
+      `UPDATE public.users SET updated_at = NOW() WHERE id = $1 RETURNING id`,
+      [req.user.id]
+    );
+    if (userUpdate.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'کاربر یافت نشد.'
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      enabled,
+      notificationsEnabled: enabled,
+      message: enabled ? 'اعلان‌ها با موفقیت فعال شد.' : 'اعلان‌ها با موفقیت غیرفعال شد.'
+    });
+  } catch (err) {
+    console.error('[User Notification Settings Error]', err);
+    return res.status(500).json({
+      success: false,
+      error: 'خطا در به‌روزرسانی تنظیمات اعلان.'
+    });
   }
 });
 

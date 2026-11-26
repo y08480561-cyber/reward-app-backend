@@ -61,6 +61,90 @@ const memoryDb = {
   claims: []
 };
 
+function isWorkerRuntime() {
+  return (
+    (typeof process !== 'undefined' && process.env && process.env.WORKER_RUNTIME === 'cloudflare-workers') ||
+    (typeof navigator !== 'undefined' && navigator.userAgent === 'Cloudflare-Workers') ||
+    Boolean(pool && pool.isD1)
+  );
+}
+
+function toBool(val, defaultVal = false) {
+  if (val === undefined || val === null) return defaultVal;
+  if (typeof val === 'boolean') return val;
+  if (typeof val === 'number') return val !== 0;
+  if (typeof val === 'string') {
+    const s = val.trim().toLowerCase();
+    if (s === 'true' || s === '1' || s === 't' || s === 'yes') return true;
+    if (s === 'false' || s === '0' || s === 'f' || s === 'no' || s === '') return false;
+  }
+  return Boolean(val);
+}
+
+function parseJsonField(val, fallback) {
+  const cloneFallback = () => (Array.isArray(fallback) ? [...fallback] : (fallback && typeof fallback === 'object' ? { ...fallback } : fallback));
+  if (val === undefined || val === null || val === '') return cloneFallback();
+  if (typeof val === 'object') {
+    if (Array.isArray(fallback)) return Array.isArray(val) ? val : cloneFallback();
+    if (fallback && typeof fallback === 'object') return !Array.isArray(val) ? val : cloneFallback();
+    return val;
+  }
+  if (typeof val === 'string') {
+    try {
+      const parsed = JSON.parse(val);
+      if (parsed === null || parsed === undefined) return cloneFallback();
+      if (Array.isArray(fallback) && !Array.isArray(parsed)) return cloneFallback();
+      if (fallback && typeof fallback === 'object' && !Array.isArray(fallback) && (typeof parsed !== 'object' || Array.isArray(parsed))) {
+        return cloneFallback();
+      }
+      return parsed;
+    } catch (_e) {
+      return cloneFallback();
+    }
+  }
+  return cloneFallback();
+}
+
+function normalizeCategoryRow(row) {
+  if (!row) return row;
+  return {
+    ...row,
+    sort_order: Number(row.sort_order || 0),
+    is_active: toBool(row.is_active, true)
+  };
+}
+
+function normalizeRewardRow(row) {
+  if (!row) return row;
+  return {
+    ...row,
+    cost_points: Number(row.cost_points || 0),
+    stock_quantity: Number(row.stock_quantity || 0),
+    sort_order: Number(row.sort_order || 0),
+    additional_images: parseJsonField(row.additional_images, []),
+    is_featured: toBool(row.is_featured, false),
+    is_active: toBool(row.is_active, true)
+  };
+}
+
+function normalizeAppearanceRow(row) {
+  if (!row) return row;
+  const activeSections = parseJsonField(row.active_sections, {
+    featured: true,
+    categories: true,
+    history: true,
+    banners: true
+  });
+  if (activeSections && activeSections.isActive !== undefined) {
+    activeSections.isActive = toBool(activeSections.isActive, true);
+  }
+  return {
+    ...row,
+    hero_banner_url: row.hero_banner_url || '',
+    active_sections: activeSections
+  };
+}
+
 // Unified Admin Authentication Middleware (Strict header-based, no query string credentials, no hardcoded secrets)
 function requireAdminAuth(req, res, next) {
   const configuredKey = process.env.ADMIN_KEY ? process.env.ADMIN_KEY.trim() : '';
@@ -141,9 +225,9 @@ rewardsRouter.get('/categories', async (req, res) => {
   try {
     if (pool) {
       const result = await pool.query('SELECT * FROM public.reward_categories WHERE is_active = true ORDER BY sort_order ASC');
-      return res.json({ success: true, categories: result.rows });
+      return res.json({ success: true, categories: result.rows.map(normalizeCategoryRow) });
     }
-    return res.json({ success: true, categories: memoryDb.categories });
+    return res.json({ success: true, categories: memoryDb.categories.map(normalizeCategoryRow) });
   } catch (err) {
     return res.status(500).json({ success: false, message: 'خطا در دریافت دسته‌بندی‌ها' });
   }
@@ -162,10 +246,7 @@ rewardsRouter.get('/appearance', async (req, res) => {
     const row = result.rows[0];
     return res.json({
       success: true,
-      appearance: {
-        ...row,
-        hero_banner_url: row.hero_banner_url || ''
-      }
+      appearance: normalizeAppearanceRow(row)
     });
   } catch (err) {
     console.error('[Rewards Error] Failed to fetch appearance from PostgreSQL:', err.message);
@@ -190,9 +271,9 @@ rewardsRouter.get('/', async (req, res) => {
       }
       query += ` ORDER BY r.sort_order ASC, r.created_at DESC`;
       const result = await pool.query(query, queryParams);
-      return res.json({ success: true, rewards: result.rows });
+      return res.json({ success: true, rewards: result.rows.map(normalizeRewardRow) });
     }
-    return res.json({ success: true, rewards: memoryDb.rewards });
+    return res.json({ success: true, rewards: memoryDb.rewards.map(normalizeRewardRow) });
   } catch (err) {
     console.error('[Rewards API Error] GET /api/rewards failed:', err.message);
     return res.status(500).json({ success: false, message: 'خطا در دریافت لیست جوایز' });
@@ -227,6 +308,103 @@ rewardsRouter.post('/claim', requireUserAuth, async (req, res) => {
       };
       memoryDb.claims.push(newClaim);
       return res.json({ success: true, claim: newClaim, tracking_code: trackingCode });
+    }
+
+    if (client.isD1 && typeof client.batch === 'function') {
+      // 1. Pre-check Idempotency first so retries return 409 even if score/stock was already deducted
+      if (idempotency_key) {
+        const idempCheck = await client.query('SELECT id FROM public.reward_claims WHERE idempotency_key = $1 LIMIT 1', [idempotency_key]);
+        if (idempCheck.rows.length > 0) {
+          return res.status(409).json({ success: false, message: 'این درخواست قبلاً ثبت شده است.' });
+        }
+      }
+
+      // 2. Fetch Reward (pre-check for user-friendly errors)
+      const rewRes = await client.query('SELECT * FROM public.rewards WHERE id = $1', [reward_id]);
+      if (rewRes.rows.length === 0) {
+        return res.status(404).json({ success: false, message: 'جایزه یافت نشد.' });
+      }
+      const reward = rewRes.rows[0];
+
+      if (!toBool(reward.is_active, false) || reward.deleted_at) {
+        return res.status(400).json({ success: false, message: 'این جایزه در حال حاضر غیرفعال است.' });
+      }
+
+      const costPoints = Number(reward.cost_points || 0);
+      if (Number(reward.stock_quantity || 0) <= 0) {
+        return res.status(400).json({ success: false, message: 'موجودی این جایزه به پایان رسیده است.' });
+      }
+
+      // 3. Pre-check User Score
+      const scoreRes = await client.query('SELECT total_score FROM public.user_scores WHERE user_id = $1', [userId]);
+      let currentScore = scoreRes.rows.length > 0 ? Number(scoreRes.rows[0].total_score) : null;
+      if (currentScore === null) {
+        const uScoreRes = await client.query('SELECT total_score FROM public.users WHERE id = $1', [userId]);
+        currentScore = uScoreRes.rows.length > 0 ? Number(uScoreRes.rows[0].total_score || 0) : 0;
+      }
+
+      if (currentScore < costPoints) {
+        return res.status(400).json({ success: false, message: `امتیاز شما کافی نیست. (نیاز: ${costPoints}، موجودی: ${currentScore})` });
+      }
+
+      // 4. Execute atomic D1 batch relying on CHECK (total_score >= 0), CHECK (stock_quantity >= 0), and UNIQUE(idempotency_key)
+      const claimId = 'clm_' + crypto.randomBytes(8).toString('hex');
+      const trackingCode = 'CLM-' + crypto.randomBytes(4).toString('hex').toUpperCase();
+
+      try {
+        const batchResults = await client.batch([
+          {
+            text: `INSERT OR IGNORE INTO public.user_scores (user_id, total_score, updated_at)
+                   VALUES ($1, COALESCE((SELECT total_score FROM public.users WHERE id = $1), 0), NOW())`,
+            params: [userId]
+          },
+          {
+            text: `UPDATE public.user_scores SET total_score = total_score - $1, updated_at = NOW() WHERE user_id = $2`,
+            params: [costPoints, userId]
+          },
+          {
+            text: `UPDATE public.users SET total_score = MAX(0, total_score - $1), updated_at = NOW() WHERE id = $2`,
+            params: [costPoints, userId]
+          },
+          {
+            text: `UPDATE public.rewards
+                   SET stock_quantity = CASE WHEN is_active = 1 AND deleted_at IS NULL THEN stock_quantity - 1 ELSE -1 END,
+                       updated_at = NOW()
+                   WHERE id = $1`,
+            params: [reward_id]
+          },
+          {
+            text: `INSERT INTO public.reward_claims
+                   (id, tracking_code, user_id, reward_id, cost_points, status, recipient_name, phone, shipping_address, idempotency_key, created_at, updated_at)
+                   VALUES ($1, $2, $3, $4, $5, 'PENDING', $6, $7, $8, $9, NOW(), NOW())
+                   RETURNING *`,
+            params: [claimId, trackingCode, userId, reward_id, costPoints, recipient_name || '', phone || '', shipping_address || '', idempotency_key || null]
+          }
+        ]);
+
+        const createdClaim = batchResults[4] && batchResults[4].rows ? batchResults[4].rows[0] : null;
+        console.log(`[Reward Claim D1] User ${userId} claimed ${reward.title}. Score Deducted: ${costPoints}`);
+        return res.json({
+          success: true,
+          message: 'درخواست شما با موفقیت ثبت شد و پس از بررسی نهایی پردازش خواهد شد.',
+          claim: createdClaim,
+          tracking_code: trackingCode
+        });
+      } catch (batchErr) {
+        const errMsg = String(batchErr && batchErr.message ? batchErr.message : batchErr);
+        if (/UNIQUE constraint failed/i.test(errMsg) && /idempotency_key/i.test(errMsg)) {
+          return res.status(409).json({ success: false, message: 'این درخواست قبلاً ثبت شده است.' });
+        }
+        if (/CHECK constraint failed/i.test(errMsg)) {
+          if (/stock_quantity/i.test(errMsg)) {
+            return res.status(400).json({ success: false, message: 'موجودی این جایزه به پایان رسیده است.' });
+          }
+          if (/total_score/i.test(errMsg)) {
+            return res.status(400).json({ success: false, message: 'امتیاز شما کافی نیست.' });
+          }
+        }
+        throw batchErr;
+      }
     }
 
     await client.query('BEGIN');
@@ -298,7 +476,7 @@ rewardsRouter.post('/claim', requireUserAuth, async (req, res) => {
     });
 
   } catch (err) {
-    if (client) await client.query('ROLLBACK');
+    if (client && !client.isD1) await client.query('ROLLBACK');
     console.error('[Rewards Claim Error]', err);
     return res.status(500).json({ success: false, message: 'خطا در فرآیند ثبت درخواست جایزه' });
   } finally {
@@ -325,9 +503,9 @@ rewardsRouter.get('/admin/rewards', requireAdminAuth, async (req, res) => {
   try {
     if (pool) {
       const result = await pool.query('SELECT r.*, c.name as category_name FROM public.rewards r LEFT JOIN public.reward_categories c ON r.category_id = c.id WHERE r.deleted_at IS NULL ORDER BY r.sort_order ASC');
-      return res.json({ success: true, rewards: result.rows });
+      return res.json({ success: true, rewards: result.rows.map(normalizeRewardRow) });
     }
-    return res.json({ success: true, rewards: memoryDb.rewards });
+    return res.json({ success: true, rewards: memoryDb.rewards.map(normalizeRewardRow) });
   } catch (err) {
     console.error('[Rewards Admin Error] GET /admin/rewards failed:', err.message);
     return res.status(500).json({ success: false, message: 'خطا در لیست جوایز' });
@@ -344,7 +522,7 @@ rewardsRouter.post('/admin/rewards', requireAdminAuth, async (req, res) => {
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
         RETURNING *
       `, [id, title, description || '', category_id || null, cost_points || 0, stock_quantity || 0, image_url || '', !!is_featured, is_active !== false, sort_order || 0]);
-      return res.json({ success: true, reward: result.rows[0] });
+      return res.json({ success: true, reward: normalizeRewardRow(result.rows[0]) });
     }
     const newReward = {
       id,
@@ -354,12 +532,13 @@ rewardsRouter.post('/admin/rewards', requireAdminAuth, async (req, res) => {
       cost_points: cost_points || 0,
       stock_quantity: stock_quantity || 0,
       image_url: image_url || '',
+      additional_images: [],
       is_featured: !!is_featured,
       is_active: is_active !== false,
       sort_order: sort_order || 0
     };
     memoryDb.rewards.push(newReward);
-    return res.json({ success: true, reward: newReward });
+    return res.json({ success: true, reward: normalizeRewardRow(newReward) });
   } catch (err) {
     console.error('[Rewards Admin Error] POST /admin/rewards failed:', err.message);
     return res.status(500).json({ success: false, message: 'خطا در ایجاد جایزه' });
@@ -376,7 +555,7 @@ rewardsRouter.put('/admin/rewards/:id', requireAdminAuth, async (req, res) => {
         SET title = COALESCE($1, title), description = COALESCE($2, description), category_id = COALESCE($3, category_id), cost_points = COALESCE($4, cost_points), stock_quantity = COALESCE($5, stock_quantity), image_url = COALESCE($6, image_url), is_featured = COALESCE($7, is_featured), is_active = COALESCE($8, is_active), sort_order = COALESCE($9, sort_order), updated_at = NOW()
         WHERE id = $10 RETURNING *
       `, [title, description, category_id, cost_points, stock_quantity, image_url, is_featured, is_active, sort_order, id]);
-      return res.json({ success: true, reward: result.rows[0] });
+      return res.json({ success: true, reward: result.rows[0] ? normalizeRewardRow(result.rows[0]) : undefined });
     }
     return res.json({ success: true });
   } catch (err) {
@@ -426,6 +605,96 @@ rewardsRouter.patch('/admin/claims/:id', requireAdminAuth, async (req, res) => {
       if (tracking_number !== undefined) c.tracking_number = tracking_number;
       c.updated_at = new Date().toISOString();
       return res.json({ success: true, message: 'وضعیت با موفقیت به‌روزرسانی شد', claim: c });
+    }
+
+    if (client.isD1 && typeof client.batch === 'function') {
+      const claimRes = await client.query('SELECT * FROM public.reward_claims WHERE id = $1', [id]);
+      if (claimRes.rows.length === 0) {
+        return res.status(404).json({ success: false, message: 'درخواست یافت نشد.' });
+      }
+      const oldClaim = claimRes.rows[0];
+      const normalizedOldStatus = (oldClaim.status || '').toUpperCase();
+      const normalizedNewStatus = (status || '').toUpperCase();
+      const costPoints = Number(oldClaim.cost_points || 0);
+
+      const batchQueries = [];
+
+      if (normalizedNewStatus === 'REJECTED' && normalizedOldStatus !== 'REJECTED') {
+        batchQueries.push(
+          {
+            text: `UPDATE public.user_scores
+                   SET total_score = total_score + $1, updated_at = NOW()
+                   WHERE user_id = $2
+                     AND EXISTS (SELECT 1 FROM public.reward_claims WHERE id = $3 AND UPPER(status) != 'REJECTED')`,
+            params: [costPoints, oldClaim.user_id, id]
+          },
+          {
+            text: `UPDATE public.users
+                   SET total_score = total_score + $1, updated_at = NOW()
+                   WHERE id = $2
+                     AND EXISTS (SELECT 1 FROM public.reward_claims WHERE id = $3 AND UPPER(status) != 'REJECTED')`,
+            params: [costPoints, oldClaim.user_id, id]
+          },
+          {
+            text: `UPDATE public.rewards
+                   SET stock_quantity = stock_quantity + 1, updated_at = NOW()
+                   WHERE id = $1
+                     AND EXISTS (SELECT 1 FROM public.reward_claims WHERE id = $2 AND UPPER(status) != 'REJECTED')`,
+            params: [oldClaim.reward_id, id]
+          }
+        );
+      } else if (normalizedOldStatus === 'REJECTED' && status && normalizedNewStatus !== 'REJECTED') {
+        const scoreRes = await client.query('SELECT total_score FROM public.user_scores WHERE user_id = $1', [oldClaim.user_id]);
+        const currentScore = scoreRes.rows.length > 0 ? Number(scoreRes.rows[0].total_score) : 0;
+        if (currentScore < costPoints) {
+          return res.status(400).json({ success: false, message: 'امتیاز کاربر برای بازگرداندن از حالت رد شده کافی نیست.' });
+        }
+        batchQueries.push(
+          {
+            text: `UPDATE public.user_scores
+                   SET total_score = total_score - $1, updated_at = NOW()
+                   WHERE user_id = $2
+                     AND EXISTS (SELECT 1 FROM public.reward_claims WHERE id = $3 AND UPPER(status) = 'REJECTED')`,
+            params: [costPoints, oldClaim.user_id, id]
+          },
+          {
+            text: `UPDATE public.users
+                   SET total_score = MAX(0, total_score - $1), updated_at = NOW()
+                   WHERE id = $2
+                     AND EXISTS (SELECT 1 FROM public.reward_claims WHERE id = $3 AND UPPER(status) = 'REJECTED')`,
+            params: [costPoints, oldClaim.user_id, id]
+          },
+          {
+            text: `UPDATE public.rewards
+                   SET stock_quantity = stock_quantity - 1, updated_at = NOW()
+                   WHERE id = $1
+                     AND EXISTS (SELECT 1 FROM public.reward_claims WHERE id = $2 AND UPPER(status) = 'REJECTED')`,
+            params: [oldClaim.reward_id, id]
+          }
+        );
+      }
+
+      batchQueries.push({
+        text: `UPDATE public.reward_claims
+               SET status = COALESCE($1, status),
+                   admin_notes = COALESCE($2, admin_notes),
+                   tracking_number = COALESCE($3, tracking_number),
+                   updated_at = NOW()
+               WHERE id = $4
+               RETURNING *`,
+        params: [status ?? null, admin_notes ?? null, tracking_number ?? null, id]
+      });
+
+      try {
+        const batchResults = await client.batch(batchQueries);
+        const updatedClaim = batchResults[batchResults.length - 1].rows[0];
+        return res.json({ success: true, message: 'درخواست با موفقیت بروزرسانی شد.', claim: updatedClaim });
+      } catch (batchErr) {
+        if (/CHECK constraint failed/i.test(String(batchErr && batchErr.message))) {
+          return res.status(400).json({ success: false, message: 'امتیاز کاربر یا موجودی جایزه برای تغییر وضعیت کافی نیست.' });
+        }
+        throw batchErr;
+      }
     }
 
     await client.query('BEGIN');
@@ -485,7 +754,7 @@ rewardsRouter.patch('/admin/claims/:id', requireAdminAuth, async (req, res) => {
     return res.json({ success: true, message: 'درخواست با موفقیت بروزرسانی شد.', claim: result.rows[0] });
 
   } catch (err) {
-    if (client) await client.query('ROLLBACK');
+    if (client && !client.isD1) await client.query('ROLLBACK');
     console.error('[Admin Claim Update Error]', err);
     return res.status(500).json({ success: false, message: 'خطا در بروزرسانی درخواست.' });
   } finally {
@@ -500,39 +769,25 @@ const saveAppearanceHandler = async (req, res) => {
 
   try {
     const { hero_title, hero_subtitle, hero_banner_url, primary_color, active_sections, is_active, terms_text } = req.body;
-    
-    // Ensure reward_appearance table exists with appropriate columns
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS public.reward_appearance (
-        id TEXT PRIMARY KEY DEFAULT 'default',
-        hero_title TEXT NOT NULL DEFAULT 'ویترین جوایز و پاداش‌های ارزشمند',
-        hero_subtitle TEXT DEFAULT 'امتیازهای کسب‌شده خود در مسابقات را به کارت شارژ، بسته‌های اینترنت و جوایز نقدی تبدیل کنید',
-        hero_banner_url TEXT DEFAULT '',
-        primary_color TEXT DEFAULT '#10B981',
-        active_sections JSONB DEFAULT '{"featured": true, "categories": true, "history": true, "banners": true}',
-        terms_text TEXT DEFAULT 'درخواست‌های دریافت جایزه پس از بررسی توسط تیم پشتیبانی ظرف ۲۴ الی ۷۲ ساعت کاری پردازش و ارسال خواهند شد.',
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      );
-    `);
 
     let activeSecObj = active_sections;
     if (!activeSecObj) {
       activeSecObj = { isActive: is_active !== false };
     } else if (typeof activeSecObj === 'string') {
-      try { activeSecObj = JSON.parse(activeSecObj); } catch(e) { activeSecObj = { isActive: is_active !== false }; }
+      activeSecObj = parseJsonField(activeSecObj, { isActive: is_active !== false });
     }
     const activeSecStr = JSON.stringify(activeSecObj);
 
     const result = await pool.query(`
       INSERT INTO public.reward_appearance (id, hero_title, hero_subtitle, hero_banner_url, primary_color, active_sections, terms_text, updated_at)
-      VALUES ('default', $1, $2, $3, $4, $5::jsonb, $6, NOW())
+      VALUES ('default', $1, $2, $3, $4, $5, $6, NOW())
       ON CONFLICT (id) DO UPDATE SET 
-        hero_title = COALESCE(EXCLUDED.hero_title, public.reward_appearance.hero_title),
-        hero_subtitle = COALESCE(EXCLUDED.hero_subtitle, public.reward_appearance.hero_subtitle),
-        hero_banner_url = COALESCE(EXCLUDED.hero_banner_url, public.reward_appearance.hero_banner_url),
-        primary_color = COALESCE(EXCLUDED.primary_color, public.reward_appearance.primary_color),
-        active_sections = COALESCE(EXCLUDED.active_sections, public.reward_appearance.active_sections),
-        terms_text = COALESCE(EXCLUDED.terms_text, public.reward_appearance.terms_text),
+        hero_title = COALESCE(EXCLUDED.hero_title, reward_appearance.hero_title),
+        hero_subtitle = COALESCE(EXCLUDED.hero_subtitle, reward_appearance.hero_subtitle),
+        hero_banner_url = COALESCE(EXCLUDED.hero_banner_url, reward_appearance.hero_banner_url),
+        primary_color = COALESCE(EXCLUDED.primary_color, reward_appearance.primary_color),
+        active_sections = COALESCE(EXCLUDED.active_sections, reward_appearance.active_sections),
+        terms_text = COALESCE(EXCLUDED.terms_text, reward_appearance.terms_text),
         updated_at = NOW()
       RETURNING *
     `, [
@@ -547,10 +802,15 @@ const saveAppearanceHandler = async (req, res) => {
     const savedRow = result.rows && result.rows.length > 0 ? result.rows[0] : null;
     return res.json({
       success: true,
-      appearance: savedRow ? {
-        ...savedRow,
-        hero_banner_url: savedRow.hero_banner_url || ''
-      } : { hero_title, hero_subtitle, hero_banner_url, primary_color }
+      appearance: savedRow
+        ? normalizeAppearanceRow(savedRow)
+        : {
+            hero_title,
+            hero_subtitle,
+            hero_banner_url: hero_banner_url || '',
+            primary_color,
+            active_sections: activeSecObj
+          }
     });
   } catch (err) {
     console.error('[Rewards Admin Error] Save appearance failed:', err);
@@ -616,7 +876,15 @@ rewardsRouter.post('/admin/upload-banner', requireAdminAuth, upload.single('bann
       }
     }
 
-    // Fallback: Save directly to server's public/uploads directory
+    if (isWorkerRuntime()) {
+      return res.status(501).json({
+        success: false,
+        storageUnavailable: true,
+        message: 'ذخیره‌سازی محلی فایل در محیط Cloudflare Workers پشتیبانی نمی‌شود. لطفاً از Supabase Storage یا Cloudflare R2 استفاده کنید.'
+      });
+    }
+
+    // Fallback: Save directly to server's public/uploads directory (Node.js / Render / cPanel only)
     const uploadsDir = path.join(__dirname, '../public/uploads/banners');
     if (!fs.existsSync(uploadsDir)) {
       fs.mkdirSync(uploadsDir, { recursive: true });

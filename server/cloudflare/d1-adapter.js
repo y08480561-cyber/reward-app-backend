@@ -24,7 +24,12 @@ class D1PoolAdapter {
 
     // PostgreSQL -> SQLite syntax equivalents
     q = q.replace(/\bILIKE\b/gi, 'LIKE');
-    q = q.replace(/\bNOW\(\)/gi, 'CURRENT_TIMESTAMP');
+    q = q.replace(/('(?:''|[^'])*')|\bNOW\(\)|\bCURRENT_TIMESTAMP\b/gi, (match, strLiteral) => {
+      if (strLiteral !== undefined) {
+        return strLiteral;
+      }
+      return "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))";
+    });
     q = q.replace(/\bGEN_RANDOM_UUID\(\)/gi, '(lower(hex(randomblob(4))) || "-" || lower(hex(randomblob(2))) || "-4" || substr(lower(hex(randomblob(2))),2,3) || "-" || substr("89ab", abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))),2,3) || "-" || lower(hex(randomblob(6))))');
     q = q.replace(/\bFOR\s+(UPDATE|SHARE)(\s+SKIP\s+LOCKED)?\b/gi, '');
 
@@ -45,12 +50,32 @@ class D1PoolAdapter {
 
   sanitizeParam(p) {
     if (p === undefined || p === null) return null;
-    if (p instanceof Date) return p.toISOString();
+    if (p instanceof Date) {
+      return Number.isNaN(p.getTime()) ? null : p.toISOString();
+    }
     if (typeof p === 'boolean') return p ? 1 : 0;
     if (typeof p === 'object' && !Buffer.isBuffer(p)) {
       return JSON.stringify(p);
     }
     return p;
+  }
+
+  prepareStatement(text, params = []) {
+    const { sql: convertedSql, params: orderedParams } = this.convertQuery(text, params);
+    const sanitizedParams = orderedParams.map((p) => this.sanitizeParam(p));
+
+    const stmt = this.d1.prepare(convertedSql);
+    const boundStmt = sanitizedParams.length > 0 ? stmt.bind(...sanitizedParams) : stmt;
+
+    const lowerSql = convertedSql.trim().toLowerCase();
+    const returnsRows =
+      lowerSql.startsWith('select') ||
+      lowerSql.startsWith('with') ||
+      lowerSql.startsWith('values') ||
+      lowerSql.startsWith('pragma') ||
+      /\breturning\b/i.test(convertedSql);
+
+    return { boundStmt, returnsRows };
   }
 
   async query(text, params = []) {
@@ -72,19 +97,7 @@ class D1PoolAdapter {
       return { rows: [], rowCount: 0 };
     }
 
-    const { sql: convertedSql, params: orderedParams } = this.convertQuery(text, params);
-    const sanitizedParams = orderedParams.map((p) => this.sanitizeParam(p));
-
-    const stmt = this.d1.prepare(convertedSql);
-    const boundStmt = sanitizedParams.length > 0 ? stmt.bind(...sanitizedParams) : stmt;
-
-    const lowerSql = convertedSql.trim().toLowerCase();
-    const returnsRows =
-      lowerSql.startsWith('select') ||
-      lowerSql.startsWith('with') ||
-      lowerSql.startsWith('values') ||
-      lowerSql.startsWith('pragma') ||
-      /\breturning\b/i.test(convertedSql);
+    const { boundStmt, returnsRows } = this.prepareStatement(text, params);
 
     if (returnsRows) {
       const res = await boundStmt.all();
@@ -103,6 +116,30 @@ class D1PoolAdapter {
     }
   }
 
+  async batch(queries = []) {
+    if (!this.d1) {
+      throw new Error('[D1 Adapter Error] D1 database binding (env.DB) is not initialized.');
+    }
+    if (!Array.isArray(queries) || queries.length === 0) {
+      return [];
+    }
+
+    const prepared = queries.map((item) => {
+      const text = typeof item === 'string' ? item : item.text;
+      const params = typeof item === 'string' ? [] : (item.params || []);
+      return this.prepareStatement(text, params);
+    });
+
+    const rawResults = await this.d1.batch(prepared.map((p) => p.boundStmt));
+    return rawResults.map((res, idx) => {
+      const rows = res && Array.isArray(res.results) ? res.results : [];
+      const rowCount = prepared[idx].returnsRows
+        ? rows.length
+        : ((res && res.meta && typeof res.meta.changes === 'number') ? res.meta.changes : 0);
+      return { rows, rowCount };
+    });
+  }
+
   async connect() {
     if (!this.d1) {
       throw new Error('[D1 Adapter Error] D1 database binding (env.DB) is not initialized.');
@@ -112,6 +149,9 @@ class D1PoolAdapter {
       isD1: true,
       query(text, params = []) {
         return self.query(text, params);
+      },
+      batch(queries = []) {
+        return self.batch(queries);
       },
       release() {
         // No-op for D1
