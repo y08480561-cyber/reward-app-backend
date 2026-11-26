@@ -106,18 +106,23 @@ async function handleAssetFallback(request, env, url, pathname) {
   }
 
   let targetPath = pathname;
-  if (pathname === '/admin' || pathname === '/admin/dashboard') {
+  if (pathname === '/' || pathname === '/admin' || pathname === '/admin/dashboard') {
     targetPath = '/index.html';
   } else if (pathname === '/admin/users' || pathname === '/admin/users/') {
     targetPath = '/users.html';
   }
 
-  if (targetPath !== pathname) {
+  try {
     const rewrittenUrl = new URL(url.toString());
     rewrittenUrl.pathname = targetPath;
-    return env.ASSETS.fetch(new Request(rewrittenUrl.toString(), request));
+    return await env.ASSETS.fetch(new Request(rewrittenUrl.toString(), request));
+  } catch (err) {
+    console.error('[Asset Fallback Error]', err);
+    return jsonResponse({
+      success: false,
+      error: 'خطای بارگذاری پنل مدیریت'
+    }, 500);
   }
-  return env.ASSETS.fetch(request);
 }
 
 export async function handleWorkerRequest(request, env) {
