@@ -10,7 +10,7 @@
     {
       "binding": "DB",
       "database_name": "reward-app-db",
-      "database_id": "YOUR_D1_DATABASE_ID_TO_BE_LINKED_FROM_CF_DASHBOARD"
+      "database_id": "a5662c6f-c952-4200-8403-a55640b02498"
     }
   ],
   "vars": {
