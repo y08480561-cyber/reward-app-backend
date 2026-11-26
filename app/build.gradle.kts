@@ -128,7 +128,9 @@ dependencies {
   implementation(libs.logging.interceptor)
   implementation(libs.moshi.kotlin)
   implementation(libs.okhttp)
-  implementation("ir.myket:billing:2.2")
+  implementation("ir.myket:billing:2.2") {
+    exclude(group = "com.squareup.okhttp3")
+  }
   implementation("ir.tapsell.plus:tapsell-plus-sdk-android:2.3.3")
   implementation("com.google.android.gms:play-services-ads-identifier:18.2.0")
   implementation(libs.retrofit)

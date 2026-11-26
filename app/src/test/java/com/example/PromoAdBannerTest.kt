@@ -427,6 +427,8 @@ class PromoAdBannerTest {
             imageUrl = "https://example.com/home.png",
             targetUrl = "https://example.com/h",
             placements = listOf("home"),
+            displayOrder = 1,
+            updatedAtMs = 1000L,
             isActive = true
         )
         val bannerLeaderboardOnly = PromoAdBanner(
@@ -435,6 +437,8 @@ class PromoAdBannerTest {
             imageUrl = "https://example.com/lead.png",
             targetUrl = "https://example.com/l",
             placements = listOf("leaderboard"),
+            displayOrder = 2,
+            updatedAtMs = 1000L,
             isActive = true
         )
         val bannerProfileAndSquares = PromoAdBanner(
@@ -443,6 +447,8 @@ class PromoAdBannerTest {
             imageUrl = "https://example.com/ps.png",
             targetUrl = "https://example.com/ps",
             placements = listOf("profile", "squares"),
+            displayOrder = 3,
+            updatedAtMs = 1000L,
             isActive = true
         )
         val bannerAll = PromoAdBanner(
@@ -451,6 +457,8 @@ class PromoAdBannerTest {
             imageUrl = "https://example.com/all.png",
             targetUrl = "https://example.com/all",
             placements = listOf("home", "leaderboard", "profile", "squares"),
+            displayOrder = 4,
+            updatedAtMs = 1000L,
             isActive = true
         )
         val banners = listOf(bannerHomeOnly, bannerLeaderboardOnly, bannerProfileAndSquares, bannerAll)
