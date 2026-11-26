@@ -15,5 +15,11 @@
   ],
   "vars": {
     "NODE_ENV": "production"
+  },
+  "alias": {
+    "iconv-lite": "./server/cloudflare/stubs/iconv-lite.js",
+    "raw-body": "./server/cloudflare/stubs/raw-body.js",
+    "body-parser": "./server/cloudflare/stubs/body-parser.js",
+    "multer": "./server/cloudflare/stubs/multer.js"
   }
 }
