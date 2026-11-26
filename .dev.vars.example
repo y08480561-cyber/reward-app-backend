@@ -1,0 +1,14 @@
+# Cloudflare Workers Local Development Environment Variables (.dev.vars)
+# Copy this file to .dev.vars and fill in your actual development secrets.
+# NEVER commit .dev.vars or actual production secrets to version control.
+
+ADMIN_KEY=your_secure_admin_key_here
+DATABASE_URL=postgres://postgres:password@your-supabase-db-host:6543/postgres
+ONESIGNAL_APP_ID=your_onesignal_app_id_here
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your_supabase_anon_key_here
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key_here
+TAPSELL_APP_KEY=your_tapsell_app_key_here
+TAPSELL_KEY=your_tapsell_key_here
+TAPSELL_REWARDED_ZONE_ID=your_tapsell_rewarded_zone_id_here
+TAPSELL_ZONE_ID=your_tapsell_zone_id_here

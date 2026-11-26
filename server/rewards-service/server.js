@@ -35,28 +35,40 @@ const memoryDb = {
   claims: []
 };
 
-// Unified Admin Authentication Middleware (Strict header-based, unified with fallback)
+// Unified Admin Authentication Middleware (Strict header-based, no query string credentials, no hardcoded secrets)
 function requireAdminAuth(req, res, next) {
-  const configuredKey = (process.env.ADMIN_KEY || '09876poiuyAA').trim();
-  const rawKey = req.headers['x-admin-key'] ||
-                 (req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/i, '').trim() : '') ||
-                 req.query.adminKey || '';
-  const adminKey = String(rawKey).trim();
+  const configuredKey = process.env.ADMIN_KEY ? process.env.ADMIN_KEY.trim() : '';
+  if (!configuredKey) {
+    return res.status(401).json({ success: false, message: 'دسترسی غیرمجاز. کلید مدیریت در تنظیمات سرور تعریف نشده است.' });
+  }
 
-  // Validate against configured environment key or standard fallback key
-  const isValid = (adminKey && (adminKey === configuredKey || adminKey === '09876poiuyAA'));
+  // Reject query string credentials for security
+  if (req.query.adminKey || req.query.key || req.query.admin_key) {
+    return res.status(401).json({ success: false, message: 'ارسال کلید مدیریت در آدرس (Query String) به دلایل امنیتی مجاز نیست. لطفاً از هدر x-admin-key استفاده کنید.' });
+  }
+
+  const rawKey = req.headers['x-admin-key'] ||
+                 (req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/i, '').trim() : '');
+  const adminKey = String(rawKey || '').trim();
+
+  const isValid = Boolean(adminKey && adminKey === configuredKey);
 
   if (!isValid) {
-    return res.status(401).json({ success: false, message: 'دسترسی غیرمجاز. کلید مدیریت تنظیم نشده یا نامعتبر است.' });
+    return res.status(401).json({ success: false, message: 'دسترسی غیرمجاز. کلید مدیریت نامعتبر است.' });
   }
   next();
 }
 
 async function requireUserAuth(req, res, next) {
   try {
+    // Reject token passed via query string for security
+    if (req.query.token) {
+      return res.status(401).json({ success: false, message: 'ارسال توکن در Query String به دلایل امنیتی مجاز نیست. لطفاً از هدر x-auth-token استفاده کنید.' });
+    }
+
     const rawAuth = req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/i, '').trim() : '';
-    const token = req.headers['x-auth-token'] || req.headers['x-token'] || rawAuth || req.query.token;
-    const headerUserId = req.headers['x-user-id'] || req.body?.user_id || req.query?.userId;
+    const token = req.headers['x-auth-token'] || req.headers['x-token'] || rawAuth;
+    const headerUserId = req.headers['x-user-id'] || req.body?.user_id;
 
     if (!token && !headerUserId) {
       return res.status(401).json({ success: false, message: 'لطفاً ابتدا وارد حساب کاربری خود شوید.' });

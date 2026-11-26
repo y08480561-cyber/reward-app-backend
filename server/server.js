@@ -973,20 +973,34 @@ app.get(['/health', '/api/health'], async (req, res) => {
   });
 });
 
-// Admin Authentication Middleware (Strict header-based, unified with fallback)
+// Admin Authentication Middleware (Strict header-based, no query string credentials, no hardcoded secrets)
 function requireAdminAuth(req, res, next) {
-  const configuredKey = (process.env.ADMIN_KEY || '09876poiuyAA').trim();
-  const rawKey = req.headers['x-admin-key'] ||
-                 (req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/i, '').trim() : '') ||
-                 req.query.adminKey || '';
-  const adminKey = String(rawKey).trim();
+  const configuredKey = process.env.ADMIN_KEY ? process.env.ADMIN_KEY.trim() : '';
+  if (!configuredKey) {
+    return res.status(401).json({ 
+      error: "دسترسی غیرمجاز. کلید امنیتی مدیریت در متغیرهای سرور تنظیم نشده است.",
+      received: false
+    });
+  }
 
-  // Validate against configured environment key or standard fallback key
-  const isValid = (adminKey && (adminKey === configuredKey || adminKey === '09876poiuyAA'));
+  // Reject any credential sent in query string for strict security
+  if (req.query.adminKey || req.query.key || req.query.admin_key) {
+    return res.status(401).json({ 
+      error: "ارسال کلید مدیریت در آدرس (Query String) به دلایل امنیتی مسدود است. لطفاً از هدر x-admin-key استفاده کنید.",
+      received: false
+    });
+  }
+
+  const rawKey = req.headers['x-admin-key'] ||
+                 (req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/i, '').trim() : '');
+  const adminKey = String(rawKey || '').trim();
+
+  // Validate strictly against configured environment key (constant-time check where possible)
+  const isValid = Boolean(adminKey && adminKey === configuredKey);
 
   if (!isValid) {
     return res.status(401).json({ 
-      error: "دسترسی غیرمجاز. کلید امنیتی مدیریت تنظیم نشده یا نامعتبر است.",
+      error: "دسترسی غیرمجاز. کلید امنیتی مدیریت نامعتبر است.",
       received: Boolean(adminKey)
     });
   }
@@ -1005,9 +1019,17 @@ app.get('/api/admin/auth/verify', requireAdminAuth, (req, res) => {
 // User Authentication Middleware (Strict server-side validation against PostgreSQL public.users)
 async function requireUserAuth(req, res, next) {
   try {
+    // Reject token passed via query string for security
+    if (req.query.token) {
+      return res.status(401).json({
+        success: false,
+        error: "ارسال توکن در Query String به دلایل امنیتی مجاز نیست. لطفاً از هدر x-auth-token استفاده کنید."
+      });
+    }
+
     const rawAuth = req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/i, '').trim() : '';
-    const token = req.headers['x-auth-token'] || req.headers['x-token'] || rawAuth || req.query.token;
-    const headerUserId = req.headers['x-user-id'] || req.query.userId;
+    const token = req.headers['x-auth-token'] || req.headers['x-token'] || rawAuth;
+    const headerUserId = req.headers['x-user-id'];
 
     if (!token && !headerUserId) {
       return res.status(401).json({
@@ -3012,7 +3034,7 @@ app.post('/api/admin/competition/start-new', requireAdminAuth, ensureDatabaseRea
 
     // 8. Insert audit log
     const logId = `CLOG_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
-    const rawAdminKey = req.headers['x-admin-key'] || req.query.adminKey || 'ADMIN';
+    const rawAdminKey = req.headers['x-admin-key'] || (req.headers.authorization ? req.headers.authorization.replace(/^Bearer\s+/i, '').trim() : '') || 'ADMIN';
     const maskedKey = rawAdminKey.length > 4 ? rawAdminKey.substring(0, 4) + '***' : '***';
 
     await client.query(`

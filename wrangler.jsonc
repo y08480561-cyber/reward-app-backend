@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "reward-backend",
+  "main": "worker.js",
+  "compatibility_date": "2024-09-23",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "hyperdrive": [
+    {
+      "binding": "DATABASE",
+      "id": "YOUR_HYPERDRIVE_ID_HERE"
+    }
+  ],
+  "vars": {
+    "NODE_ENV": "production"
+  }
+}
