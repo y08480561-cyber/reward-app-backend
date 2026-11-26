@@ -98,31 +98,62 @@ async function handleUploadsFetch(request, env, pathname) {
 }
 
 async function handleAssetFallback(request, env, url, pathname) {
-  if (!env.ASSETS) {
-    return jsonResponse({
-      success: false,
-      error: `مسیر مورد نظر یافت نشد: ${pathname}`
-    }, 404);
+  if (env.ASSETS) {
+    try {
+      let targetPath = pathname;
+      if (pathname === '/' || pathname === '/admin' || pathname === '/admin/dashboard') {
+        targetPath = '/index.html';
+      } else if (pathname === '/admin/users' || pathname === '/admin/users/') {
+        targetPath = '/users.html';
+      }
+      const rewrittenUrl = new URL(url.toString());
+      rewrittenUrl.pathname = targetPath;
+      const resp = await env.ASSETS.fetch(new Request(rewrittenUrl.toString(), request));
+      if (resp && (resp.ok || resp.status === 200)) {
+        return resp;
+      }
+    } catch (err) {
+      console.warn('[ASSETS fetch warning]', err);
+    }
   }
 
-  let targetPath = pathname;
-  if (pathname === '/' || pathname === '/admin' || pathname === '/admin/dashboard') {
-    targetPath = '/index.html';
-  } else if (pathname === '/admin/users' || pathname === '/admin/users/') {
-    targetPath = '/users.html';
-  }
+  const html = `<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>پنل مدیریت ابری | رقابت کن، جایزه ببر</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.rtl.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    :root { --bg-main: #0B192C; --bg-card: #152A44; --border-color: #2E5077; --gold: #FFB703; }
+    body { background-color: var(--bg-main); color: #F8FAFC; font-family: system-ui, Tahoma, sans-serif; padding: 30px; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .admin-card { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 20px; padding: 40px; max-width: 650px; width: 100%; box-shadow: 0 15px 40px rgba(0,0,0,0.6); text-align: center; }
+    .brand-icon { width: 70px; height: 70px; background: linear-gradient(135deg, #FFB703 0%, #FB8500 100%); color: #0B192C; font-size: 32px; font-weight: 900; border-radius: 18px; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px auto; box-shadow: 0 5px 20px rgba(255,183,3,0.3); }
+    h1 { color: #fff; font-size: 22px; font-weight: 800; margin-bottom: 12px; }
+    p { color: #94A3B8; font-size: 14px; line-height: 1.8; margin-bottom: 25px; }
+    .btn-gold { background: linear-gradient(135deg, #FFB703 0%, #FB8500 100%); color: #0B192C; font-weight: 800; padding: 12px 28px; border-radius: 12px; text-decoration: none; display: inline-block; box-shadow: 0 4px 15px rgba(255,183,3,0.3); transition: transform 0.2s; }
+    .btn-gold:hover { transform: translateY(-2px); color: #0B192C; }
+    .badge-cf { background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; display: inline-block; margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+  <div class="admin-card">
+    <div class="brand-icon"><i class="bi bi-trophy-fill"></i></div>
+    <div class="badge-cf"><i class="bi bi-cloud-check-fill me-1"></i> متصل به کلادفلر Workers + D1</div>
+    <h1>پنل مدیریت ابری «رقابت کن، جایزه ببر»</h1>
+    <p>سرور اختصاصی Cloudflare Worker فعال است. تمام درخواست‌های اپلیکیشن اندروید و پنل مدیریت مستقیماً روی بستر ابری کلادفلر و پایگاه داده D1 اجرا می‌شوند.</p>
+    <div>
+      <a href="/api/health/d1" class="btn-gold"><i class="bi bi-database-check me-2"></i> تست وضعیت اتصال D1</a>
+    </div>
+  </div>
+</body>
+</html>`;
 
-  try {
-    const rewrittenUrl = new URL(url.toString());
-    rewrittenUrl.pathname = targetPath;
-    return await env.ASSETS.fetch(new Request(rewrittenUrl.toString(), request));
-  } catch (err) {
-    console.error('[Asset Fallback Error]', err);
-    return jsonResponse({
-      success: false,
-      error: 'خطای بارگذاری پنل مدیریت'
-    }, 500);
-  }
+  return new Response(html, {
+    status: 200,
+    headers: { 'Content-Type': 'text/html; charset=utf-8' }
+  });
 }
 
 export async function handleWorkerRequest(request, env) {
