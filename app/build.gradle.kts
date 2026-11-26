@@ -26,8 +26,8 @@ android {
     manifestPlaceholders["marketPermission"] = "ir.mservices.market.BILLING"
 
     buildConfigField("String", "API_PRODUCTION_URL", "\"https://api.kalametgame.ir\"")
-    buildConfigField("String", "API_TEST_URL", "\"https://api-test.kalametgame.ir\"")
-    buildConfigField("String", "LEGACY_RENDER_FALLBACK_URL", "\"https://reward-app-backend-1.onrender.com\"")
+    buildConfigField("String", "API_TEST_URL", "\"https://api.kalametgame.ir\"")
+    buildConfigField("String", "LEGACY_RENDER_FALLBACK_URL", "\"https://api.kalametgame.ir\"")
     buildConfigField("boolean", "USE_CLOUDFLARE_TEST_API", "true")
   }
 
