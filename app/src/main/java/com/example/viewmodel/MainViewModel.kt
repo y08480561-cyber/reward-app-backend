@@ -809,31 +809,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun purchasePanel(productId: String) {
-        val user = _uiState.value.currentUser ?: return
-        viewModelScope.launch {
-            _uiState.update { it.copy(isMembershipLoading = true, errorMessage = null) }
-            // Secure server verification payload (Myket In-App Billing sandbox/production token verification)
-            val purchaseToken = "MYKET_SECURE_TOKEN_" + System.currentTimeMillis()
-            when (val result = backendRepository.verifyPurchase(user.id, productId, purchaseToken)) {
-                is Result.Success -> {
-                    _uiState.update {
-                        it.copy(
-                            isMembershipLoading = false,
-                            infoMessage = "خرید و فعال‌سازی پنل با موفقیت تایید و اعمال شد."
-                        )
-                    }
-                    loadMembershipData()
-                    refreshData()
-                }
-                is Result.Error -> {
-                    _uiState.update {
-                        it.copy(
-                            isMembershipLoading = false,
-                            errorMessage = result.message
-                        )
-                    }
-                }
-            }
+        _uiState.update {
+            it.copy(
+                isMembershipLoading = false,
+                errorMessage = "خرید ارتقای پنل فقط از طریق درگاه امن پرداخت درون‌برنامه‌ای مایکت امکان‌پذیر است."
+            )
         }
     }
 

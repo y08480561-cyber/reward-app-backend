@@ -322,11 +322,17 @@ export async function handleAuthAndGameRoutes(request, env, url, pathname) {
     });
   }
 
-  // 4. GET /api/squares
+  // 4. GET /api/squares (Strict Token Auth Required)
   if (method === 'GET' && pathname === '/api/squares') {
-    const userId = request.headers.get('x-user-id') || url.searchParams.get('userId');
-    if (!userId) return jsonResponse({ error: 'شناسه کاربر نامعتبر است.' }, 401);
+    const auth = await requireUserAuth(request, env, url);
+    if (!auth.ok) return jsonResponse({ success: false, error: auth.error }, auth.status);
 
+    const queryUserId = String(url.searchParams.get('userId') || '').trim();
+    if (queryUserId && queryUserId !== auth.user.id) {
+      return jsonResponse({ success: false, error: 'توکن امنیتی با شناسه کاربر مطابقت ندارد.' }, 403);
+    }
+
+    const userId = auth.user.id;
     const cycle = await getOrCreateActiveCycle(env.DB, userId);
     const { results } = await env.DB.prepare(
       `SELECT square_number, status, completed_at FROM square_states WHERE user_id = ?1 AND cycle_id = ?2`
@@ -354,15 +360,47 @@ export async function handleAuthAndGameRoutes(request, env, url, pathname) {
     return jsonResponse({ cycle, squares });
   }
 
-  // 5. GET /api/panels
+  // 5. GET /api/panels (Synced dynamically with store_products)
   if (method === 'GET' && pathname === '/api/panels') {
+    const { results } = await env.DB.prepare(
+      `SELECT id, title, description, price_toman, units_granted
+       FROM store_products
+       WHERE id IN ('pkg_upgrade_silver', 'pkg_upgrade_gold') AND is_active = 1`
+    ).all();
+
+    const silverRow = (results || []).find((r) => r.id === 'pkg_upgrade_silver');
+    const goldRow = (results || []).find((r) => r.id === 'pkg_upgrade_gold');
+
+    const silverPrice = silverRow ? Number(silverRow.price_toman) : 70000;
+    const silverMult = silverRow ? Number(silverRow.units_granted || 3) : 3;
+    const goldPrice = goldRow ? Number(goldRow.price_toman) : 120000;
+    const goldMult = goldRow ? Number(goldRow.units_granted || 6) : 6;
+
     return jsonResponse({
       success: true,
       panels: [
         { id: 'free', name: 'پنل عادی', priceToman: 0, multiplier: 1, description: 'رایگان - ضریب ۱ برابری امتیاز هر مربع' },
-        { id: 'silver', name: 'پنل نقره‌ای', priceToman: 55000, multiplier: 2, description: 'ضریب ۲ برابری امتیاز هر مربع (اعتبار تا پایان دوره جاری)' },
-        { id: 'gold', name: 'پنل طلایی', priceToman: 105000, multiplier: 4, description: 'ضریب ۴ برابری امتیاز هر مربع (اعتبار تا پایان دوره جاری)' },
-        { id: 'gold_upgrade', name: 'ارتقا از نقره‌ای به طلایی', priceToman: 105000, multiplier: 4, description: 'ارتقا به پنل طلایی با حفظ امتیازات قبلی' }
+        {
+          id: 'silver',
+          name: silverRow?.title || 'پنل نقره‌ای',
+          priceToman: silverPrice,
+          multiplier: silverMult,
+          description: silverRow?.description || `ضریب ${silverMult} برابری امتیاز هر مربع`
+        },
+        {
+          id: 'gold',
+          name: goldRow?.title || 'پنل طلایی',
+          priceToman: goldPrice,
+          multiplier: goldMult,
+          description: goldRow?.description || `ضریب ${goldMult} برابری امتیاز هر مربع`
+        },
+        {
+          id: 'gold_upgrade',
+          name: 'ارتقا از نقره‌ای به طلایی',
+          priceToman: goldPrice,
+          multiplier: goldMult,
+          description: `ارتقا به پنل طلایی (ضریب ${goldMult}X) با حفظ امتیازات قبلی`
+        }
       ]
     });
   }
@@ -371,6 +409,11 @@ export async function handleAuthAndGameRoutes(request, env, url, pathname) {
   if (method === 'GET' && pathname === '/api/panels/me') {
     const auth = await requireUserAuth(request, env, url);
     if (!auth.ok) return jsonResponse({ success: false, error: auth.error }, auth.status);
+
+    const queryUserId = String(url.searchParams.get('userId') || '').trim();
+    if (queryUserId && queryUserId !== auth.user.id) {
+      return jsonResponse({ success: false, error: 'توکن امنیتی با شناسه کاربر مطابقت ندارد.' }, 403);
+    }
 
     const cycle = await getOrCreateActiveCycle(env.DB, auth.user.id);
     const { tier, multiplier } = await getUserActiveTierAndMultiplier(env.DB, auth.user.id);
@@ -386,7 +429,7 @@ export async function handleAuthAndGameRoutes(request, env, url, pathname) {
     });
   }
 
-  // 7. POST /api/purchases/verify (Legacy panel upgrade - protected by user auth + RSA)
+  // 7. POST /api/purchases/verify (Legacy panel upgrade - Strict user auth + mandatory RSA)
   if (method === 'POST' && pathname === '/api/purchases/verify') {
     const auth = await requireUserAuth(request, env, url);
     if (!auth.ok) return jsonResponse({ success: false, error: auth.error }, auth.status);
@@ -395,38 +438,46 @@ export async function handleAuthAndGameRoutes(request, env, url, pathname) {
     if (!body) return jsonResponse({ error: 'فرمت JSON نامعتبر است.' }, 400);
 
     const userId = auth.user.id;
+    if (body.userId && String(body.userId).trim() !== userId) {
+      return jsonResponse({ error: 'شناسه کاربر با توکن احراز هویت مطابقت ندارد.' }, 403);
+    }
+
     let { productId, purchaseToken, orderId, purchaseData, signature } = body;
 
-    if (purchaseData && signature) {
-      const pubKey = String(env.MYKET_PUBLIC_KEY || DEFAULT_MYKET_PUBLIC_KEY);
-      const validSig = await verifyMyketRsaSignature(purchaseData, signature, pubKey);
-      if (!validSig) {
-        return jsonResponse({ error: 'امضای دیجیتال تراکنش مایکت نامعتبر است.' }, 401);
-      }
-      try {
-        const parsed = JSON.parse(purchaseData);
-        if (parsed.productId) productId = parsed.productId;
-        if (parsed.purchaseToken) purchaseToken = parsed.purchaseToken;
-        if (parsed.orderId) orderId = parsed.orderId;
-        if (parsed.purchaseState !== undefined && Number(parsed.purchaseState) !== 0) {
-          return jsonResponse({ error: 'تراکنش خرید در حالت تکمیل‌شده نیست.' }, 400);
-        }
-      } catch {
-        return jsonResponse({ error: 'اطلاعات ساختاریافته خرید قابل تحلیل نیست.' }, 400);
-      }
+    if (!purchaseData || typeof purchaseData !== 'string' || !signature || typeof signature !== 'string') {
+      return jsonResponse({
+        error: 'اطلاعات امضاشده و امضای دیجیتال خرید مایکت (purchaseData و signature) الزامی است.'
+      }, 400);
     }
 
-    if (!productId) {
-      return jsonResponse({ error: 'شناسه محصول نامعتبر است.' }, 400);
+    const pubKey = String(env.MYKET_PUBLIC_KEY || DEFAULT_MYKET_PUBLIC_KEY);
+    const validSig = await verifyMyketRsaSignature(purchaseData, signature, pubKey);
+    if (!validSig) {
+      return jsonResponse({ error: 'امضای دیجیتال تراکنش مایکت نامعتبر است.' }, 401);
     }
 
-    if (purchaseToken) {
-      const existing = await env.DB.prepare(
-        `SELECT purchase_id FROM purchases WHERE purchase_token = ?1 LIMIT 1`
-      ).bind(purchaseToken).first();
-      if (existing) {
-        return jsonResponse({ error: 'این توکن خرید قبلاً ثبت شده است (جلوگیری از ثبت تکراری).' }, 409);
+    try {
+      const parsed = JSON.parse(purchaseData);
+      if (parsed.productId) productId = parsed.productId;
+      if (parsed.purchaseToken) purchaseToken = parsed.purchaseToken;
+      if (parsed.orderId) orderId = parsed.orderId;
+      if (parsed.purchaseState !== undefined && Number(parsed.purchaseState) !== 0) {
+        return jsonResponse({ error: 'تراکنش خرید در حالت تکمیل‌شده نیست.' }, 400);
       }
+    } catch {
+      return jsonResponse({ error: 'اطلاعات ساختاریافته خرید قابل تحلیل نیست.' }, 400);
+    }
+
+    if (!productId || !purchaseToken || !String(purchaseToken).trim()) {
+      return jsonResponse({ error: 'شناسه محصول و توکن خرید معتبر مایکت الزامی است.' }, 400);
+    }
+    purchaseToken = String(purchaseToken).trim();
+
+    const existing = await env.DB.prepare(
+      `SELECT purchase_id FROM purchases WHERE purchase_token = ?1 LIMIT 1`
+    ).bind(purchaseToken).first();
+    if (existing) {
+      return jsonResponse({ error: 'این توکن خرید قبلاً ثبت شده است (جلوگیری از ثبت تکراری).' }, 409);
     }
 
     const currentTierInfo = await getUserActiveTierAndMultiplier(env.DB, userId);
@@ -435,18 +486,25 @@ export async function handleAuthAndGameRoutes(request, env, url, pathname) {
     let amount = 0;
 
     if (productId === 'pkg_upgrade_silver' || productId === 'silver_panel' || productId === 'reqabat_upgrade_silver') {
+      const spRow = await env.DB.prepare(
+        `SELECT price_toman, units_granted FROM store_products WHERE id = 'pkg_upgrade_silver' LIMIT 1`
+      ).first();
+      const silverMult = spRow ? Number(spRow.units_granted || 3) : 3;
       if (currentTierInfo.tier === 'GOLD') {
         newTier = 'GOLD';
         multiplier = 6;
       } else {
         newTier = 'SILVER';
-        multiplier = 3;
+        multiplier = silverMult;
       }
-      amount = 70000;
+      amount = spRow ? Number(spRow.price_toman) : 70000;
     } else if (productId === 'pkg_upgrade_gold' || productId === 'gold_panel' || productId === 'gold_upgrade' || productId === 'reqabat_upgrade_gold') {
+      const spRow = await env.DB.prepare(
+        `SELECT price_toman, units_granted FROM store_products WHERE id = 'pkg_upgrade_gold' LIMIT 1`
+      ).first();
       newTier = 'GOLD';
-      multiplier = 6;
-      amount = 120000;
+      multiplier = spRow ? Number(spRow.units_granted || 6) : 6;
+      amount = spRow ? Number(spRow.price_toman) : 120000;
     } else {
       return jsonResponse({ error: 'شناسه محصول نامعتبر است.' }, 400);
     }
@@ -524,6 +582,11 @@ export async function handleAuthAndGameRoutes(request, env, url, pathname) {
     const auth = await requireUserAuth(request, env, url);
     if (!auth.ok) return jsonResponse({ success: false, error: auth.error }, auth.status);
 
+    const queryUserId = String(url.searchParams.get('userId') || '').trim();
+    if (queryUserId && queryUserId !== auth.user.id) {
+      return jsonResponse({ success: false, error: 'توکن امنیتی با شناسه کاربر مطابقت ندارد.' }, 403);
+    }
+
     const userId = auth.user.id;
     const entRow = await env.DB.prepare(
       `SELECT instant_unlock_credits, is_vip, total_purchased_toman FROM user_entitlements WHERE user_id = ?1 LIMIT 1`
@@ -552,7 +615,7 @@ export async function handleAuthAndGameRoutes(request, env, url, pathname) {
     });
   }
 
-  // 10. POST /api/store/verify-purchase
+  // 10. POST /api/store/verify-purchase (Strict Auth + Mandatory Myket RSA Verification)
   if (method === 'POST' && pathname === '/api/store/verify-purchase') {
     const auth = await requireUserAuth(request, env, url);
     if (!auth.ok) return jsonResponse({ success: false, error: auth.error }, auth.status);
@@ -561,41 +624,49 @@ export async function handleAuthAndGameRoutes(request, env, url, pathname) {
     if (!body) return jsonResponse({ error: 'فرمت JSON نامعتبر است.' }, 400);
 
     const userId = auth.user.id;
+    if (body.userId && String(body.userId).trim() !== userId) {
+      return jsonResponse({ error: 'شناسه کاربر با توکن احراز هویت مطابقت ندارد.' }, 403);
+    }
+
     let { productId, purchaseToken, orderId, purchaseData, signature } = body;
 
-    if (purchaseData && signature) {
-      const pubKey = String(env.MYKET_PUBLIC_KEY || DEFAULT_MYKET_PUBLIC_KEY);
-      const isValidSig = await verifyMyketRsaSignature(purchaseData, signature, pubKey);
-      if (!isValidSig) {
-        return jsonResponse({ error: 'امضای دیجیتال تراکنش مایکت نامعتبر است (خطای اعتبارسنجی امنیتی سرور).' }, 401);
-      }
-      try {
-        const parsed = JSON.parse(purchaseData);
-        if (parsed.productId) productId = parsed.productId;
-        if (parsed.purchaseToken) purchaseToken = parsed.purchaseToken;
-        if (parsed.orderId) orderId = parsed.orderId;
-        if (parsed.purchaseState !== undefined && Number(parsed.purchaseState) !== 0) {
-          return jsonResponse({ error: 'تراکنش خرید در مایکت در حالت تکمیل‌شده (Purchased) نیست.' }, 400);
-        }
-      } catch {
-        return jsonResponse({ error: 'اطلاعات ساختار یافته خرید مایکت قابل تحلیل نیست.' }, 400);
-      }
+    if (!purchaseData || typeof purchaseData !== 'string' || !signature || typeof signature !== 'string') {
+      return jsonResponse({
+        error: 'اطلاعات امضاشده و امضای دیجیتال خرید مایکت (purchaseData و signature) الزامی است.'
+      }, 400);
     }
 
-    if (!productId) {
-      return jsonResponse({ error: 'شناسه کاربر و محصول الزامی است.' }, 400);
+    const pubKey = String(env.MYKET_PUBLIC_KEY || DEFAULT_MYKET_PUBLIC_KEY);
+    const isValidSig = await verifyMyketRsaSignature(purchaseData, signature, pubKey);
+    if (!isValidSig) {
+      return jsonResponse({ error: 'امضای دیجیتال تراکنش مایکت نامعتبر است (خطای اعتبارسنجی امنیتی سرور).' }, 401);
     }
 
-    if (purchaseToken) {
-      const tokenCheck = await env.DB.prepare(
-        `SELECT purchase_id FROM purchases WHERE purchase_token = ?1 LIMIT 1`
-      ).bind(purchaseToken).first();
-      if (tokenCheck) {
-        return jsonResponse({
-          error: 'این توکن خرید قبلاً در سیستم ثبت و تایید شده است (جلوگیری از ثبت تکراری).',
-          alreadyProcessed: true
-        }, 409);
+    try {
+      const parsed = JSON.parse(purchaseData);
+      if (parsed.productId) productId = parsed.productId;
+      if (parsed.purchaseToken) purchaseToken = parsed.purchaseToken;
+      if (parsed.orderId) orderId = parsed.orderId;
+      if (parsed.purchaseState !== undefined && Number(parsed.purchaseState) !== 0) {
+        return jsonResponse({ error: 'تراکنش خرید در مایکت در حالت تکمیل‌شده (Purchased) نیست.' }, 400);
       }
+    } catch {
+      return jsonResponse({ error: 'اطلاعات ساختار یافته خرید مایکت قابل تحلیل نیست.' }, 400);
+    }
+
+    if (!productId || !purchaseToken || !String(purchaseToken).trim()) {
+      return jsonResponse({ error: 'شناسه محصول و توکن خرید معتبر مایکت الزامی است.' }, 400);
+    }
+    purchaseToken = String(purchaseToken).trim();
+
+    const tokenCheck = await env.DB.prepare(
+      `SELECT purchase_id FROM purchases WHERE purchase_token = ?1 LIMIT 1`
+    ).bind(purchaseToken).first();
+    if (tokenCheck) {
+      return jsonResponse({
+        error: 'این توکن خرید قبلاً در سیستم ثبت و تایید شده است (جلوگیری از ثبت تکراری).',
+        alreadyProcessed: true
+      }, 409);
     }
 
     const product = await env.DB.prepare(
@@ -748,7 +819,11 @@ export async function handleAuthAndGameRoutes(request, env, url, pathname) {
     const entRow = await env.DB.prepare(
       `SELECT instant_unlock_credits FROM user_entitlements WHERE user_id = ?1 LIMIT 1`
     ).bind(userId).first();
-    const credits = Number(entRow?.instant_unlock_credits || 0);
+    let credits = entRow ? Number(entRow.instant_unlock_credits || 0) : 0;
+    if (!entRow) {
+      const uRow = await env.DB.prepare(`SELECT instant_unlock_credits FROM users WHERE id = ?1 LIMIT 1`).bind(userId).first();
+      credits = uRow ? Number(uRow.instant_unlock_credits || 0) : 0;
+    }
     if (credits <= 0) {
       return jsonResponse({
         error: 'سهمیه بازگشایی سریع شما به پایان رسیده است. لطفاً از بخش فروشگاه بسته جدید تهیه فرمایید.',
@@ -759,10 +834,21 @@ export async function handleAuthAndGameRoutes(request, env, url, pathname) {
     const { multiplier: awardedPoints } = await getUserActiveTierAndMultiplier(env.DB, userId);
     const nowIso = new Date(now).toISOString();
 
-    // Atomic conditional credit decrement + square lock + score increment inside batch
-    // Pre-insert square state & conditionally decrement credits
+    // Atomic batch:
+    // 1. Seed user_entitlements if user only had legacy users.instant_unlock_credits
+    // 2. Insert square_states (UNIQUE prevents duplicate square)
+    // 3. Decrement user_entitlements.instant_unlock_credits unconditionally (trigger & user_scores CHECK abort entire batch if < 0)
+    // 4. Decrement users.instant_unlock_credits and add total_score
+    // 5. Update user_scores ONLY if post-decrement entitlement credits >= 0 (otherwise triggers CHECK (total_score >= 0) rollback)
+    // 6. Update active competition total_score
     try {
       await env.DB.batch([
+        env.DB.prepare(
+          `INSERT OR IGNORE INTO user_entitlements
+             (user_id, instant_unlock_credits, is_vip, account_tier, multiplier, total_purchased_toman, updated_at)
+           SELECT id, instant_unlock_credits, is_vip, account_tier, multiplier, 0, ?2
+           FROM users WHERE id = ?1`
+        ).bind(userId, nowIso),
         env.DB.prepare(
           `INSERT INTO square_states (state_key, user_id, cycle_id, square_number, status, completed_at, created_at)
            VALUES (?1, ?2, ?3, ?4, 'COMPLETED', ?5, ?6)`
@@ -770,32 +856,48 @@ export async function handleAuthAndGameRoutes(request, env, url, pathname) {
         env.DB.prepare(
           `UPDATE user_entitlements
            SET instant_unlock_credits = instant_unlock_credits - 1, updated_at = ?2
-           WHERE user_id = ?1 AND instant_unlock_credits >= 1`
+           WHERE user_id = ?1`
         ).bind(userId, nowIso),
         env.DB.prepare(
           `UPDATE users
-           SET instant_unlock_credits = CASE WHEN instant_unlock_credits > 0 THEN instant_unlock_credits - 1 ELSE 0 END,
+           SET instant_unlock_credits = instant_unlock_credits - 1,
                total_score = total_score + ?1,
                updated_at = ?2
            WHERE id = ?3`
         ).bind(awardedPoints, nowIso, userId),
         env.DB.prepare(
           `INSERT INTO user_scores (user_id, total_score, updated_at)
-           VALUES (?1, ?2, ?3)
-           ON CONFLICT(user_id) DO UPDATE SET total_score = user_scores.total_score + ?2, updated_at = ?3`
+           VALUES (
+             ?1,
+             CASE WHEN COALESCE((SELECT instant_unlock_credits FROM user_entitlements WHERE user_id = ?1), -1) >= 0 THEN ?2 ELSE -1 END,
+             ?3
+           )
+           ON CONFLICT(user_id) DO UPDATE SET
+             total_score = CASE
+               WHEN COALESCE((SELECT instant_unlock_credits FROM user_entitlements WHERE user_id = ?1), -1) >= 0
+               THEN user_scores.total_score + ?2
+               ELSE -1
+             END,
+             updated_at = ?3`
         ).bind(userId, awardedPoints, nowIso),
         env.DB.prepare(
           `UPDATE competitions SET total_score = total_score + ?1 WHERE status = 'ACTIVE'`
         ).bind(awardedPoints)
       ]);
     } catch (err) {
-      if (String(err?.message || '').includes('UNIQUE')) {
+      const errMsg = String(err?.message || '');
+      if (errMsg.includes('UNIQUE')) {
         return jsonResponse({ error: 'این مربع قبلاً در این دوره ۲۴ ساعته باز و تکمیل شده است.' }, 409);
+      }
+      if (errMsg.includes('CHECK')) {
+        return jsonResponse({
+          error: 'سهمیه بازگشایی سریع شما به پایان رسیده است. لطفاً از بخش فروشگاه بسته جدید تهیه فرمایید.',
+          noCredits: true
+        }, 403);
       }
       throw err;
     }
 
-    // Verify decrement succeeded (in case credits hit 0 concurrently)
     const afterEnt = await env.DB.prepare(
       `SELECT instant_unlock_credits FROM user_entitlements WHERE user_id = ?1 LIMIT 1`
     ).bind(userId).first();
@@ -909,9 +1011,19 @@ export async function handleAuthAndGameRoutes(request, env, url, pathname) {
     });
   }
 
-  // 13. GET /api/leaderboard
+  // 13. GET /api/leaderboard (Public display without exposing raw userId UUIDs)
   if (method === 'GET' && pathname === '/api/leaderboard') {
-    const currentUserId = request.headers.get('x-user-id') || url.searchParams.get('userId') || '';
+    let authenticatedUserId = '';
+    const hasAuthAttempt = Boolean(
+      request.headers.get('authorization') ||
+      request.headers.get('x-auth-token') ||
+      request.headers.get('x-token')
+    );
+    if (hasAuthAttempt) {
+      const auth = await requireUserAuth(request, env, url);
+      if (auth.ok) authenticatedUserId = auth.user.id;
+    }
+
     const { results } = await env.DB.prepare(
       `SELECT u.id AS user_id, u.first_name, u.last_name,
               COALESCE(s.total_score, u.total_score, 0) AS total_score, u.created_at
@@ -925,17 +1037,16 @@ export async function handleAuthAndGameRoutes(request, env, url, pathname) {
       const fullName = `${row.first_name || 'کاربر'} ${row.last_name || ''}`.trim() || 'کاربر مسابقه';
       return {
         rank: index + 1,
-        userId: row.user_id,
         displayName: fullName,
         totalScore: Number(row.total_score || 0),
-        isCurrentUser: row.user_id === currentUserId
+        isCurrentUser: Boolean(authenticatedUserId && row.user_id === authenticatedUserId)
       };
     });
 
     return jsonResponse({ leaderboard });
   }
 
-  // 14. POST /api/user/feedback
+  // 14. POST /api/user/feedback (Single Atomic DB.batch)
   if (method === 'POST' && pathname === '/api/user/feedback') {
     const auth = await requireUserAuth(request, env, url);
     if (!auth.ok) return jsonResponse({ success: false, error: auth.error }, auth.status);
@@ -953,35 +1064,41 @@ export async function handleAuthAndGameRoutes(request, env, url, pathname) {
 
     const REWARD_POINTS = 2;
     const nowIso = new Date().toISOString();
+    const feedbackId = 'FB_' + generateSecureHex(8);
 
-    const updateRes = await env.DB.prepare(
-      `UPDATE users
-       SET feedback_reward_claimed = 1,
-           total_score = total_score + ?1,
-           updated_at = ?2
-       WHERE id = ?3 AND feedback_reward_claimed = 0`
-    ).bind(REWARD_POINTS, nowIso, userId).run();
+    const batchRes = await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO user_feedback (id, user_id, rating, comment, created_at)
+         SELECT ?1, ?2, ?3, ?4, ?5
+         FROM users
+         WHERE id = ?2 AND feedback_reward_claimed = 0`
+      ).bind(feedbackId, userId, rating, comment, nowIso),
+      env.DB.prepare(
+        `INSERT OR IGNORE INTO user_scores (user_id, total_score, updated_at) VALUES (?1, 0, ?2)`
+      ).bind(userId, nowIso),
+      env.DB.prepare(
+        `UPDATE user_scores
+         SET total_score = total_score + ?1, updated_at = ?2
+         WHERE user_id = ?3
+           AND EXISTS (SELECT 1 FROM users WHERE id = ?3 AND feedback_reward_claimed = 0)`
+      ).bind(REWARD_POINTS, nowIso, userId),
+      env.DB.prepare(
+        `UPDATE users
+         SET feedback_reward_claimed = 1,
+             total_score = total_score + ?1,
+             updated_at = ?2
+         WHERE id = ?3 AND feedback_reward_claimed = 0`
+      ).bind(REWARD_POINTS, nowIso, userId)
+    ]);
 
-    const changes = Number(updateRes?.meta?.changes ?? 0);
-    if (changes === 0) {
+    const userUpdateChanges = Number(batchRes?.[3]?.meta?.changes ?? 0);
+    if (userUpdateChanges === 0) {
       const existingUser = await env.DB.prepare(`SELECT id FROM users WHERE id = ?1 LIMIT 1`).bind(userId).first();
       if (!existingUser) {
         return jsonResponse({ error: 'کاربر یافت نشد.' }, 404);
       }
       return jsonResponse({ error: 'پاداش بازخورد قبلاً توسط شما دریافت شده است.' }, 409);
     }
-
-    const feedbackId = 'FB_' + generateSecureHex(8);
-    await env.DB.batch([
-      env.DB.prepare(
-        `INSERT INTO user_feedback (id, user_id, rating, comment, created_at) VALUES (?1, ?2, ?3, ?4, ?5)`
-      ).bind(feedbackId, userId, rating, comment, nowIso),
-      env.DB.prepare(
-        `INSERT INTO user_scores (user_id, total_score, updated_at)
-         VALUES (?1, ?2, ?3)
-         ON CONFLICT(user_id) DO UPDATE SET total_score = user_scores.total_score + ?2, updated_at = ?3`
-      ).bind(userId, REWARD_POINTS, nowIso)
-    ]);
 
     const scoreRow = await env.DB.prepare(`SELECT total_score FROM user_scores WHERE user_id = ?1 LIMIT 1`).bind(userId).first();
     const finalScore = Number(scoreRow?.total_score || REWARD_POINTS);

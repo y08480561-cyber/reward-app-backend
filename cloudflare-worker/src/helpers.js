@@ -113,14 +113,14 @@ export async function getOrCreateActiveCycle(db, userId) {
   const now = Date.now();
   const { startTime, endTime } = getIranMidnightBounds(now);
 
-  const existing = await db.prepare(
+  const selectActiveSql =
     `SELECT cycle_id, user_id, start_time, end_time, status
      FROM daily_cycles
      WHERE user_id = ?1 AND start_time <= ?2 AND end_time > ?2
      ORDER BY start_time DESC
-     LIMIT 1`
-  ).bind(userId, now).first();
+     LIMIT 1`;
 
+  const existing = await db.prepare(selectActiveSql).bind(userId, now).first();
   if (existing && now < Number(existing.end_time)) {
     return {
       cycleId: existing.cycle_id,
@@ -131,24 +131,26 @@ export async function getOrCreateActiveCycle(db, userId) {
     };
   }
 
-  // Note: cycle_id is PRIMARY KEY; prefix per-user or match legacy CYC_<epoch> safely when same second
-  const baseCycleId = 'CYC_' + Math.floor(startTime / 1000);
-  const existingConflict = await db.prepare(
-    `SELECT cycle_id, user_id FROM daily_cycles WHERE cycle_id = ?1 LIMIT 1`
-  ).bind(baseCycleId).first();
-
-  const cycleId = !existingConflict || existingConflict.user_id === userId
-    ? baseCycleId
-    : `${baseCycleId}_${userId.slice(0, 8)}`;
-
+  // Deterministic per-user cycle_id eliminates cross-user PRIMARY KEY collisions and concurrent write races
+  const deterministicCycleId = `CYC_${Math.floor(startTime / 1000)}_${userId}`;
   await db.prepare(
-    `INSERT INTO daily_cycles (cycle_id, user_id, start_time, end_time, status)
-     VALUES (?1, ?2, ?3, ?4, 'ACTIVE')
-     ON CONFLICT(cycle_id) DO UPDATE SET start_time = ?3, end_time = ?4, status = 'ACTIVE'`
-  ).bind(cycleId, userId, startTime, endTime).run();
+    `INSERT OR IGNORE INTO daily_cycles (cycle_id, user_id, start_time, end_time, status)
+     VALUES (?1, ?2, ?3, ?4, 'ACTIVE')`
+  ).bind(deterministicCycleId, userId, startTime, endTime).run();
+
+  const resolved = await db.prepare(selectActiveSql).bind(userId, now).first();
+  if (resolved) {
+    return {
+      cycleId: resolved.cycle_id,
+      userId: resolved.user_id,
+      startTime: Number(resolved.start_time),
+      endTime: Number(resolved.end_time),
+      status: resolved.status || 'ACTIVE'
+    };
+  }
 
   return {
-    cycleId,
+    cycleId: deterministicCycleId,
     userId,
     startTime,
     endTime,

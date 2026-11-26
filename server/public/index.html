@@ -2381,9 +2381,10 @@
       if (sectionId === 'store') {
         loadStoreProducts();
         loadStorePurchases();
-      } else if (sectionId === 'rewards') {
+      } else if (sectionId === 'rewards_management' || sectionId === 'rewards') {
         loadRewardsData();
         loadRewardAppearance();
+        loadRewardClaims();
       } else if (sectionId === 'rewards_appearance') {
         loadRewardAppearance();
       } else if (sectionId === 'reward_claims') {
@@ -3120,7 +3121,9 @@
       if (bootstrapArchiveModal) bootstrapArchiveModal.show();
 
       try {
-        const res = await fetch(`/api/competitions/${compId}/results`);
+        const res = await fetch(`/api/competitions/${compId}/results`, {
+          headers: { 'x-admin-key': getAdminKey() }
+        });
         const data = await res.json();
         if (data.success) {
           setElText('archiveModalCompTitle', data.competition.title);
@@ -3134,7 +3137,7 @@
                 <tr>
                   <td><span class="badge ${r.rank <= 3 ? 'bg-warning text-dark fw-bold' : 'bg-secondary'}">#${r.rank}</span></td>
                   <td class="fw-bold">${r.displayName}</td>
-                  <td dir="ltr" class="text-secondary">${r.phoneNumber}</td>
+                  <td dir="ltr" class="text-secondary">${r.phoneNumber || '—'}</td>
                   <td><span class="badge badge-gold">${r.finalScore} امتیاز</span></td>
                 </tr>
               `).join('');

@@ -295,14 +295,61 @@ export async function handleRewardsRoutes(request, env, url, pathname) {
     const auth = verifyAdminAuth(request, env, url);
     if (!auth.ok) return jsonResponse({ success: false, message: auth.message }, auth.status);
 
-    const { results } = await env.DB.prepare(
-      `SELECT c.*, r.title AS reward_title, u.first_name, u.last_name, u.phone_number AS phone
-       FROM reward_claims c
-       LEFT JOIN rewards r ON c.reward_id = r.id
-       LEFT JOIN users u ON c.user_id = u.id
-       ORDER BY c.created_at DESC`
-    ).all();
-    return jsonResponse({ success: true, claims: results || [] });
+    const rawLimit = Number(url.searchParams.get('limit') || 100);
+    const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.floor(rawLimit), 1), 200) : 100;
+    const rawPage = Number(url.searchParams.get('page') || 1);
+    const page = Number.isFinite(rawPage) && rawPage >= 1 ? Math.floor(rawPage) : 1;
+    const rawOffset = url.searchParams.get('offset');
+    const offset = rawOffset !== null && Number.isFinite(Number(rawOffset)) && Number(rawOffset) >= 0
+      ? Math.floor(Number(rawOffset))
+      : (page - 1) * limit;
+    const statusFilter = String(url.searchParams.get('status') || '').trim().toUpperCase();
+
+    let whereSql = '';
+    const filterParams = [];
+    if (statusFilter && statusFilter !== 'ALL') {
+      filterParams.push(statusFilter);
+      whereSql = `WHERE UPPER(c.status) = ?1`;
+    }
+
+    const limitParamIdx = filterParams.length + 1;
+    const offsetParamIdx = filterParams.length + 2;
+
+    const [{ results }, countRow, pendingRow] = await Promise.all([
+      env.DB.prepare(
+        `SELECT c.*, r.title AS reward_title, u.first_name, u.last_name, u.phone_number AS phone
+         FROM reward_claims c
+         LEFT JOIN rewards r ON c.reward_id = r.id
+         LEFT JOIN users u ON c.user_id = u.id
+         ${whereSql}
+         ORDER BY c.created_at DESC
+         LIMIT ?${limitParamIdx} OFFSET ?${offsetParamIdx}`
+      ).bind(...filterParams, limit, offset).all(),
+      env.DB.prepare(
+        `SELECT COUNT(*) AS total FROM reward_claims c ${whereSql}`
+      ).bind(...filterParams).first(),
+      env.DB.prepare(
+        `SELECT COUNT(*) AS pending_count FROM reward_claims WHERE UPPER(status) = 'PENDING'`
+      ).first()
+    ]);
+
+    const claims = results || [];
+    const total = Number(countRow?.total || 0);
+    const pendingCount = Number(pendingRow?.pending_count || 0);
+
+    return jsonResponse({
+      success: true,
+      claims,
+      pendingCount,
+      pagination: {
+        total,
+        limit,
+        offset,
+        page: Math.floor(offset / limit) + 1,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+        hasMore: offset + claims.length < total
+      }
+    });
   }
 
   const adminClaimMatch = subPath.match(/^\/admin\/claims\/([^/]+)$/);

@@ -1,27 +1,40 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "reward-app-backend",
-  "main": "worker.js",
-  "compatibility_date": "2025-09-01",
+  "main": "cloudflare-worker/src/index.js",
+  "compatibility_date": "2026-03-01",
   "compatibility_flags": [
-    "nodejs_compat",
-    "enable_nodejs_http_modules",
-    "enable_nodejs_http_server_modules"
+    "nodejs_compat"
   ],
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "reward-app-db",
-      "database_id": "a5662c6f-c952-4200-8403-a55640b02498"
+      "database_id": "a5662c6f-c952-4200-8403-a55640b02498",
+      "migrations_dir": "cloudflare-worker/migrations"
     }
   ],
-  "vars": {
-    "NODE_ENV": "production"
+  "assets": {
+    "directory": "server/public",
+    "binding": "ASSETS",
+    "run_worker_first": [
+      "/api/*",
+      "/health",
+      "/uploads/*",
+      "/admin",
+      "/admin/*"
+    ]
   },
-  "alias": {
-    "iconv-lite": "./server/cloudflare/stubs/iconv-lite.js",
-    "raw-body": "./server/cloudflare/stubs/raw-body.js",
-    "body-parser": "./server/cloudflare/stubs/body-parser.js",
-    "multer": "./server/cloudflare/stubs/multer.js"
+  // پس از ساخت واقعی Bucket در Cloudflare R2 (مثلاً: npx wrangler r2 bucket create reward-app-banners)،
+  // بخش زیر را از حالت کامنت خارج کنید تا آپلود تصاویر بنرها روی R2 فعال شود:
+  // "r2_buckets": [
+  //   {
+  //     "binding": "BANNERS_BUCKET",
+  //     "bucket_name": "reward-app-banners"
+  //   }
+  // ],
+  "vars": {
+    "NODE_ENV": "production",
+    "ENVIRONMENT": "production"
   }
 }

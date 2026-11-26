@@ -1,4 +1,4 @@
-import { jsonResponse, generateSecureHex, verifyAdminAuth } from './security.js';
+import { jsonResponse, generateSecureHex, requireUserAuth, verifyAdminAuth } from './security.js';
 import { getActiveCompetition, readJsonBody, toMs } from './helpers.js';
 import { buildSelectedUsersExcelBytes, buildUsersExcelBytes, getIranJalaliDateString } from './xlsx.js';
 
@@ -322,7 +322,7 @@ export async function handleAdminAndCompetitionRoutes(request, env, url, pathnam
     if (!userId) return jsonResponse({ error: 'شناسه کاربر الزامی است.' }, 400);
 
     const now = Date.now();
-    const newCycleId = 'CYC_' + Math.floor(now / 1000) + '_' + String(userId).slice(0, 6);
+    const newCycleId = 'CYC_' + Math.floor(now / 1000) + '_' + String(userId);
     const endTime = now + 24 * 60 * 60 * 1000;
 
     await env.DB.prepare(
@@ -337,18 +337,38 @@ export async function handleAdminAndCompetitionRoutes(request, env, url, pathnam
     });
   }
 
-  // Public Competition APIs
+  // Public Competition APIs (Personal score gated by valid token; no raw userId UUID exposure)
   if (method === 'GET' && pathname === '/api/competition/current') {
-    const userId = request.headers.get('x-user-id') || url.searchParams.get('userId');
+    const hasUserToken = Boolean(
+      request.headers.get('authorization') ||
+      request.headers.get('x-auth-token') ||
+      request.headers.get('x-token')
+    );
+    const hasRawUserHint = Boolean(
+      request.headers.get('x-user-id') ||
+      url.searchParams.get('userId')
+    );
+
+    let authenticatedUserId = '';
+    if (hasUserToken || hasRawUserHint) {
+      const auth = await requireUserAuth(request, env, url);
+      if (!auth.ok) return jsonResponse({ success: false, error: auth.error }, auth.status);
+      const queryUserId = String(url.searchParams.get('userId') || '').trim();
+      if (queryUserId && queryUserId !== auth.user.id) {
+        return jsonResponse({ success: false, error: 'توکن امنیتی با شناسه کاربر مطابقت ندارد.' }, 403);
+      }
+      authenticatedUserId = auth.user.id;
+    }
+
     const active = await getActiveCompetition(env.DB);
     let userScore = 0;
 
-    if (userId) {
+    if (authenticatedUserId) {
       const scoreRow = await env.DB.prepare(
         `SELECT COALESCE(s.total_score, u.total_score, 0) AS score
          FROM users u LEFT JOIN user_scores s ON u.id = s.user_id
          WHERE u.id = ?1 LIMIT 1`
-      ).bind(userId).first();
+      ).bind(authenticatedUserId).first();
       if (scoreRow) userScore = Number(scoreRow.score || 0);
     }
 
@@ -395,8 +415,11 @@ export async function handleAdminAndCompetitionRoutes(request, env, url, pathnam
     const comp = await env.DB.prepare(`SELECT * FROM competitions WHERE id = ?1 LIMIT 1`).bind(compId).first();
     if (!comp) return jsonResponse({ error: 'مسابقه مورد نظر یافت نشد.' }, 404);
 
+    const adminAuth = verifyAdminAuth(request, env, url);
+    const isAdmin = adminAuth.ok;
+
     const { results } = await env.DB.prepare(
-      `SELECT id, user_id, final_score, final_rank, first_name, last_name, phone_number, archived_at
+      `SELECT id, final_score, final_rank, first_name, last_name, phone_number, archived_at
        FROM competition_archives
        WHERE competition_id = ?1
        ORDER BY final_rank ASC, final_score DESC LIMIT 200`
@@ -404,17 +427,18 @@ export async function handleAdminAndCompetitionRoutes(request, env, url, pathnam
 
     const mapped = (results || []).map((r) => {
       const fullName = `${r.first_name || 'کاربر'} ${r.last_name || ''}`.trim() || 'کاربر مسابقه';
-      const maskedPhone = r.phone_number && r.phone_number.length >= 11
-        ? `${r.phone_number.substring(0, 4)}***${r.phone_number.substring(7)}`
-        : '***';
-      return {
+      const item = {
         rank: Number(r.final_rank),
-        userId: r.user_id,
         displayName: fullName,
-        phoneNumber: maskedPhone,
         finalScore: Number(r.final_score),
         archivedAt: toMs(r.archived_at, Date.now())
       };
+      if (isAdmin) {
+        item.phoneNumber = r.phone_number && r.phone_number.length >= 11
+          ? `${r.phone_number.substring(0, 4)}***${r.phone_number.substring(7)}`
+          : '***';
+      }
+      return item;
     });
 
     return jsonResponse({
@@ -461,7 +485,7 @@ export async function handleAdminAndCompetitionRoutes(request, env, url, pathnam
     });
   }
 
-  // Start New Competition (D1 lock + atomic batch archive & reset)
+  // Start New Competition (D1 lock + idempotent chunked archive + atomic cutover batch)
   if (method === 'POST' && pathname === '/api/admin/competition/start-new') {
     const auth = verifyAdminAuth(request, env, url);
     if (!auth.ok) return jsonResponse({ error: auth.message }, auth.status);
@@ -478,7 +502,7 @@ export async function handleAdminAndCompetitionRoutes(request, env, url, pathnam
     }
 
     const nowMs = Date.now();
-    const staleThreshold = nowMs - 60000;
+    const staleThreshold = nowMs - 120000;
     const lockRes = await env.DB.prepare(
       `UPDATE competition_locks
        SET is_locked = 1, locked_at = ?1
@@ -509,9 +533,9 @@ export async function handleAdminAndCompetitionRoutes(request, env, url, pathnam
       let totalScoreArchived = 0;
       let participantsCount = 0;
       const nowIso = new Date(nowMs).toISOString();
-      const batchStmts = [];
-
       const safeUsers = usersRows || [];
+
+      const archiveStmts = [];
       for (let i = 0; i < safeUsers.length; i++) {
         const u = safeUsers[i];
         const finalScore = Number(u.total_score || 0);
@@ -520,7 +544,7 @@ export async function handleAdminAndCompetitionRoutes(request, env, url, pathnam
         totalScoreArchived += finalScore;
 
         const archId = `ARCH_${prevId}_${u.user_id}`;
-        batchStmts.push(
+        archiveStmts.push(
           env.DB.prepare(
             `INSERT INTO competition_archives (id, competition_id, user_id, final_score, final_rank, first_name, last_name, phone_number, archived_at)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
@@ -530,36 +554,28 @@ export async function handleAdminAndCompetitionRoutes(request, env, url, pathnam
         );
       }
 
-      if (activeComp) {
-        batchStmts.push(
-          env.DB.prepare(
-            `UPDATE competitions SET status = 'ARCHIVED', ended_at = ?1, total_participants = ?2, total_score = ?3 WHERE id = ?4`
-          ).bind(nowIso, participantsCount, totalScoreArchived, prevId)
-        );
-      } else {
-        batchStmts.push(
-          env.DB.prepare(
-            `INSERT OR IGNORE INTO competitions (id, competition_number, title, status, started_at, ended_at, total_participants, total_score, created_by, created_at)
-             VALUES (?1, ?2, ?3, 'ARCHIVED', ?4, ?4, ?5, ?6, 'admin', ?4)`
-          ).bind(prevId, prevNumber, prevTitle, nowIso, participantsCount, totalScoreArchived)
-        );
+      // Phase 1: Ensure previous competition row exists if missing, then archive snapshot in safe D1 chunks
+      // NOTE: During Phase 1, scores are NOT zeroed and active competition remains ACTIVE.
+      // If any chunk fails, re-running is completely idempotent via ON CONFLICT(id) DO UPDATE and zero scores are lost.
+      if (!activeComp) {
+        await env.DB.prepare(
+          `INSERT OR IGNORE INTO competitions (id, competition_number, title, status, started_at, created_by, created_at)
+           VALUES (?1, ?2, ?3, 'ACTIVE', ?4, 'admin', ?4)`
+        ).bind(prevId, prevNumber, prevTitle, nowIso).run();
       }
 
+      const ARCHIVE_CHUNK_SIZE = 50;
+      for (let i = 0; i < archiveStmts.length; i += ARCHIVE_CHUNK_SIZE) {
+        const chunk = archiveStmts.slice(i, i + ARCHIVE_CHUNK_SIZE);
+        await env.DB.batch(chunk);
+        await env.DB.prepare(`UPDATE competition_locks SET locked_at = ?1 WHERE id = 'active'`).bind(Date.now()).run();
+      }
+
+      // Phase 2: Fixed-size atomic cutover (archive close + new competition + score reset + square reset + announcement + log)
       const nextNumber = prevNumber + 1;
       const newCompId = `COMP_${nextNumber}_${nowMs}`;
       const competitionTitle = newTitle && String(newTitle).trim() ? String(newTitle).trim() : `مسابقه شماره ${nextNumber}`;
       const competitionEndDate = endDate ? new Date(endDate).toISOString() : null;
-
-      batchStmts.push(
-        env.DB.prepare(
-          `INSERT INTO competitions (id, competition_number, title, status, started_at, ended_at, created_by, created_at)
-           VALUES (?1, ?2, ?3, 'ACTIVE', ?4, ?5, 'admin', ?4)`
-        ).bind(newCompId, nextNumber, competitionTitle, nowIso, competitionEndDate),
-        env.DB.prepare(`UPDATE user_scores SET total_score = 0, updated_at = ?1`).bind(nowIso),
-        env.DB.prepare(`UPDATE users SET total_score = 0, updated_at = ?1`).bind(nowIso),
-        env.DB.prepare(`DELETE FROM square_states`),
-        env.DB.prepare(`UPDATE home_announcements SET is_active = 0`)
-      );
 
       const newAnnId = `ANN_${nowMs}_${generateSecureHex(3)}`;
       const annTitle = announcementTitle && String(announcementTitle).trim()
@@ -568,16 +584,24 @@ export async function handleAdminAndCompetitionRoutes(request, env, url, pathnam
       const annBody = announcementContent && String(announcementContent).trim()
         ? String(announcementContent).trim()
         : `دوره جدید مسابقه («${competitionTitle}») آغاز شد! با مشاهده تبلیغات و تکمیل ۱۰۰ مربع روزانه امتیاز کسب کرده و برنده جوایز ارزنده شوید.`;
+      const logId = `CLOG_${nowMs}_${generateSecureHex(4)}`;
 
-      batchStmts.push(
+      await env.DB.batch([
+        env.DB.prepare(
+          `UPDATE competitions SET status = 'ARCHIVED', ended_at = ?1, total_participants = ?2, total_score = ?3 WHERE id = ?4`
+        ).bind(nowIso, participantsCount, totalScoreArchived, prevId),
+        env.DB.prepare(
+          `INSERT INTO competitions (id, competition_number, title, status, started_at, ended_at, created_by, created_at)
+           VALUES (?1, ?2, ?3, 'ACTIVE', ?4, ?5, 'admin', ?4)`
+        ).bind(newCompId, nextNumber, competitionTitle, nowIso, competitionEndDate),
+        env.DB.prepare(`UPDATE user_scores SET total_score = 0, updated_at = ?1`).bind(nowIso),
+        env.DB.prepare(`UPDATE users SET total_score = 0, updated_at = ?1`).bind(nowIso),
+        env.DB.prepare(`DELETE FROM square_states`),
+        env.DB.prepare(`UPDATE home_announcements SET is_active = 0`),
         env.DB.prepare(
           `INSERT INTO home_announcements (id, title, content, type, is_active, competition_id, starts_at, ends_at, created_by, created_at, updated_at)
            VALUES (?1, ?2, ?3, 'COMPETITION_START', 1, ?4, ?5, ?6, 'admin', ?5, ?5)`
-        ).bind(newAnnId, annTitle, annBody, newCompId, nowIso, competitionEndDate)
-      );
-
-      const logId = `CLOG_${nowMs}_${generateSecureHex(4)}`;
-      batchStmts.push(
+        ).bind(newAnnId, annTitle, annBody, newCompId, nowIso, competitionEndDate),
         env.DB.prepare(
           `INSERT INTO competition_logs (log_id, action, admin_key_used, prev_competition_id, new_competition_id, prev_title, new_title, participants_count, total_score_archived, details, created_at)
            VALUES (?1, 'START_NEW_COMPETITION', ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)`
@@ -593,9 +617,7 @@ export async function handleAdminAndCompetitionRoutes(request, env, url, pathnam
           `پایان مسابقه شماره ${prevNumber} با ${participantsCount} شرکت‌کننده و آرشیو ${totalScoreArchived} امتیاز. شروع مسابقه جدید «${competitionTitle}» و انتشار اطلاعیه صفحه اصلی.`,
           nowIso
         )
-      );
-
-      await env.DB.batch(batchStmts);
+      ]);
 
       return jsonResponse({
         success: true,
@@ -714,30 +736,61 @@ export async function handleAdminAndCompetitionRoutes(request, env, url, pathnam
     const activeBool = isActive !== false;
     const activeInt = activeBool ? 1 : 0;
     const nowIso = new Date().toISOString();
-    const startsAtIso = startsAt ? new Date(startsAt).toISOString() : nowIso;
-    const endsAtIso = endsAt ? new Date(endsAt).toISOString() : null;
 
-    if (activeBool) {
-      await env.DB.prepare(`UPDATE home_announcements SET is_active = 0 WHERE id != ?1`).bind(id || '').run();
+    let startsAtIso = nowIso;
+    if (startsAt) {
+      const parsedStart = new Date(startsAt);
+      if (Number.isNaN(parsedStart.getTime())) {
+        return jsonResponse({ error: 'فرمت تاریخ شروع نامعتبر است.' }, 400);
+      }
+      startsAtIso = parsedStart.toISOString();
     }
 
-    let savedId = id;
-    if (id) {
-      const updateRes = await env.DB.prepare(
-        `UPDATE home_announcements
-         SET title = ?1, content = ?2, type = ?3, is_active = ?4, competition_id = ?5, starts_at = ?6, ends_at = ?7, updated_at = ?8
-         WHERE id = ?9`
-      ).bind(cleanTitle, cleanContent, cleanType, activeInt, competitionId || null, startsAtIso, endsAtIso, nowIso, id).run();
-      if (Number(updateRes?.meta?.changes ?? 0) === 0) {
+    let endsAtIso = null;
+    if (endsAt) {
+      const parsedEnd = new Date(endsAt);
+      if (Number.isNaN(parsedEnd.getTime())) {
+        return jsonResponse({ error: 'فرمت تاریخ پایان نامعتبر است.' }, 400);
+      }
+      endsAtIso = parsedEnd.toISOString();
+    }
+
+    // Validate target announcement existence BEFORE deactivating any existing active announcement
+    let savedId = id ? String(id).trim() : '';
+    if (savedId) {
+      const targetRow = await env.DB.prepare(
+        `SELECT id FROM home_announcements WHERE id = ?1 LIMIT 1`
+      ).bind(savedId).first();
+      if (!targetRow) {
         return jsonResponse({ error: 'پیام مورد نظر جهت ویرایش یافت نشد.' }, 404);
       }
     } else {
       savedId = `ANN_${Date.now()}_${generateSecureHex(3)}`;
-      await env.DB.prepare(
-        `INSERT INTO home_announcements (id, title, content, type, is_active, competition_id, starts_at, ends_at, created_by, created_at, updated_at)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'admin', ?9, ?9)`
-      ).bind(savedId, cleanTitle, cleanContent, cleanType, activeInt, competitionId || null, startsAtIso, endsAtIso, nowIso).run();
     }
+
+    const stmts = [];
+    if (activeBool) {
+      stmts.push(env.DB.prepare(`UPDATE home_announcements SET is_active = 0 WHERE id != ?1`).bind(savedId));
+    }
+
+    if (id) {
+      stmts.push(
+        env.DB.prepare(
+          `UPDATE home_announcements
+           SET title = ?1, content = ?2, type = ?3, is_active = ?4, competition_id = ?5, starts_at = ?6, ends_at = ?7, updated_at = ?8
+           WHERE id = ?9`
+        ).bind(cleanTitle, cleanContent, cleanType, activeInt, competitionId || null, startsAtIso, endsAtIso, nowIso, savedId)
+      );
+    } else {
+      stmts.push(
+        env.DB.prepare(
+          `INSERT INTO home_announcements (id, title, content, type, is_active, competition_id, starts_at, ends_at, created_by, created_at, updated_at)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'admin', ?9, ?9)`
+        ).bind(savedId, cleanTitle, cleanContent, cleanType, activeInt, competitionId || null, startsAtIso, endsAtIso, nowIso)
+      );
+    }
+
+    await env.DB.batch(stmts);
 
     return jsonResponse({
       success: true,

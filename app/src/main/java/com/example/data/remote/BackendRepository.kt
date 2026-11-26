@@ -877,13 +877,27 @@ class BackendRepository(
         }
     }
 
-    suspend fun verifyPurchase(userId: String, productId: String, purchaseToken: String): Result<JSONObject> = withContext(Dispatchers.IO) {
+    suspend fun verifyPurchase(
+        userId: String,
+        productId: String,
+        purchaseToken: String,
+        orderId: String? = null,
+        packageName: String? = null,
+        purchaseData: String,
+        signature: String
+    ): Result<JSONObject> = withContext(Dispatchers.IO) {
+        if (purchaseToken.isBlank() || purchaseData.isBlank() || signature.isBlank()) {
+            return@withContext Result.Error("اطلاعات و امضای دیجیتال خرید مایکت نامعتبر یا ناقص است.")
+        }
         val url = "${prefs.serverUrl.trimEnd('/')}/api/purchases/verify"
         val payload = JSONObject().apply {
             put("userId", userId)
             put("productId", productId)
             put("purchaseToken", purchaseToken)
-            put("orderId", "MYKET_ORD_" + System.currentTimeMillis())
+            if (!orderId.isNullOrBlank()) put("orderId", orderId)
+            if (!packageName.isNullOrBlank()) put("packageName", packageName)
+            put("purchaseData", purchaseData)
+            put("signature", signature)
         }
         try {
             val reqBuilder = Request.Builder()
@@ -1712,6 +1726,9 @@ class BackendRepository(
         purchaseData: String? = null,
         signature: String? = null
     ): Result<JSONObject> = withContext(Dispatchers.IO) {
+        if (purchaseToken.isBlank() || purchaseData.isNullOrBlank() || signature.isNullOrBlank()) {
+            return@withContext Result.Error("اطلاعات و امضای دیجیتال خرید مایکت ناقص یا نامعتبر است.")
+        }
         val url = "${prefs.serverUrl.trimEnd('/')}/api/store/verify-purchase"
         val payload = JSONObject().apply {
             put("userId", userId)
@@ -1719,8 +1736,8 @@ class BackendRepository(
             put("purchaseToken", purchaseToken)
             if (!orderId.isNullOrBlank()) put("orderId", orderId)
             if (!packageName.isNullOrBlank()) put("packageName", packageName)
-            if (!purchaseData.isNullOrBlank()) put("purchaseData", purchaseData)
-            if (!signature.isNullOrBlank()) put("signature", signature)
+            put("purchaseData", purchaseData)
+            put("signature", signature)
         }
         try {
             val reqBuilder = Request.Builder()
