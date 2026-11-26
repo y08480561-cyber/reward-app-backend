@@ -1619,10 +1619,10 @@
             </div>
 
             <div class="row g-2 mb-3 align-items-center">
-              <div class="col-md-5">
+              <div class="col-md-4">
                 <input type="text" id="adBannerSearchInput" class="form-control form-control-sm form-control-dark" placeholder="جستجو بر اساس نام داخلی تبلیغ یا آدرس مقصد..." oninput="renderAdBannersTable()">
               </div>
-              <div class="col-md-4">
+              <div class="col-md-3">
                 <select id="adBannerStatusFilter" class="form-select form-select-sm form-select-dark" onchange="renderAdBannersTable()">
                   <option value="all">همه وضعیت‌ها</option>
                   <option value="active">فعال (در حال نمایش)</option>
@@ -1631,7 +1631,16 @@
                   <option value="expired">منقضی‌شده</option>
                 </select>
               </div>
-              <div class="col-md-3 text-md-end small text-secondary" id="adBannersFilterCount">
+              <div class="col-md-3">
+                <select id="adBannerPlacementFilter" class="form-select form-select-sm form-select-dark" onchange="renderAdBannersTable()">
+                  <option value="all">همه محل‌های نمایش</option>
+                  <option value="home">صفحه اصلی</option>
+                  <option value="leaderboard">جدول رتبه‌بندی</option>
+                  <option value="profile">پروفایل کاربر</option>
+                  <option value="squares">بخش ۱۰۰ مربع</option>
+                </select>
+              </div>
+              <div class="col-md-2 text-md-end small text-secondary" id="adBannersFilterCount">
                 در حال بارگذاری...
               </div>
             </div>
@@ -2209,6 +2218,45 @@
                       <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size: 11px;" onclick="setAdBannerQuickEndDays(3)">+۳ روز</button>
                       <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size: 11px;" onclick="setAdBannerQuickEndDays(7)">+۷ روز</button>
                       <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size: 11px;" onclick="setAdBannerQuickEndDays(30)">+۳۰ روز</button>
+                    </div>
+                  </div>
+
+                  <!-- Field 9: Display Placements -->
+                  <div class="col-12">
+                    <div class="p-3 rounded" style="background-color: #0B192C; border: 1px solid rgba(255, 183, 3, 0.35);">
+                      <div class="d-flex justify-content-between align-items-center mb-2">
+                        <label class="form-label text-warning small fw-bold mb-0">۹. محل‌های نمایش بنر در اپلیکیشن:</label>
+                        <div class="form-check form-switch small">
+                          <input class="form-check-input" type="checkbox" id="adBannerSelectAllPlacements" onchange="toggleAllAdBannerPlacements(this)">
+                          <label class="form-check-label text-secondary" for="adBannerSelectAllPlacements">انتخاب همه بخش‌ها</label>
+                        </div>
+                      </div>
+                      <div class="row g-2">
+                        <div class="col-sm-6 col-md-3">
+                          <div class="form-check">
+                            <input class="form-check-input ad-banner-placement-chk" type="checkbox" value="home" id="placementHome" checked>
+                            <label class="form-check-label text-white small" for="placementHome">صفحه اصلی</label>
+                          </div>
+                        </div>
+                        <div class="col-sm-6 col-md-3">
+                          <div class="form-check">
+                            <input class="form-check-input ad-banner-placement-chk" type="checkbox" value="leaderboard" id="placementLeaderboard">
+                            <label class="form-check-label text-white small" for="placementLeaderboard">جدول رتبه‌بندی</label>
+                          </div>
+                        </div>
+                        <div class="col-sm-6 col-md-3">
+                          <div class="form-check">
+                            <input class="form-check-input ad-banner-placement-chk" type="checkbox" value="profile" id="placementProfile">
+                            <label class="form-check-label text-white small" for="placementProfile">پروفایل کاربر</label>
+                          </div>
+                        </div>
+                        <div class="col-sm-6 col-md-3">
+                          <div class="form-check">
+                            <input class="form-check-input ad-banner-placement-chk" type="checkbox" value="squares" id="placementSquares">
+                            <label class="form-check-label text-white small" for="placementSquares">بخش ۱۰۰ مربع</label>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -5184,6 +5232,20 @@
       }
     }
 
+    function renderPlacementStatsBreakdown(stats) {
+      if (!stats || typeof stats !== 'object') return '';
+      const placementLabels = { home: 'خانه', leaderboard: 'رتبه‌ها', profile: 'پروفایل', squares: 'مربع' };
+      const parts = [];
+      for (const [key, label] of Object.entries(placementLabels)) {
+        const item = stats[key];
+        if (item && ((item.impressions || 0) > 0 || (item.clicks || 0) > 0)) {
+          parts.push(`<span class="badge bg-secondary bg-opacity-75 text-light" style="font-size: 9px;" title="${label}: ${item.impressions || 0} نمایش، ${item.clicks || 0} کلیک">${label}: ${Number(item.impressions || 0).toLocaleString('fa-IR')}ن / ${Number(item.clicks || 0).toLocaleString('fa-IR')}ک</span>`);
+        }
+      }
+      if (parts.length === 0) return '';
+      return `<div class="mt-1 d-flex flex-wrap gap-1">${parts.join('')}</div>`;
+    }
+
     function renderAdBannersTable() {
       const tbody = document.getElementById('adBannersTbody');
       const countEl = document.getElementById('adBannersFilterCount');
@@ -5191,9 +5253,11 @@
 
       const search = (document.getElementById('adBannerSearchInput')?.value || '').trim().toLowerCase();
       const statusFilter = document.getElementById('adBannerStatusFilter')?.value || 'all';
+      const placementFilter = document.getElementById('adBannerPlacementFilter')?.value || 'all';
 
       const filtered = cachedAdBanners.filter((b) => {
         if (statusFilter !== 'all' && b.computed_status !== statusFilter) return false;
+        if (placementFilter !== 'all' && (!b.placements || !b.placements.includes(placementFilter))) return false;
         if (search) {
           const hay = `${b.title || ''} ${b.target_url || ''}`.toLowerCase();
           if (!hay.includes(search)) return false;
@@ -5217,10 +5281,20 @@
         expired: '<span class="badge bg-danger">منقضی‌شده</span>'
       };
 
+      const placementLabels = {
+        home: 'صفحه اصلی',
+        leaderboard: 'رتبه‌بندی',
+        profile: 'پروفایل',
+        squares: '۱۰۰ مربع'
+      };
+
       tbody.innerHTML = filtered.map((b, idx) => {
         const modeBadge = b.link_open_mode === 'internal'
           ? '<span class="badge bg-dark border border-info text-info" style="font-size: 11px;">مرورگر داخلی</span>'
           : '<span class="badge bg-dark border border-warning text-warning" style="font-size: 11px;">مرورگر خارجی</span>';
+
+        const bannerPlacements = Array.isArray(b.placements) ? b.placements : ['home'];
+        const placementBadges = bannerPlacements.map(p => `<span class="badge bg-dark border border-secondary text-light me-1" style="font-size: 10px;">${placementLabels[p] || p}</span>`).join('');
 
         const safeUrl = isValidHttpUrlFrontend(b.target_url) ? b.target_url : '';
         const safeImgUrl = isSafeBannerImageUrl(b.image_url) ? b.image_url : '';
@@ -5247,9 +5321,12 @@
             </td>
             <td>
               <div class="fw-bold text-white mb-1">${escapeHtml(b.title)}</div>
-              <div class="d-flex align-items-center gap-2 flex-wrap">
+              <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
                 ${modeBadge}
-                ${safeUrl ? `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer" class="small text-info text-truncate d-inline-block" style="max-width: 220px; direction: ltr;">${escapeHtml(safeUrl)}</a>` : '<span class="small text-danger">لینک نامعتبر</span>'}
+                <div>${placementBadges}</div>
+              </div>
+              <div>
+                ${safeUrl ? `<a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer" class="small text-info text-truncate d-inline-block" style="max-width: 260px; direction: ltr;">${escapeHtml(safeUrl)}</a>` : '<span class="small text-danger">لینک نامعتبر</span>'}
               </div>
             </td>
             <td>
@@ -5268,6 +5345,7 @@
               <div>نمایش: <strong class="text-info">${Number(b.impression_count || 0).toLocaleString('fa-IR')}</strong></div>
               <div>کلیک: <strong class="text-warning">${Number(b.click_count || 0).toLocaleString('fa-IR')}</strong></div>
               <div class="text-secondary">CTR: <strong class="text-success">${b.ctr_percent || 0}٪</strong></div>
+              ${renderPlacementStatsBreakdown(b.placement_stats)}
             </td>
             <td>
               <div class="d-flex gap-1 flex-wrap">
@@ -5324,6 +5402,14 @@
           document.getElementById('adBannerLinkModeSelect').value = b.link_open_mode === 'internal' ? 'internal' : 'external';
           document.getElementById('adBannerStartAtInput').value = toDatetimeLocalValue(b.start_at);
           document.getElementById('adBannerEndAtInput').value = toDatetimeLocalValue(b.end_at);
+
+          const bannerPlacements = Array.isArray(b.placements) ? b.placements : ['home'];
+          document.querySelectorAll('.ad-banner-placement-chk').forEach(chk => {
+            chk.checked = bannerPlacements.includes(chk.value);
+          });
+          const allChk = document.getElementById('adBannerSelectAllPlacements');
+          if (allChk) allChk.checked = bannerPlacements.length === 4;
+
           document.getElementById('adBannerUploadStatus').textContent = 'تصویر فعلی بارگذاری شده است (برای تغییر فایل جدید انتخاب کنید)';
           document.getElementById('adBannerUploadStatus').className = 'small text-info';
         } else {
@@ -5340,6 +5426,13 @@
           document.getElementById('adBannerLinkModeSelect').value = 'external';
           document.getElementById('adBannerStartAtInput').value = '';
           document.getElementById('adBannerEndAtInput').value = '';
+
+          document.querySelectorAll('.ad-banner-placement-chk').forEach(chk => {
+            chk.checked = (chk.value === 'home');
+          });
+          const allChk = document.getElementById('adBannerSelectAllPlacements');
+          if (allChk) allChk.checked = false;
+
           document.getElementById('adBannerUploadStatus').textContent = 'تصویری انتخاب نشده است';
           document.getElementById('adBannerUploadStatus').className = 'small text-secondary';
         }
@@ -5545,6 +5638,12 @@
         return;
       }
 
+      const placements = Array.from(document.querySelectorAll('.ad-banner-placement-chk:checked')).map(el => el.value);
+      if (placements.length === 0) {
+        showModalErr('حداقل یک محل نمایش برای بنر باید انتخاب شود.');
+        return;
+      }
+
       const start_at = startVal ? new Date(startVal).toISOString() : null;
       const end_at = endVal ? new Date(endVal).toISOString() : null;
       if (start_at && end_at && new Date(end_at).getTime() <= new Date(start_at).getTime()) {
@@ -5574,7 +5673,8 @@
             link_open_mode,
             display_order,
             start_at,
-            end_at
+            end_at,
+            placements
           })
         });
         const data = await parseJsonResponseSafely(res);
@@ -5593,6 +5693,13 @@
         if (spinner) spinner.classList.add('d-none');
         if (saveBtn) saveBtn.disabled = false;
       }
+    }
+
+    function toggleAllAdBannerPlacements(masterChk) {
+      const checked = masterChk.checked;
+      document.querySelectorAll('.ad-banner-placement-chk').forEach(chk => {
+        chk.checked = checked;
+      });
     }
 
     async function toggleAdBannerStatus(bannerId) {

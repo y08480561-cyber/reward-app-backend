@@ -322,6 +322,11 @@ VALUES
     ('rew_cash_50k', 'جایزه نقدی ۵۰,۰۰۰ تومانی', 'واریز پایا مستقیم به کارت بانکی متصل به شماره همراه شما.', 'cat_cash', 500, 20, 'https://images.unsplash.com/photo-1580519542036-c47de6196ba5?w=600&q=80', true, true, 4)
 ON CONFLICT (id) DO NOTHING;
 
+-- ۲۴. افزودن ستون محل‌های نمایش (placements) و آمار تفکیکی (placement_stats) به جدول بنرهای تبلیغاتی
+ALTER TABLE public.ad_banners ADD COLUMN IF NOT EXISTS placements JSONB DEFAULT '["home"]';
+ALTER TABLE public.ad_banners ADD COLUMN IF NOT EXISTS placement_stats JSONB DEFAULT '{}';
+
+
 
 
 

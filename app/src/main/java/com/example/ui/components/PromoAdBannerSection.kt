@@ -84,13 +84,14 @@ fun PromoAdBannerSection(
     onBannerVisible: (String) -> Unit,
     onBannerClick: (PromoAdBanner) -> Unit,
     modifier: Modifier = Modifier,
+    placement: String? = null,
     clockOffsetMs: Long = 0L
 ) {
     val effectiveNowMs = remember(banners, clockOffsetMs) {
         System.currentTimeMillis() + clockOffsetMs
     }
-    val activeBanners = remember(banners, effectiveNowMs) {
-        PromoBannerUrlValidator.filterAndSortActive(banners, nowMs = effectiveNowMs)
+    val activeBanners = remember(banners, effectiveNowMs, placement) {
+        PromoBannerUrlValidator.filterAndSortActive(banners, nowMs = effectiveNowMs, placement = placement)
     }
     if (activeBanners.isEmpty()) return
 

@@ -1854,6 +1854,16 @@ class BackendRepository(
             val startAtMs = parseFlexibleTimestampMs(obj, "startAt", "start_at")
             val endAtMs = parseFlexibleTimestampMs(obj, "endAt", "end_at")
 
+            val placementsArr = obj.optJSONArray("placements")
+            val placementsList = mutableListOf<String>()
+            if (placementsArr != null) {
+                for (j in 0 until placementsArr.length()) {
+                    val p = placementsArr.optString(j).trim().lowercase()
+                    if (p.isNotEmpty()) placementsList.add(p)
+                }
+            }
+            if (placementsList.isEmpty()) placementsList.add("home")
+
             list.add(
                 com.example.model.PromoAdBanner(
                     id = id,
@@ -1867,19 +1877,21 @@ class BackendRepository(
                     startAtMs = startAtMs,
                     endAtMs = endAtMs,
                     displayOrder = obj.optInt("displayOrder", obj.optInt("display_order", i)),
-                    updatedAtMs = parseFlexibleTimestampMs(obj, "updatedAt", "updated_at") ?: 0L
+                    updatedAtMs = parseFlexibleTimestampMs(obj, "updatedAt", "updated_at") ?: 0L,
+                    placements = placementsList
                 )
             )
         }
         return com.example.model.PromoBannerUrlValidator.filterAndSortActive(list, nowMs = referenceNowMs)
     }
 
-    suspend fun recordAdBannerImpression(bannerId: String, userId: String) = withContext(Dispatchers.IO) {
+    suspend fun recordAdBannerImpression(bannerId: String, userId: String, placement: String? = null) = withContext(Dispatchers.IO) {
         if (bannerId.isBlank()) return@withContext
         val url = "${prefs.serverUrl.trimEnd('/')}/api/ad-banners/${android.net.Uri.encode(bannerId)}/impression"
         try {
             val payload = JSONObject().apply {
                 if (userId.isNotBlank()) put("userId", userId)
+                if (!placement.isNullOrBlank()) put("placement", placement)
             }
             val request = Request.Builder()
                 .url(url)
@@ -1892,13 +1904,14 @@ class BackendRepository(
         }
     }
 
-    suspend fun recordAdBannerClick(bannerId: String, userId: String, tapNonce: String) = withContext(Dispatchers.IO) {
+    suspend fun recordAdBannerClick(bannerId: String, userId: String, tapNonce: String, placement: String? = null) = withContext(Dispatchers.IO) {
         if (bannerId.isBlank()) return@withContext
         val url = "${prefs.serverUrl.trimEnd('/')}/api/ad-banners/${android.net.Uri.encode(bannerId)}/click"
         try {
             val payload = JSONObject().apply {
                 if (userId.isNotBlank()) put("userId", userId)
                 if (tapNonce.isNotBlank()) put("tapNonce", tapNonce)
+                if (!placement.isNullOrBlank()) put("placement", placement)
             }
             val request = Request.Builder()
                 .url(url)

@@ -37,6 +37,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,6 +51,7 @@ import com.example.model.CompetitionInfo
 import com.example.model.DailyCycle
 import com.example.model.HomeAnnouncement
 import com.example.model.PromoAdBanner
+import com.example.model.PromoBannerUrlValidator
 import com.example.model.User
 import com.example.ui.components.HomeAnnouncementBanner
 import com.example.ui.components.LuxuryCard
@@ -88,6 +90,13 @@ fun HomeScreen(
     )
     val completedCount = completedSquaresToday ?: cycle?.completedSquaresCount ?: 0
     val totalSquares = cycle?.totalSquares ?: 100
+
+    val effectiveNowMs = remember(promoAdBanners, promoAdBannersClockOffsetMs) {
+        System.currentTimeMillis() + promoAdBannersClockOffsetMs
+    }
+    val homeBanners = remember(promoAdBanners, effectiveNowMs) {
+        PromoBannerUrlValidator.filterAndSortActive(promoAdBanners, effectiveNowMs, "home")
+    }
     val progressFraction = (completedCount.toFloat() / totalSquares.coerceAtLeast(1).toFloat()).coerceIn(0f, 1f)
 
     LuxuryScreenCanvas {
@@ -275,14 +284,16 @@ fun HomeScreen(
                 )
             }
 
-            // 3. Clickable Promotional Image Ad Banners (only when active & valid banners exist)
-            PromoAdBannerSection(
-                banners = promoAdBanners,
-                clockOffsetMs = promoAdBannersClockOffsetMs,
-                onBannerVisible = onPromoBannerVisible,
-                onBannerClick = onPromoBannerClick,
-                modifier = Modifier.fillMaxWidth()
-            )
+            // 3. Clickable Promotional Image Ad Banners (only when active & valid banners for home exist)
+            if (homeBanners.isNotEmpty()) {
+                PromoAdBannerSection(
+                    banners = homeBanners,
+                    clockOffsetMs = promoAdBannersClockOffsetMs,
+                    onBannerVisible = onPromoBannerVisible,
+                    onBannerClick = onPromoBannerClick,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
 
             // 4. Optional Quiet Announcement Strip (only when server has an active message)
             if (announcement != null && announcement.isActive) {

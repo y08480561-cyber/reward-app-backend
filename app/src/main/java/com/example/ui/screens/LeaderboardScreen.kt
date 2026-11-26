@@ -30,6 +30,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.model.LeaderboardEntry
+import com.example.model.PromoAdBanner
+import com.example.model.PromoBannerUrlValidator
 import com.example.ui.components.LuxuryBadge
 import com.example.ui.components.LuxuryBadgeTone
 import com.example.ui.components.LuxuryCard
@@ -38,6 +40,7 @@ import com.example.ui.components.LuxuryHighlightCard
 import com.example.ui.components.LuxuryLoadingState
 import com.example.ui.components.LuxuryPrimaryButton
 import com.example.ui.components.LuxuryScreenCanvas
+import com.example.ui.components.PromoAdBannerSection
 import com.example.ui.components.LuxuryTopBar
 import com.example.ui.components.formatNumberPersian
 import com.example.ui.components.toPersianDigits
@@ -47,6 +50,10 @@ import com.example.viewmodel.MainUiState
 @Composable
 fun LeaderboardScreen(
     uiState: MainUiState,
+    promoAdBanners: List<PromoAdBanner> = emptyList(),
+    promoAdBannersClockOffsetMs: Long = 0L,
+    onPromoBannerVisible: (String) -> Unit = {},
+    onPromoBannerClick: (PromoAdBanner) -> Unit = {},
     onRefresh: () -> Unit,
     onBack: () -> Unit
 ) {
@@ -74,6 +81,13 @@ fun LeaderboardScreen(
     val showPodium = searchQuery.isBlank() && filteredList.size >= 3
     val listEntries = remember(filteredList, showPodium) {
         if (showPodium) filteredList.drop(3) else filteredList
+    }
+
+    val effectiveNowMs = remember(promoAdBanners, promoAdBannersClockOffsetMs) {
+        System.currentTimeMillis() + promoAdBannersClockOffsetMs
+    }
+    val leaderboardBanners = remember(promoAdBanners, effectiveNowMs) {
+        PromoBannerUrlValidator.filterAndSortActive(promoAdBanners, effectiveNowMs, "leaderboard")
     }
 
     LuxuryScreenCanvas {
@@ -107,6 +121,19 @@ fun LeaderboardScreen(
                     .navigationBarsPadding(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                if (leaderboardBanners.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    PromoAdBannerSection(
+                        banners = leaderboardBanners,
+                        clockOffsetMs = promoAdBannersClockOffsetMs,
+                        onBannerVisible = onPromoBannerVisible,
+                        onBannerClick = onPromoBannerClick,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                    )
+                }
+
                 // Compact Current User Highlight Strip
                 if (currentUserEntry != null && !uiState.isLeaderboardLoading) {
                     Spacer(modifier = Modifier.height(12.dp))

@@ -598,10 +598,14 @@ async function initDatabaseTables() {
       display_order INTEGER NOT NULL DEFAULT 0,
       click_count INTEGER NOT NULL DEFAULT 0,
       impression_count INTEGER NOT NULL DEFAULT 0,
+      placements JSONB DEFAULT '["home"]',
+      placement_stats JSONB DEFAULT '{}',
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );`,
     `ALTER TABLE public.ad_banners ADD COLUMN IF NOT EXISTS link_open_mode TEXT NOT NULL DEFAULT 'external';`,
+    `ALTER TABLE public.ad_banners ADD COLUMN IF NOT EXISTS placements JSONB DEFAULT '["home"]';`,
+    `ALTER TABLE public.ad_banners ADD COLUMN IF NOT EXISTS placement_stats JSONB DEFAULT '{}';`,
     `CREATE INDEX IF NOT EXISTS idx_ad_banners_active_order ON public.ad_banners(is_active, display_order ASC, created_at DESC);`
   ];
 
@@ -4137,6 +4141,53 @@ function normalizeLinkOpenMode(rawMode) {
   return null;
 }
 
+function parseBannerPlacements(raw) {
+  const allowed = ['home', 'leaderboard', 'profile', 'squares'];
+  let list = [];
+  if (Array.isArray(raw)) {
+    list = raw;
+  } else if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) list = parsed;
+      else list = raw.split(',').map(s => s.trim());
+    } catch {
+      list = raw.split(',').map(s => s.trim());
+    }
+  }
+  const cleaned = list
+    .map(s => String(s || '').trim().toLowerCase())
+    .filter(s => allowed.includes(s));
+  const unique = [...new Set(cleaned)];
+  return unique.length > 0 ? unique : ['home'];
+}
+
+function normalizePlacements(input) {
+  const allowed = ['home', 'leaderboard', 'profile', 'squares'];
+  let list = [];
+  if (Array.isArray(input)) {
+    list = input;
+  } else if (typeof input === 'string') {
+    try {
+      const parsed = JSON.parse(input);
+      if (Array.isArray(parsed)) list = parsed;
+      else list = input.split(',').map(s => s.trim());
+    } catch {
+      list = input.split(',').map(s => s.trim());
+    }
+  } else if (!input) {
+    list = ['home'];
+  }
+  const cleaned = list
+    .map(s => String(s || '').trim().toLowerCase())
+    .filter(s => allowed.includes(s));
+  const unique = [...new Set(cleaned)];
+  if (unique.length === 0) {
+    return { valid: false, message: 'حداقل یک محل نمایش معتبر (home, leaderboard, profile, squares) باید انتخاب شود.' };
+  }
+  return { valid: true, placements: unique };
+}
+
 function enrichAdminBannerRow(row, nowMs = Date.now()) {
   const startMs = row.start_at ? new Date(row.start_at).getTime() : null;
   const endMs = row.end_at ? new Date(row.end_at).getTime() : null;
@@ -4155,6 +4206,15 @@ function enrichAdminBannerRow(row, nowMs = Date.now()) {
   const clicks = Number(row.click_count || 0);
   const ctrPercent = impressions > 0 ? Number(((clicks / impressions) * 100).toFixed(2)) : 0;
 
+  let placementStats = {};
+  if (row.placement_stats) {
+    if (typeof row.placement_stats === 'object') {
+      placementStats = row.placement_stats;
+    } else {
+      try { placementStats = JSON.parse(row.placement_stats); } catch (_) {}
+    }
+  }
+
   return {
     id: row.id,
     title: row.title,
@@ -4165,6 +4225,8 @@ function enrichAdminBannerRow(row, nowMs = Date.now()) {
     start_at: row.start_at,
     end_at: row.end_at,
     display_order: Number(row.display_order || 0),
+    placements: parseBannerPlacements(row.placements),
+    placement_stats: placementStats,
     click_count: clicks,
     impression_count: impressions,
     ctr_percent: ctrPercent,
@@ -4185,6 +4247,7 @@ function serializePublicBannerRow(row) {
     startAt: row.start_at ? new Date(row.start_at).getTime() : null,
     endAt: row.end_at ? new Date(row.end_at).getTime() : null,
     displayOrder: Number(row.display_order || 0),
+    placements: parseBannerPlacements(row.placements),
     updatedAt: row.updated_at ? new Date(row.updated_at).getTime() : Date.now()
   };
 }
@@ -4286,15 +4349,16 @@ app.post('/api/admin/ad-banners/upload-image', requireAdminAuth, (req, res) => {
   });
 });
 
-// Admin: List All Ad Banners with Search, Status Filter, and Summary Metrics
+// Admin: List All Ad Banners with Search, Status Filter, Placement Filter, and Summary Metrics
 app.get('/api/admin/ad-banners', requireAdminAuth, ensureDatabaseReady, async (req, res) => {
   try {
     const search = String(req.query.search || '').trim().toLowerCase();
     const statusFilter = String(req.query.status || 'all').trim().toLowerCase();
+    const placementFilter = String(req.query.placement || 'all').trim().toLowerCase();
 
     const result = await pool.query(`
       SELECT id, title, image_url, target_url, link_open_mode, is_active, start_at, end_at,
-             display_order, click_count, impression_count, created_at, updated_at
+             display_order, click_count, impression_count, placements, placement_stats, created_at, updated_at
       FROM public.ad_banners
       ORDER BY display_order ASC, created_at DESC
     `);
@@ -4317,6 +4381,7 @@ app.get('/api/admin/ad-banners', requireAdminAuth, ensureDatabaseReady, async (r
 
     const filtered = allBanners.filter((b) => {
       if (statusFilter !== 'all' && b.computed_status !== statusFilter) return false;
+      if (placementFilter !== 'all' && !b.placements.includes(placementFilter)) return false;
       if (search) {
         const hay = `${b.title} ${b.target_url}`.toLowerCase();
         if (!hay.includes(search)) return false;
@@ -4355,6 +4420,11 @@ app.post('/api/admin/ad-banners', requireAdminAuth, ensureDatabaseReady, async (
       return res.status(400).json({ success: false, message: 'نوع باز شدن لینک باید external یا internal باشد.' });
     }
 
+    const placementsCheck = normalizePlacements(body.placements);
+    if (!placementsCheck.valid) {
+      return res.status(400).json({ success: false, message: placementsCheck.message });
+    }
+
     const startCheck = parseOptionalBannerDate(body.start_at);
     if (!startCheck.valid) {
       return res.status(400).json({ success: false, message: 'تاریخ شروع نمایش نامعتبر است.' });
@@ -4374,11 +4444,12 @@ app.post('/api/admin/ad-banners', requireAdminAuth, ensureDatabaseReady, async (
       : 0;
     const isActive = body.is_active === undefined ? true : Boolean(body.is_active);
     const id = `ad_${crypto.randomUUID()}`;
+    const placementsJson = JSON.stringify(placementsCheck.placements);
 
     const insertRes = await pool.query(
       `INSERT INTO public.ad_banners
-        (id, title, image_url, target_url, link_open_mode, is_active, start_at, end_at, display_order, click_count, impression_count, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0, 0, NOW(), NOW())
+        (id, title, image_url, target_url, link_open_mode, is_active, start_at, end_at, display_order, click_count, impression_count, placements, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 0, 0, $10, NOW(), NOW())
        RETURNING *`,
       [
         id,
@@ -4389,7 +4460,8 @@ app.post('/api/admin/ad-banners', requireAdminAuth, ensureDatabaseReady, async (
         isActive,
         startCheck.date ? startCheck.date.toISOString() : null,
         endCheck.date ? endCheck.date.toISOString() : null,
-        displayOrder
+        displayOrder,
+        placementsJson
       ]
     );
 
@@ -4474,6 +4546,13 @@ app.put('/api/admin/ad-banners/:id', requireAdminAuth, ensureDatabaseReady, asyn
       return res.status(400).json({ success: false, message: 'نوع باز شدن لینک باید external یا internal باشد.' });
     }
 
+    const placementsCheck = body.placements !== undefined
+      ? normalizePlacements(body.placements)
+      : { valid: true, placements: parseBannerPlacements(existing.placements) };
+    if (!placementsCheck.valid) {
+      return res.status(400).json({ success: false, message: placementsCheck.message });
+    }
+
     const startCheck = body.start_at !== undefined
       ? parseOptionalBannerDate(body.start_at)
       : { valid: true, date: existing.start_at ? new Date(existing.start_at) : null };
@@ -4496,6 +4575,7 @@ app.put('/api/admin/ad-banners/:id', requireAdminAuth, ensureDatabaseReady, asyn
     const displayOrder = body.display_order !== undefined
       ? (Number.isFinite(Number(body.display_order)) ? Math.max(0, Math.floor(Number(body.display_order))) : 0)
       : Number(existing.display_order || 0);
+    const placementsJson = JSON.stringify(placementsCheck.placements);
 
     const updateRes = await pool.query(
       `UPDATE public.ad_banners
@@ -4507,8 +4587,9 @@ app.put('/api/admin/ad-banners/:id', requireAdminAuth, ensureDatabaseReady, asyn
            start_at = $6,
            end_at = $7,
            display_order = $8,
+           placements = $9,
            updated_at = NOW()
-       WHERE id = $9
+       WHERE id = $10
        RETURNING *`,
       [
         title,
@@ -4519,6 +4600,7 @@ app.put('/api/admin/ad-banners/:id', requireAdminAuth, ensureDatabaseReady, asyn
         startCheck.date ? startCheck.date.toISOString() : null,
         endCheck.date ? endCheck.date.toISOString() : null,
         displayOrder,
+        placementsJson,
         id
       ]
     );
@@ -4600,13 +4682,15 @@ app.get('/api/ad-banners/active', async (req, res) => {
   res.set('Pragma', 'no-cache');
   res.set('Expires', '0');
   const serverNow = Date.now();
+  const requestedPlacement = String(req.query.placement || '').trim().toLowerCase();
+
   if (!pool || !isDbConnected) {
     return res.json({ success: true, banners: [], version: '0', serverNow, fallback: true });
   }
 
   try {
     const result = await pool.query(`
-      SELECT id, title, image_url, target_url, link_open_mode, is_active, start_at, end_at, display_order, updated_at
+      SELECT id, title, image_url, target_url, link_open_mode, is_active, start_at, end_at, display_order, placements, updated_at
       FROM public.ad_banners
       WHERE is_active = true
         AND (start_at IS NULL OR start_at <= NOW())
@@ -4615,7 +4699,14 @@ app.get('/api/ad-banners/active', async (req, res) => {
     `);
 
     const banners = result.rows
-      .filter((row) => validateBannerTargetUrl(row.target_url).valid)
+      .filter((row) => {
+        if (!validateBannerTargetUrl(row.target_url).valid) return false;
+        if (requestedPlacement) {
+          const placements = parseBannerPlacements(row.placements);
+          if (!placements.includes(requestedPlacement)) return false;
+        }
+        return true;
+      })
       .map(serializePublicBannerRow);
 
     const latestTs = banners.reduce((max, b) => Math.max(max, b.updatedAt || 0), 0);
@@ -4636,7 +4727,11 @@ app.post('/api/ad-banners/:id/impression', async (req, res) => {
 
   const nowMs = Date.now();
   const viewerKey = String(req.body?.userId || req.headers['x-user-id'] || req.ip || 'anon').slice(0, 64);
-  const dedupKey = `${id}:${viewerKey}`;
+  const rawPlacement = String(req.body?.placement || '').trim().toLowerCase();
+  const validPlacements = ['home', 'leaderboard', 'profile', 'squares'];
+  const placement = validPlacements.includes(rawPlacement) ? rawPlacement : null;
+
+  const dedupKey = placement ? `${id}:${placement}:${viewerKey}` : `${id}:${viewerKey}`;
   pruneRecentTrackerMap(recentBannerImpressions, 10000, nowMs);
   const lastSeen = recentBannerImpressions.get(dedupKey);
   if (lastSeen && nowMs - lastSeen < 10000) {
@@ -4646,13 +4741,23 @@ app.post('/api/ad-banners/:id/impression', async (req, res) => {
   try {
     const updateRes = await pool.query(
       `UPDATE public.ad_banners
-       SET impression_count = impression_count + 1
+       SET impression_count = impression_count + 1,
+           placement_stats = CASE
+             WHEN $2::text IS NOT NULL THEN
+               jsonb_set(
+                 COALESCE(placement_stats, '{}'::jsonb),
+                 ARRAY[$2::text, 'impressions'],
+                 to_jsonb(COALESCE((placement_stats->$2::text->>'impressions')::int, 0) + 1),
+                 true
+               )
+             ELSE COALESCE(placement_stats, '{}'::jsonb)
+           END
        WHERE id = $1
          AND is_active = true
          AND (start_at IS NULL OR start_at <= NOW())
          AND (end_at IS NULL OR end_at > NOW())
        RETURNING id`,
-      [id]
+      [id, placement]
     );
     if (updateRes.rows.length === 0) {
       return res.status(404).json({ success: false, recorded: false, message: 'بنر فعال یافت نشد.' });
@@ -4675,7 +4780,11 @@ app.post('/api/ad-banners/:id/click', async (req, res) => {
   const nowMs = Date.now();
   const tapNonce = String(req.body?.tapNonce || '').trim();
   const viewerKey = String(req.body?.userId || req.headers['x-user-id'] || req.ip || 'anon').slice(0, 64);
-  const dedupKey = tapNonce ? `${id}:nonce:${tapNonce}` : `${id}:viewer:${viewerKey}`;
+  const rawPlacement = String(req.body?.placement || '').trim().toLowerCase();
+  const validPlacements = ['home', 'leaderboard', 'profile', 'squares'];
+  const placement = validPlacements.includes(rawPlacement) ? rawPlacement : null;
+
+  const dedupKey = tapNonce ? `${id}:nonce:${tapNonce}` : (placement ? `${id}:${placement}:${viewerKey}` : `${id}:viewer:${viewerKey}`);
   pruneRecentTrackerMap(recentBannerClicks, 2000, nowMs);
   const lastClicked = recentBannerClicks.get(dedupKey);
   if (lastClicked && nowMs - lastClicked < 2000) {
@@ -4685,13 +4794,23 @@ app.post('/api/ad-banners/:id/click', async (req, res) => {
   try {
     const updateRes = await pool.query(
       `UPDATE public.ad_banners
-       SET click_count = click_count + 1
+       SET click_count = click_count + 1,
+           placement_stats = CASE
+             WHEN $2::text IS NOT NULL THEN
+               jsonb_set(
+                 COALESCE(placement_stats, '{}'::jsonb),
+                 ARRAY[$2::text, 'clicks'],
+                 to_jsonb(COALESCE((placement_stats->$2::text->>'clicks')::int, 0) + 1),
+                 true
+               )
+             ELSE COALESCE(placement_stats, '{}'::jsonb)
+           END
        WHERE id = $1
          AND is_active = true
          AND (start_at IS NULL OR start_at <= NOW())
          AND (end_at IS NULL OR end_at > NOW())
        RETURNING id`,
-      [id]
+      [id, placement]
     );
     if (updateRes.rows.length === 0) {
       return res.status(404).json({ success: false, recorded: false, message: 'بنر فعال یافت نشد.' });

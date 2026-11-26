@@ -374,9 +374,13 @@ CREATE TABLE IF NOT EXISTS public.ad_banners (
     display_order INTEGER NOT NULL DEFAULT 0,
     click_count INTEGER NOT NULL DEFAULT 0,
     impression_count INTEGER NOT NULL DEFAULT 0,
+    placements JSONB DEFAULT '["home"]',
+    placement_stats JSONB DEFAULT '{}',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ALTER TABLE public.ad_banners ADD COLUMN IF NOT EXISTS link_open_mode TEXT NOT NULL DEFAULT 'external';
+ALTER TABLE public.ad_banners ADD COLUMN IF NOT EXISTS placements JSONB DEFAULT '["home"]';
+ALTER TABLE public.ad_banners ADD COLUMN IF NOT EXISTS placement_stats JSONB DEFAULT '{}';
 CREATE INDEX IF NOT EXISTS idx_ad_banners_active_order ON public.ad_banners(is_active, display_order ASC, created_at DESC);
 

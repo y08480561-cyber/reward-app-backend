@@ -417,4 +417,72 @@ class PromoAdBannerTest {
         assertTrue(client.connectTimeoutMillis >= 25_000)
         assertTrue(client.readTimeoutMillis >= 35_000)
     }
+
+    @Test
+    fun `placement filtering returns only banners assigned to targeted screen`() {
+        val now = System.currentTimeMillis()
+        val bannerHomeOnly = PromoAdBanner(
+            id = "b_home",
+            title = "تبلیغ خانه",
+            imageUrl = "https://example.com/home.png",
+            targetUrl = "https://example.com/h",
+            placements = listOf("home"),
+            isActive = true
+        )
+        val bannerLeaderboardOnly = PromoAdBanner(
+            id = "b_lead",
+            title = "تبلیغ لیدربورد",
+            imageUrl = "https://example.com/lead.png",
+            targetUrl = "https://example.com/l",
+            placements = listOf("leaderboard"),
+            isActive = true
+        )
+        val bannerProfileAndSquares = PromoAdBanner(
+            id = "b_prof_sq",
+            title = "تبلیغ پروفایل و مربع",
+            imageUrl = "https://example.com/ps.png",
+            targetUrl = "https://example.com/ps",
+            placements = listOf("profile", "squares"),
+            isActive = true
+        )
+        val bannerAll = PromoAdBanner(
+            id = "b_all",
+            title = "تبلیغ همه",
+            imageUrl = "https://example.com/all.png",
+            targetUrl = "https://example.com/all",
+            placements = listOf("home", "leaderboard", "profile", "squares"),
+            isActive = true
+        )
+        val banners = listOf(bannerHomeOnly, bannerLeaderboardOnly, bannerProfileAndSquares, bannerAll)
+
+        val homeFiltered = PromoBannerUrlValidator.filterAndSortActive(banners, now, "home")
+        assertEquals(listOf("b_home", "b_all"), homeFiltered.map { it.id })
+
+        val leadFiltered = PromoBannerUrlValidator.filterAndSortActive(banners, now, "leaderboard")
+        assertEquals(listOf("b_lead", "b_all"), leadFiltered.map { it.id })
+
+        val profFiltered = PromoBannerUrlValidator.filterAndSortActive(banners, now, "profile")
+        assertEquals(listOf("b_prof_sq", "b_all"), profFiltered.map { it.id })
+
+        val sqFiltered = PromoBannerUrlValidator.filterAndSortActive(banners, now, "squares")
+        assertEquals(listOf("b_prof_sq", "b_all"), sqFiltered.map { it.id })
+    }
+
+    @Test
+    fun `legacy banner without explicit placements defaults to home only and does not leak to other screens`() {
+        val now = System.currentTimeMillis()
+        val legacyBanner = PromoAdBanner(
+            id = "b_legacy",
+            title = "تبلیغ قدیمی",
+            imageUrl = "https://example.com/legacy.png",
+            targetUrl = "https://example.com/legacy",
+            isActive = true
+        )
+        assertEquals(listOf("home"), legacyBanner.placements)
+
+        assertTrue(legacyBanner.isCurrentlyDisplayable(now, "home"))
+        assertFalse(legacyBanner.isCurrentlyDisplayable(now, "leaderboard"))
+        assertFalse(legacyBanner.isCurrentlyDisplayable(now, "profile"))
+        assertFalse(legacyBanner.isCurrentlyDisplayable(now, "squares"))
+    }
 }

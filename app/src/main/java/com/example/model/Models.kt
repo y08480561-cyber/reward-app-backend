@@ -350,14 +350,16 @@ data class PromoAdBanner(
     val startAtMs: Long? = null,
     val endAtMs: Long? = null,
     val displayOrder: Int = 0,
-    val updatedAtMs: Long = System.currentTimeMillis()
+    val updatedAtMs: Long = System.currentTimeMillis(),
+    val placements: List<String> = listOf("home")
 ) {
-    fun isCurrentlyDisplayable(nowMs: Long = System.currentTimeMillis()): Boolean {
+    fun isCurrentlyDisplayable(nowMs: Long = System.currentTimeMillis(), placement: String? = null): Boolean {
         if (!isActive) return false
         if (imageUrl.isBlank()) return false
         if (!PromoBannerUrlValidator.isSafeHttpUrl(targetUrl)) return false
         if (startAtMs != null && startAtMs > nowMs) return false
         if (endAtMs != null && endAtMs <= nowMs) return false
+        if (placement != null && placements.isNotEmpty() && !placements.contains(placement)) return false
         return true
     }
 }
@@ -386,10 +388,11 @@ object PromoBannerUrlValidator {
 
     fun filterAndSortActive(
         banners: List<PromoAdBanner>,
-        nowMs: Long = System.currentTimeMillis()
+        nowMs: Long = System.currentTimeMillis(),
+        placement: String? = null
     ): List<PromoAdBanner> {
         return banners
-            .filter { it.isCurrentlyDisplayable(nowMs) }
+            .filter { it.isCurrentlyDisplayable(nowMs, placement) }
             .sortedWith(compareBy<PromoAdBanner> { it.displayOrder }.thenByDescending { it.updatedAtMs })
     }
 }

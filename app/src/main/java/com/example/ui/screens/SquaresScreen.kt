@@ -61,11 +61,14 @@ import androidx.compose.ui.unit.sp
 import com.example.model.AdSquare
 import com.example.model.DailyCycle
 import com.example.model.HomeAnnouncement
+import com.example.model.PromoAdBanner
+import com.example.model.PromoBannerUrlValidator
 import com.example.model.SquareStatus
 import com.example.ui.components.FeedbackTone
 import com.example.ui.components.LuxuryFeedbackBanner
 import com.example.ui.components.LuxuryHairlineDivider
 import com.example.ui.components.LuxuryScreenCanvas
+import com.example.ui.components.PromoAdBannerSection
 import com.example.ui.components.formatRemainingTimePersian
 import com.example.ui.components.toPersianDigits
 import com.example.ui.theme.*
@@ -75,6 +78,10 @@ fun SquaresScreen(
     squares: List<AdSquare>,
     cycle: DailyCycle?,
     announcement: HomeAnnouncement? = null,
+    promoAdBanners: List<PromoAdBanner> = emptyList(),
+    promoAdBannersClockOffsetMs: Long = 0L,
+    onPromoBannerVisible: (String) -> Unit = {},
+    onPromoBannerClick: (PromoAdBanner) -> Unit = {},
     errorMessage: String? = null,
     onDismissError: () -> Unit = {},
     onSquareClick: (Activity, AdSquare) -> Unit
@@ -99,8 +106,28 @@ fun SquaresScreen(
     val remainingCount = (100 - completedCount).coerceAtLeast(0)
     val progressFraction = (completedCount.toFloat() / 100f).coerceIn(0f, 1f)
 
+    val effectiveNowMs = remember(promoAdBanners, promoAdBannersClockOffsetMs) {
+        System.currentTimeMillis() + promoAdBannersClockOffsetMs
+    }
+    val squaresBanners = remember(promoAdBanners, effectiveNowMs) {
+        PromoBannerUrlValidator.filterAndSortActive(promoAdBanners, effectiveNowMs, "squares")
+    }
+
     LuxuryScreenCanvas {
         Column(modifier = Modifier.fillMaxSize()) {
+            if (squaresBanners.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                PromoAdBannerSection(
+                    banners = squaresBanners,
+                    clockOffsetMs = promoAdBannersClockOffsetMs,
+                    onBannerVisible = onPromoBannerVisible,
+                    onBannerClick = onPromoBannerClick,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                )
+            }
+
             // Streamlined Sticky Header
             Surface(
                 modifier = Modifier.fillMaxWidth(),

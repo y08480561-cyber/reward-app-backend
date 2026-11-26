@@ -1342,17 +1342,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun onPromoBannerVisible(bannerId: String) {
+    fun onPromoBannerVisible(bannerId: String, placement: String? = null) {
         if (bannerId.isBlank()) return
-        if (!trackedBannerImpressions.add(bannerId)) return
+        val trackingKey = if (placement.isNullOrBlank()) bannerId else "$bannerId:$placement"
+        if (!trackedBannerImpressions.add(trackingKey)) return
         val userId = _uiState.value.currentUser?.id ?: prefs.userId
         viewModelScope.launch {
-            backendRepository.recordAdBannerImpression(bannerId, userId)
+            backendRepository.recordAdBannerImpression(bannerId, userId, placement)
         }
     }
 
     fun onPromoBannerClick(
         banner: com.example.model.PromoAdBanner,
+        placement: String? = null,
         onOpenUrl: (safeUrl: String, linkOpenMode: String) -> Unit
     ) {
         val nowMs = System.currentTimeMillis()
@@ -1362,7 +1364,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val safeUrl = com.example.model.PromoBannerUrlValidator.normalizeSafeHttpUrl(banner.targetUrl)
             ?: return
         val effectiveNowMs = nowMs + _uiState.value.promoAdBannersClockOffsetMs
-        if (!banner.isCurrentlyDisplayable(effectiveNowMs)) return
+        if (!banner.isCurrentlyDisplayable(effectiveNowMs, placement)) return
 
         lastPromoBannerClickedId = banner.id
         lastPromoBannerClickTimeMs = nowMs
@@ -1370,7 +1372,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val userId = _uiState.value.currentUser?.id ?: prefs.userId
         val tapNonce = java.util.UUID.randomUUID().toString()
         viewModelScope.launch {
-            backendRepository.recordAdBannerClick(banner.id, userId, tapNonce)
+            backendRepository.recordAdBannerClick(banner.id, userId, tapNonce, placement)
         }
         onOpenUrl(safeUrl, banner.linkOpenMode)
     }

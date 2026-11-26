@@ -58,11 +58,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.model.CompetitionInfo
+import com.example.model.PromoAdBanner
+import com.example.model.PromoBannerUrlValidator
 import com.example.model.User
 import com.example.ui.components.LuxuryCard
 import com.example.ui.components.LuxuryHairlineDivider
 import com.example.ui.components.LuxuryHighlightCard
 import com.example.ui.components.LuxuryScreenCanvas
+import com.example.ui.components.PromoAdBannerSection
 import com.example.ui.components.LuxurySecondaryButton
 import com.example.ui.components.LuxuryTierBadge
 import com.example.ui.components.LuxuryTopBar
@@ -75,6 +78,10 @@ import com.example.ui.theme.*
 fun ProfileScreen(
     user: User,
     activeCompetition: CompetitionInfo? = null,
+    promoAdBanners: List<PromoAdBanner> = emptyList(),
+    promoAdBannersClockOffsetMs: Long = 0L,
+    onPromoBannerVisible: (String) -> Unit = {},
+    onPromoBannerClick: (PromoAdBanner) -> Unit = {},
     onLogout: () -> Unit,
     onNavigateToStore: () -> Unit,
     onNavigateToSupport: () -> Unit = {},
@@ -90,6 +97,13 @@ fun ProfileScreen(
 
     BackHandler(enabled = onBack != null) {
         onBack?.invoke()
+    }
+
+    val effectiveNowMs = remember(promoAdBanners, promoAdBannersClockOffsetMs) {
+        System.currentTimeMillis() + promoAdBannersClockOffsetMs
+    }
+    val profileBanners = remember(promoAdBanners, effectiveNowMs) {
+        PromoBannerUrlValidator.filterAndSortActive(promoAdBanners, effectiveNowMs, "profile")
     }
 
     LuxuryScreenCanvas {
@@ -109,6 +123,16 @@ fun ProfileScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                if (profileBanners.isNotEmpty()) {
+                    PromoAdBannerSection(
+                        banners = profileBanners,
+                        clockOffsetMs = promoAdBannersClockOffsetMs,
+                        onBannerVisible = onPromoBannerVisible,
+                        onBannerClick = onPromoBannerClick,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
                 // 1. Clean Identity & Key Stats Card
                 LuxuryHighlightCard(contentPadding = PaddingValues(22.dp)) {
                     Column(

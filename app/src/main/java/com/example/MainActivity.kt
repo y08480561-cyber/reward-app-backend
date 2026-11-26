@@ -164,10 +164,10 @@ class MainActivity : ComponentActivity() {
                                                 userRank = currentUserRank,
                                                 completedSquaresToday = completedToday,
                                                 onPromoBannerVisible = { bannerId ->
-                                                    viewModel.onPromoBannerVisible(bannerId)
+                                                    viewModel.onPromoBannerVisible(bannerId, "home")
                                                 },
                                                 onPromoBannerClick = { banner ->
-                                                    viewModel.onPromoBannerClick(banner) { safeUrl, linkMode ->
+                                                    viewModel.onPromoBannerClick(banner, "home") { safeUrl, linkMode ->
                                                         if (linkMode == "internal") {
                                                             inAppBrowserUrl = safeUrl
                                                         } else {
@@ -184,6 +184,20 @@ class MainActivity : ComponentActivity() {
                                             squares = uiState.squares,
                                             cycle = uiState.dailyCycle,
                                             announcement = uiState.activeAnnouncement,
+                                            promoAdBanners = uiState.promoAdBanners,
+                                            promoAdBannersClockOffsetMs = uiState.promoAdBannersClockOffsetMs,
+                                            onPromoBannerVisible = { bannerId ->
+                                                viewModel.onPromoBannerVisible(bannerId, "squares")
+                                            },
+                                            onPromoBannerClick = { banner ->
+                                                viewModel.onPromoBannerClick(banner, "squares") { safeUrl, linkMode ->
+                                                    if (linkMode == "internal") {
+                                                        inAppBrowserUrl = safeUrl
+                                                    } else {
+                                                        openExternalSafeUrl(safeUrl)
+                                                    }
+                                                }
+                                            },
                                             errorMessage = uiState.errorMessage,
                                             onDismissError = { viewModel.clearMessages() },
                                             onSquareClick = { act, square -> viewModel.onSquareClicked(act, square) }
@@ -192,6 +206,20 @@ class MainActivity : ComponentActivity() {
                                     AppScreen.LEADERBOARD -> {
                                         LeaderboardScreen(
                                             uiState = uiState,
+                                            promoAdBanners = uiState.promoAdBanners,
+                                            promoAdBannersClockOffsetMs = uiState.promoAdBannersClockOffsetMs,
+                                            onPromoBannerVisible = { bannerId ->
+                                                viewModel.onPromoBannerVisible(bannerId, "leaderboard")
+                                            },
+                                            onPromoBannerClick = { banner ->
+                                                viewModel.onPromoBannerClick(banner, "leaderboard") { safeUrl, linkMode ->
+                                                    if (linkMode == "internal") {
+                                                        inAppBrowserUrl = safeUrl
+                                                    } else {
+                                                        openExternalSafeUrl(safeUrl)
+                                                    }
+                                                }
+                                            },
                                             onRefresh = { viewModel.loadLeaderboard() },
                                             onBack = { viewModel.navigateTo(AppScreen.HOME) }
                                         )
@@ -208,6 +236,20 @@ class MainActivity : ComponentActivity() {
                                             ProfileScreen(
                                                 user = user,
                                                 activeCompetition = uiState.activeCompetition,
+                                                promoAdBanners = uiState.promoAdBanners,
+                                                promoAdBannersClockOffsetMs = uiState.promoAdBannersClockOffsetMs,
+                                                onPromoBannerVisible = { bannerId ->
+                                                    viewModel.onPromoBannerVisible(bannerId, "profile")
+                                                },
+                                                onPromoBannerClick = { banner ->
+                                                    viewModel.onPromoBannerClick(banner, "profile") { safeUrl, linkMode ->
+                                                        if (linkMode == "internal") {
+                                                            inAppBrowserUrl = safeUrl
+                                                        } else {
+                                                            openExternalSafeUrl(safeUrl)
+                                                        }
+                                                    }
+                                                },
                                                 onLogout = { viewModel.logout() },
                                                 onNavigateToStore = { viewModel.navigateTo(AppScreen.STORE) },
                                                 onNavigateToSupport = { viewModel.navigateTo(AppScreen.SUPPORT) },

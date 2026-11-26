@@ -36,7 +36,7 @@ class InMemoryAdBannersPool {
     }
 
     // SELECT all for admin
-    if (q.startsWith('SELECT id, title, image_url, target_url, link_open_mode, is_active, start_at, end_at, display_order, click_count, impression_count')) {
+    if (q.includes('SELECT id, title, image_url, target_url, link_open_mode, is_active, start_at, end_at, display_order, click_count, impression_count, placements')) {
       const rows = Array.from(this.banners.values()).sort((a, b) => {
         if (a.display_order !== b.display_order) return a.display_order - b.display_order;
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
@@ -45,7 +45,7 @@ class InMemoryAdBannersPool {
     }
 
     // SELECT active for public app
-    if (q.startsWith('SELECT id, title, image_url, target_url, link_open_mode, is_active, start_at, end_at, display_order, updated_at FROM public.ad_banners')) {
+    if (q.includes('SELECT id, title, image_url, target_url, link_open_mode, is_active, start_at, end_at, display_order, placements, updated_at FROM public.ad_banners')) {
       const now = Date.now();
       const rows = Array.from(this.banners.values())
         .filter((b) => {
@@ -88,6 +88,7 @@ class InMemoryAdBannersPool {
         display_order: Number(params[8]),
         click_count: 0,
         impression_count: 0,
+        placements: params[9] || '["home"]',
         created_at: nowIso,
         updated_at: nowIso
       };
@@ -97,7 +98,7 @@ class InMemoryAdBannersPool {
 
     // UPDATE full
     if (q.startsWith('UPDATE public.ad_banners SET title = $1')) {
-      const id = params[8];
+      const id = params[9];
       const row = this.banners.get(id);
       if (!row) return { rows: [], rowCount: 0 };
       Object.assign(row, {
@@ -109,6 +110,7 @@ class InMemoryAdBannersPool {
         start_at: params[5],
         end_at: params[6],
         display_order: Number(params[7]),
+        placements: params[8],
         updated_at: new Date().toISOString()
       });
       return { rows: [{ ...row }], rowCount: 1 };
@@ -145,6 +147,12 @@ class InMemoryAdBannersPool {
         return { rows: [], rowCount: 0 };
       }
       row.impression_count += 1;
+      const placement = params[1];
+      if (placement) {
+        if (!row.placement_stats) row.placement_stats = {};
+        if (!row.placement_stats[placement]) row.placement_stats[placement] = { impressions: 0, clicks: 0 };
+        row.placement_stats[placement].impressions = (row.placement_stats[placement].impressions || 0) + 1;
+      }
       return { rows: [{ id: row.id }], rowCount: 1 };
     }
 
@@ -161,6 +169,12 @@ class InMemoryAdBannersPool {
         return { rows: [], rowCount: 0 };
       }
       row.click_count += 1;
+      const placement = params[1];
+      if (placement) {
+        if (!row.placement_stats) row.placement_stats = {};
+        if (!row.placement_stats[placement]) row.placement_stats[placement] = { impressions: 0, clicks: 0 };
+        row.placement_stats[placement].clicks = (row.placement_stats[placement].clicks || 0) + 1;
+      }
       return { rows: [{ id: row.id }], rowCount: 1 };
     }
 
@@ -468,8 +482,115 @@ async function runTests() {
     assert.strictEqual(loginNotifRes.status, 200);
     console.log('  ✓ Test 11 Passed: Existing server routes remain intact.');
 
+    // 12. Placement targeting tests (leaderboard, profile, squares, multi, all, and edit)
+    const bLeaderboard = await createBanner({
+      title: 'تبلیغ لیدربورد',
+      image_url: 'https://cdn.example.com/b-lead.jpg',
+      target_url: 'https://example.com/lead',
+      placements: ['leaderboard'],
+      is_active: true
+    });
+    const bProfile = await createBanner({
+      title: 'تبلیغ پروفایل',
+      image_url: 'https://cdn.example.com/b-prof.jpg',
+      target_url: 'https://example.com/prof',
+      placements: ['profile'],
+      is_active: true
+    });
+    const bSquares = await createBanner({
+      title: 'تبلیغ ۱۰۰ مربع',
+      image_url: 'https://cdn.example.com/b-sq.jpg',
+      target_url: 'https://example.com/sq',
+      placements: ['squares'],
+      is_active: true
+    });
+    const bMulti = await createBanner({
+      title: 'تبلیغ رتبه و پروفایل',
+      image_url: 'https://cdn.example.com/b-multi.jpg',
+      target_url: 'https://example.com/multi',
+      placements: ['leaderboard', 'profile'],
+      is_active: true
+    });
+    const bAll = await createBanner({
+      title: 'تبلیغ تمام بخش‌ها',
+      image_url: 'https://cdn.example.com/b-all.jpg',
+      target_url: 'https://example.com/all',
+      placements: ['home', 'leaderboard', 'profile', 'squares'],
+      is_active: true
+    });
+
+    // Public placement queries
+    const leadActive = await (await fetch(`${baseUrl}/api/ad-banners/active?placement=leaderboard`)).json();
+    assert.deepStrictEqual(leadActive.banners.map(b => b.id).sort(), [bLeaderboard.id, bMulti.id, bAll.id].sort());
+
+    const profActive = await (await fetch(`${baseUrl}/api/ad-banners/active?placement=profile`)).json();
+    assert.deepStrictEqual(profActive.banners.map(b => b.id).sort(), [bProfile.id, bMulti.id, bAll.id].sort());
+
+    const sqActive = await (await fetch(`${baseUrl}/api/ad-banners/active?placement=squares`)).json();
+    assert.deepStrictEqual(sqActive.banners.map(b => b.id).sort(), [bSquares.id, bAll.id].sort());
+
+    const homeActive = await (await fetch(`${baseUrl}/api/ad-banners/active?placement=home`)).json();
+    assert.deepStrictEqual(homeActive.banners.map(b => b.id), [bAll.id]);
+
+    // Admin placement filtering
+    const adminLead = await (await fetch(`${baseUrl}/api/admin/ad-banners?placement=leaderboard`, {
+      headers: { 'x-admin-key': TEST_ADMIN_KEY }
+    })).json();
+    assert.strictEqual(adminLead.banners.length, 3);
+
+    // Edit placement (move bLeaderboard from leaderboard to home)
+    const updatePlacementsRes = await fetch(`${baseUrl}/api/admin/ad-banners/${bLeaderboard.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'x-admin-key': TEST_ADMIN_KEY },
+      body: JSON.stringify({
+        placements: ['home']
+      })
+    });
+    assert.strictEqual(updatePlacementsRes.status, 200);
+    const updatedBannerJson = await updatePlacementsRes.json();
+    assert.deepStrictEqual(updatedBannerJson.banner.placements, ['home']);
+
+    const leadAfterEdit = await (await fetch(`${baseUrl}/api/ad-banners/active?placement=leaderboard`)).json();
+    assert.deepStrictEqual(leadAfterEdit.banners.map(b => b.id).sort(), [bMulti.id, bAll.id].sort());
+
+    const homeAfterEdit = await (await fetch(`${baseUrl}/api/ad-banners/active?placement=home`)).json();
+    assert.deepStrictEqual(homeAfterEdit.banners.map(b => b.id).sort(), [bLeaderboard.id, bAll.id].sort());
+
+    // Test impression & click tracking with placement
+    const impPlacementRes = await fetch(`${baseUrl}/api/ad-banners/${bAll.id}/impression`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: 'user_placement_test', placement: 'leaderboard' })
+    });
+    assert.strictEqual(impPlacementRes.status, 200);
+
+    const clickPlacementRes = await fetch(`${baseUrl}/api/ad-banners/${bAll.id}/click`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: 'user_placement_test', placement: 'leaderboard', tapNonce: 'nonce_placement_1' })
+    });
+    assert.strictEqual(clickPlacementRes.status, 200);
+
+    const adminCheckStats = await (await fetch(`${baseUrl}/api/admin/ad-banners`, {
+      headers: { 'x-admin-key': TEST_ADMIN_KEY }
+    })).json();
+    const fetchedBAll = adminCheckStats.banners.find(b => b.id === bAll.id);
+    assert.ok(fetchedBAll);
+    assert.strictEqual(fetchedBAll.placement_stats?.leaderboard?.impressions, 1);
+    assert.strictEqual(fetchedBAll.placement_stats?.leaderboard?.clicks, 1);
+
+    // Clean up test banners
+    for (const b of [bLeaderboard, bProfile, bSquares, bMulti, bAll]) {
+      await fetch(`${baseUrl}/api/admin/ad-banners/${b.id}`, {
+        method: 'DELETE',
+        headers: { 'x-admin-key': TEST_ADMIN_KEY }
+      });
+    }
+
+    console.log('  ✓ Test 12 Passed: All 5 banner placement scenarios (single, multi, all, editing, filtering, placement analytics) validated.');
+
     console.log('====================================================');
-    console.log('[AdBanners Tests] ALL 11 BACKEND INTEGRATION TESTS PASSED!');
+    console.log('[AdBanners Tests] ALL 12 BACKEND INTEGRATION TESTS PASSED!');
     console.log('====================================================');
   } finally {
     for (const f of uploadedLocalFilesToClean) {
