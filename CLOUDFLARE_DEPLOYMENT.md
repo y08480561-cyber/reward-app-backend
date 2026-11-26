@@ -1,33 +1,24 @@
-# CLOUDFLARE DEPLOYMENT GUIDE
+# CLOUDFLARE D1 DEPLOYMENT GUIDE
 
-راهنمای گام‌به‌گام استقرار بک‌اند روی Cloudflare Workers:
+راهنمای استقرار روی Cloudflare Workers با Cloudflare D1:
 
-## پیش‌نیازها
-1. نصب Node.js نسخه ۲۲+
-2. نصب ابزار Wrangler: `npm install -g wrangler`
-
-## گام ۱: احراز هویت در کلاودفلر
+## گام ۱: ساخت دیتابیس D1 در Cloudflare
 ```bash
-npx wrangler login
+npx wrangler d1 create reward-app-db
+```
+(شناسه پایگاه داده دریافتی را در `wrangler.jsonc` در بخش `database_id` قرار دهید).
+
+## گام ۲: اجرای اسکریپت ساخت جدول‌ها روی D1
+```bash
+npx wrangler d1 execute reward-app-db --remote --file=./server/migration.sql
 ```
 
-## گام ۲: تنظیم متغیرهای محیطی و Secretها
-برای تنظیم متغیرهای محرمانه (مانند `ADMIN_KEY` و `DATABASE_URL`) در کلاودفلر:
+## گام ۳: تنظیم Secretها
 ```bash
 npx wrangler secret put ADMIN_KEY
-npx wrangler secret put DATABASE_URL
 ```
 
-## گام ۳: تست محلی (Local Development)
-یک فایل `.dev.vars` بر اساس `.dev.vars.example` بسازید و دستور زیر را اجرا کنید:
-```bash
-npx wrangler dev --compatibility-date 2024-09-23 --compatibility-flag nodejs_compat
-```
-
-## گام ۴: انتشار روی Cloudflare Workers
+## گام ۴: استقرار نهایی (Deploy)
 ```bash
 npx wrangler deploy --compatibility-date 2024-09-23 --compatibility-flag nodejs_compat
 ```
-
-## گام ۵: اتصال دامنه اختصاصی (`https://api.kalametgame.ir`)
-پس از تست موفق Worker، از طریق داشبورد کلاودفلر بخش **Workers & Pages -> Custom Domains** دامنه `api.kalametgame.ir` را به Worker متصل کنید.

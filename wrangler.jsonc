@@ -6,10 +6,11 @@
   "compatibility_flags": [
     "nodejs_compat"
   ],
-  "hyperdrive": [
+  "d1_databases": [
     {
-      "binding": "DATABASE",
-      "id": "YOUR_HYPERDRIVE_ID_HERE"
+      "binding": "DB",
+      "database_name": "reward-app-db",
+      "database_id": "YOUR_D1_DATABASE_ID_TO_BE_LINKED_FROM_CF_DASHBOARD"
     }
   ],
   "vars": {
