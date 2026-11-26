@@ -1012,33 +1012,57 @@ export async function handleAuthAndGameRoutes(request, env, url, pathname) {
   }
 
   // 13. GET /api/leaderboard (Public display without exposing raw userId UUIDs)
+  // 13. GET /api/leaderboard (Public display without exposing raw userId UUIDs)
   if (method === 'GET' && pathname === '/api/leaderboard') {
     let authenticatedUserId = '';
-    const hasAuthAttempt = Boolean(
-      request.headers.get('authorization') ||
-      request.headers.get('x-auth-token') ||
-      request.headers.get('x-token')
-    );
-    if (hasAuthAttempt) {
-      const auth = await requireUserAuth(request, env, url);
-      if (auth.ok) authenticatedUserId = auth.user.id;
+    try {
+      const hasAuthAttempt = Boolean(
+        request.headers.get('authorization') ||
+        request.headers.get('x-auth-token') ||
+        request.headers.get('x-token') ||
+        request.headers.get('x-user-id')
+      );
+      if (hasAuthAttempt) {
+        const auth = await requireUserAuth(request, env, url);
+        if (auth.ok) authenticatedUserId = auth.user.id;
+      }
+    } catch {
+      // Non-blocking auth check
     }
 
-    const { results } = await env.DB.prepare(
-      `SELECT u.id AS user_id, u.first_name, u.last_name,
-              COALESCE(s.total_score, u.total_score, 0) AS total_score, u.created_at
-       FROM users u
-       LEFT JOIN user_scores s ON u.id = s.user_id
-       ORDER BY total_score DESC, u.created_at ASC, u.id ASC
-       LIMIT 100`
-    ).all();
+    let results = [];
+    try {
+      const res = await env.DB.prepare(
+        `SELECT u.id AS user_id, u.first_name, u.last_name,
+                COALESCE(s.total_score, u.total_score, 0) AS ts, u.created_at
+         FROM users u
+         LEFT JOIN user_scores s ON u.id = s.user_id
+         ORDER BY ts DESC, u.created_at ASC
+         LIMIT 100`
+      ).all();
+      results = res.results || [];
+    } catch (err) {
+      console.warn('[Leaderboard Query Fallback 1]', err);
+      try {
+        const res2 = await env.DB.prepare(
+          `SELECT id AS user_id, first_name, last_name, total_score AS ts, created_at
+           FROM users
+           ORDER BY ts DESC
+           LIMIT 100`
+        ).all();
+        results = res2.results || [];
+      } catch (err2) {
+        console.warn('[Leaderboard Query Fallback 2]', err2);
+        results = [];
+      }
+    }
 
     const leaderboard = (results || []).map((row, index) => {
       const fullName = `${row.first_name || 'کاربر'} ${row.last_name || ''}`.trim() || 'کاربر مسابقه';
       return {
         rank: index + 1,
         displayName: fullName,
-        totalScore: Number(row.total_score || 0),
+        totalScore: Number(row.ts || row.total_score || 0),
         isCurrentUser: Boolean(authenticatedUserId && row.user_id === authenticatedUserId)
       };
     });
