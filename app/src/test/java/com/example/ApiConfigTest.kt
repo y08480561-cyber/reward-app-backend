@@ -31,11 +31,11 @@ class ApiConfigTest {
     }
 
     @Test
-    fun `default serverUrl uses Cloudflare test API while preserving production BASE_URL`() {
+    fun `default serverUrl uses production Cloudflare domain api kalametgame ir`() {
         assertEquals("https://api.kalametgame.ir", ApiConfig.BASE_URL)
-        assertEquals("https://api-test.kalametgame.ir", ApiConfig.CLOUDFLARE_TEST_BASE_URL)
-        assertEquals("https://api-test.kalametgame.ir", ApiConfig.ACTIVE_BASE_URL)
-        assertEquals("https://api-test.kalametgame.ir", prefs.serverUrl)
+        assertEquals("https://api.kalametgame.ir", ApiConfig.CLOUDFLARE_TEST_BASE_URL)
+        assertEquals("https://api.kalametgame.ir", ApiConfig.ACTIVE_BASE_URL)
+        assertEquals("https://api.kalametgame.ir", prefs.serverUrl)
     }
 
     @Test
@@ -64,7 +64,7 @@ class ApiConfigTest {
     @Test
     fun `asset url resolution resolves relative paths against active base and explicit BASE_URL`() {
         assertEquals(
-            "https://api-test.kalametgame.ir/uploads/gift.jpg",
+            "https://api.kalametgame.ir/uploads/gift.jpg",
             ApiConfig.resolveBackendAssetUrl("/uploads/gift.jpg")
         )
         assertEquals(
@@ -72,11 +72,11 @@ class ApiConfigTest {
             ApiConfig.resolveBackendAssetUrl("/uploads/gift.jpg", ApiConfig.BASE_URL)
         )
         assertEquals(
-            "https://api-test.kalametgame.ir/uploads/gift.jpg",
+            "https://api.kalametgame.ir/uploads/gift.jpg",
             ApiConfig.resolveBackendAssetUrl("uploads/gift.jpg")
         )
         assertEquals(
-            "https://api-test.kalametgame.ir/uploads/gift.jpg?v=2",
+            "https://api.kalametgame.ir/uploads/gift.jpg?v=2",
             ApiConfig.resolveBackendAssetUrl("https://reward-app-backend-1.onrender.com/uploads/gift.jpg?v=2")
         )
         assertEquals(

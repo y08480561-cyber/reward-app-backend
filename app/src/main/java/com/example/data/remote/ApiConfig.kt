@@ -24,9 +24,9 @@ object ApiConfig {
         get() = "$ACTIVE_BASE_URL/api"
 
     fun activeHost(): String = try {
-        URI(ACTIVE_BASE_URL).host ?: "api-test.kalametgame.ir"
+        URI(ACTIVE_BASE_URL).host ?: "api.kalametgame.ir"
     } catch (_: Exception) {
-        "api-test.kalametgame.ir"
+        "api.kalametgame.ir"
     }
 
     private val LEGACY_HOST_MARKERS = listOf(

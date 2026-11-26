@@ -127,7 +127,7 @@ async function runTests() {
       headers.set('Content-Type', 'application/json');
       body = JSON.stringify(body);
     }
-    const request = new Request(`https://api-test.kalametgame.ir${pathAndQuery}`, {
+    const request = new Request(`https://api.kalametgame.ir${pathAndQuery}`, {
       method: options.method || 'GET',
       headers,
       body
