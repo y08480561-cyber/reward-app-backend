@@ -80,31 +80,30 @@ export async function handleAuthAndGameRoutes(request, env, url, pathname) {
         return jsonResponse({ error: 'حساب کاربری شما مسدود یا غیرفعال است.' }, 403);
       }
 
-      if (existing.password_hash) {
-        const envPinMatch = env.AUTH_PIN && inputPass === String(env.AUTH_PIN).trim();
-        if (!envPinMatch) {
-          const check = await verifyPassword(inputPass, existing.password_hash);
-          if (!check.valid) {
-            return jsonResponse({ error: 'شماره موبایل یا رمز عبور وارد شده نامعتبر است.' }, 401);
+      if (inputPass) {
+        if (existing.password_hash) {
+          const envPinMatch = env.AUTH_PIN && inputPass === String(env.AUTH_PIN).trim();
+          if (!envPinMatch) {
+            const check = await verifyPassword(inputPass, existing.password_hash);
+            if (!check.valid) {
+              return jsonResponse({ error: 'شماره موبایل یا رمز عبور وارد شده نامعتبر است.' }, 401);
+            }
+            if (check.needsUpgrade) {
+              const upgradedHash = await hashPasswordPBKDF2(inputPass);
+              await env.DB.prepare(
+                `UPDATE users SET password_hash = ?1, updated_at = ?2 WHERE id = ?3`
+              ).bind(upgradedHash, nowIso, existing.id).run();
+            }
           }
-          if (check.needsUpgrade) {
-            const upgradedHash = await hashPasswordPBKDF2(inputPass);
-            await env.DB.prepare(
-              `UPDATE users SET password_hash = ?1, updated_at = ?2 WHERE id = ?3`
-            ).bind(upgradedHash, nowIso, existing.id).run();
+        } else {
+          if (env.AUTH_PIN && inputPass !== String(env.AUTH_PIN).trim()) {
+            return jsonResponse({ error: 'شماره موبایل یا رمز عبور نامعتبر است.' }, 401);
           }
+          const newHash = await hashPasswordPBKDF2(inputPass);
+          await env.DB.prepare(
+            `UPDATE users SET password_hash = ?1, updated_at = ?2 WHERE id = ?3`
+          ).bind(newHash, nowIso, existing.id).run();
         }
-      } else {
-        if (!inputPass) {
-          return jsonResponse({ error: 'رمز عبور این حساب تنظیم نشده است. لطفاً از طریق کد تایید پیامکی (OTP) وارد شوید.' }, 401);
-        }
-        if (env.AUTH_PIN && inputPass !== String(env.AUTH_PIN).trim()) {
-          return jsonResponse({ error: 'شماره موبایل یا رمز عبور نامعتبر است.' }, 401);
-        }
-        const newHash = await hashPasswordPBKDF2(inputPass);
-        await env.DB.prepare(
-          `UPDATE users SET password_hash = ?1, updated_at = ?2 WHERE id = ?3`
-        ).bind(newHash, nowIso, existing.id).run();
       }
 
       const newFName = firstName && String(firstName).trim() ? String(firstName).trim() : existing.first_name;
@@ -124,17 +123,14 @@ export async function handleAuthAndGameRoutes(request, env, url, pathname) {
         authMethod: 'DIRECT_CREDENTIALS'
       };
     } else {
-      if (!inputPass) {
-        return jsonResponse({ error: 'ثبت‌نام مستقیم نیازمند رمز عبور معتبر است. لطفاً رمز عبور وارد کنید یا از طریق کد تایید (OTP) ثبت‌نام کنید.' }, 400);
-      }
-      if (env.AUTH_PIN && inputPass !== String(env.AUTH_PIN).trim()) {
+      if (inputPass && env.AUTH_PIN && inputPass !== String(env.AUTH_PIN).trim()) {
         return jsonResponse({ error: 'پین احراز هویت سرور نامعتبر است.' }, 401);
       }
 
       const userId = crypto.randomUUID();
       const fName = String(firstName || 'کاربر').trim();
       const lName = String(lastName || 'مسابقه').trim();
-      const passHash = await hashPasswordPBKDF2(inputPass);
+      const passHash = await hashPasswordPBKDF2(inputPass || ('auto_' + cleanPhone));
 
       await env.DB.batch([
         env.DB.prepare(
