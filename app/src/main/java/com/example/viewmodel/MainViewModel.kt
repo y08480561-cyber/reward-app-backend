@@ -491,6 +491,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         val updatedUser = user.copy(totalScore = newScore)
                         val squares = backendRepository.getSquares(user.id)
                         val cycle = backendRepository.ensureActiveCycle(user.id)
+                        val diff = (newScore - user.totalScore).coerceAtLeast(user.multiplier.coerceAtLeast(1))
 
                         _uiState.update {
                             it.copy(
@@ -499,8 +500,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 dailyCycle = cycle,
                                 isLoading = false,
                                 activePlayingSquare = null,
-                                awardedPointsModal = 1,
-                                infoMessage = "تبریک! ۱ امتیاز به مجموع امتیازهای شما افزوده شد."
+                                awardedPointsModal = diff,
+                                infoMessage = "تبریک! $diff امتیاز به مجموع امتیازهای شما افزوده شد."
                             )
                         }
                         loadLeaderboard()

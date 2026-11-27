@@ -79,24 +79,52 @@ app.get(['/admin/users', '/admin/users/'], (req, res) => {
       return res.sendFile(filePath);
     }
   } catch (_err) {}
-  return res.status(404).json({
-    success: false,
-    error: 'صفحه پنل کاربری استاتیک در این محیط در دسترس نیست.'
-  });
+  try {
+    const { getUsersHtml } = require('./cloudflare/embedded-admin.js');
+    return res.type('html').send(getUsersHtml());
+  } catch (_e) {
+    return res.status(404).json({
+      success: false,
+      error: 'صفحه پنل کاربری استاتیک در این محیط در دسترس نیست.'
+    });
+  }
 });
 
 // Admin Dashboard Alias
-app.get(['/admin', '/admin/dashboard'], (req, res) => {
+app.get(['/admin', '/admin/dashboard', '/admin/'], (req, res) => {
   const filePath = path.join(__dirname, 'public', 'index.html');
   try {
     if (fs.existsSync(filePath)) {
       return res.sendFile(filePath);
     }
   } catch (_err) {}
-  return res.status(404).json({
-    success: false,
-    error: 'داشبورد استاتیک در این محیط در دسترس نیست.'
-  });
+  try {
+    const { getIndexHtml } = require('./cloudflare/embedded-admin.js');
+    return res.type('html').send(getIndexHtml());
+  } catch (_e) {
+    return res.status(404).json({
+      success: false,
+      error: 'داشبورد استاتیک در این محیط در دسترس نیست.'
+    });
+  }
+});
+
+// Embedded Static Assets Fallback for Cloudflare Workers
+app.get(['/assets/banner_gift_20gb.jpg', '/public/assets/banner_gift_20gb.jpg'], (req, res) => {
+  const filePath = path.join(__dirname, 'public', 'assets', 'banner_gift_20gb.jpg');
+  try {
+    if (fs.existsSync(filePath)) {
+      return res.sendFile(filePath);
+    }
+  } catch (_e) {}
+  try {
+    const { getGiftBannerBuffer } = require('./cloudflare/embedded-admin.js');
+    res.setHeader('Content-Type', 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.send(getGiftBannerBuffer());
+  } catch (_err) {
+    return res.status(404).end();
+  }
 });
 
 // ====================================================================
@@ -1064,13 +1092,22 @@ async function migrateFromLocalJsonIfExists() {
 
 // Strict Database Readiness Middleware:
 // If database connection is down, NEVER claim success or secretly write to a local file.
-function ensureDatabaseReady(req, res, next) {
+async function ensureDatabaseReady(req, res, next) {
+  if (pool && pool.isD1 && !pool._d1SchemaReady) {
+    try {
+      const { ensureD1SchemaInitialized } = require('./cloudflare/d1-schema-init.js');
+      await ensureD1SchemaInitialized(pool);
+    } catch (d1Err) {
+      console.error('[D1 Auto-Schema Error]', d1Err);
+    }
+  }
+
   if (!pool || !isDbConnected) {
     return res.status(503).json({
       success: false,
-      error: "اتصال به پایگاه داده ابری Supabase برقرار نیست. لطفاً متغیر محیطی DATABASE_URL را در پنل هاست cPanel تنظیم نمایید.",
+      error: "اتصال به پایگاه داده ابری برقرار نیست.",
       dbStatus: "DISCONNECTED",
-      tip: "در هاست اشتراکی، حتماً از رشته اتصال Connection Pooler در Supabase (پورت 6543 با دامنه pooler.supabase.com) استفاده کنید تا با محدودیت IPv6 مواجه نشوید."
+      tip: "در محیط کلادفلر، از درستی بایندینگ DB برای دیتابیس reward-app-db اطمینان حاصل کنید."
     });
   }
   next();
@@ -1086,6 +1123,12 @@ app.get(['/health', '/api/health'], async (req, res) => {
   let dbError = null;
 
   if (pool) {
+    if (pool.isD1 && !pool._d1SchemaReady) {
+      try {
+        const { ensureD1SchemaInitialized } = require('./cloudflare/d1-schema-init.js');
+        await ensureD1SchemaInitialized(pool);
+      } catch (_e) {}
+    }
     try {
       await pool.query('SELECT 1 AS ok');
       dbStatus = 'connected';
@@ -1136,6 +1179,13 @@ app.get(['/health/d1', '/api/health/d1'], async (req, res) => {
       error: 'Database pool / D1 binding (env.DB) is not initialized.',
       timestamp: Date.now()
     });
+  }
+
+  if (pool.isD1 && !pool._d1SchemaReady) {
+    try {
+      const { ensureD1SchemaInitialized } = require('./cloudflare/d1-schema-init.js');
+      await ensureD1SchemaInitialized(pool);
+    } catch (_e) {}
   }
 
   const startedAt = Date.now();

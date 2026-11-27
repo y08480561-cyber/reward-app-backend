@@ -82,6 +82,12 @@ export default {
         if (typeof app.setTestPool === 'function') {
           app.setTestPool(cachedD1Pool);
         }
+        try {
+          const { ensureD1SchemaInitialized } = require('./server/cloudflare/d1-schema-init.js');
+          await ensureD1SchemaInitialized(cachedD1Pool);
+        } catch (schemaErr) {
+          console.error('[Worker D1 Schema Init Error]', schemaErr);
+        }
       }
 
       return await activeHandler.fetch(request, env, ctx);
